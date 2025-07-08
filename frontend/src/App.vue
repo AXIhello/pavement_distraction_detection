@@ -1,8 +1,9 @@
-<!-- src/App.vue -->
+<script setup>
+import { RouterLink, RouterView } from 'vue-router'
+</script>
+
 <template>
-  <div id="app">
-    <router-view /> <!-- 显示当前路由页面内容 -->
-  </div>
+  <RouterView />
 </template>
 
 <script>

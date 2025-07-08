@@ -1,8 +1,6 @@
 <template>
   <div id="app">
-    <header>
-      <h1>交通检测系统</h1>
-    </header>
+    <Header />
 
     <main>
       <!-- 地图区域 -->
@@ -19,17 +17,7 @@
 
       <!-- 登录表单 -->
       <div class="login-container">
-        <h2>登录 | 注册</h2>
-
-        <!-- 登录方式切换按钮 -->
-        <div class="login-method-switch">
-          <button 
-            :class="{ active: loginMethod === 'password' }" 
-            @click="loginMethod = 'password'">账号密码登录</button>
-          <button 
-            :class="{ active: loginMethod === 'sms' }" 
-            @click="loginMethod = 'sms'">手机验证码登录</button>
-        </div>
+        <h2>登录</h2>
 
         <form @submit.prevent="handleLogin">
           <div v-if="loginMethod === 'password'">
@@ -51,7 +39,7 @@
             </div>
 
             <div class="form-group code-group">
-              <label for="smsCode">验证码</label>
+              <label for="smsCode">验证码：</label>
               <input type="text" id="smsCode" v-model="smsCode" required />
               <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
                 {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
@@ -59,22 +47,21 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <input type="checkbox" id="identity" v-model="identity" />
-            <label for="identity">身份认证</label>
-          </div>
-
           <button type="submit">登录</button>
-          <button type="button" @click="faceRecognition">人脸识别</button>
 
-          <!-- 登录反馈信息 -->
           <p :style="{ color: messageColor }">{{ message }}</p>
         </form>
 
-        <!-- 其他登录方式 -->
         <div class="other-login-methods">
           <span>其他登录方式</span>
-          <!-- 你可以加第三方登录按钮等 -->
+          <div class="login-method-buttons">
+            <button 
+              :class="{ active: loginMethod === 'password' }" 
+              @click="loginMethod = 'password'">账号密码登录</button>
+            <button 
+              :class="{ active: loginMethod === 'sms' }" 
+              @click="loginMethod = 'sms'">手机验证码登录</button>
+          </div>
         </div>
       </div>
       <FaceRecognition v-if="showFaceModal" @close="showFaceModal = false" />
@@ -85,28 +72,18 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
-import FaceRecognition from '@/components/FaceRecognition.vue'
+import Header from '@/components/Header.vue'
 
-const loginMethod = ref('password') // 登录方式，默认账号密码登录
-
-// 账号密码登录用
+const loginMethod = ref('password')
 const account = ref('')
 const password = ref('')
-
-// 手机验证码登录用
 const phone = ref('')
 const smsCode = ref('')
-
-// 其他状态
-const identity = ref(false)
 const message = ref('')
 const messageColor = ref('red')
-
-// 验证码倒计时
 const countdown = ref(0)
 let timer = null
 
-// 发送验证码
 function sendSmsCode() {
   if (!phone.value) {
     message.value = '请输入手机号'
@@ -114,15 +91,14 @@ function sendSmsCode() {
     return
   }
   message.value = ''
-  
-  // 这里写发送验证码的请求示例（替换为你后端接口）
+
   fetch('http://127.0.0.1:5000/api/send_sms_code', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone: phone.value })
   }).then(res => res.json())
     .then(data => {
-      if(data.success){
+      if (data.success) {
         message.value = '验证码已发送'
         messageColor.value = 'green'
         startCountdown()
@@ -136,7 +112,6 @@ function sendSmsCode() {
     })
 }
 
-// 倒计时函数
 function startCountdown() {
   countdown.value = 60
   timer = setInterval(() => {
@@ -148,12 +123,10 @@ function startCountdown() {
   }, 1000)
 }
 
-// 登录处理
 async function handleLogin() {
   message.value = ''
 
-  if(loginMethod.value === 'password'){
-    // 账号密码登录
+  if (loginMethod.value === 'password') {
     try {
       const res = await fetch('http://127.0.0.1:5000/api/login', {
         method: 'POST',
@@ -177,7 +150,6 @@ async function handleLogin() {
       messageColor.value = 'red'
     }
   } else {
-    // 手机验证码登录
     if (!phone.value || !smsCode.value) {
       message.value = '请输入手机号和验证码'
       messageColor.value = 'red'
@@ -206,11 +178,6 @@ async function handleLogin() {
     }
   }
 }
-
-// 人脸识别按钮
-function faceRecognition() {
-  alert('人脸识别功能暂未实现')
-}
 </script>
 
 <style>
@@ -218,26 +185,24 @@ function faceRecognition() {
   font-family: Arial, sans-serif;
 }
 
-header {
-  background-color: #f0f0f0;
-  padding: 10px;
-  text-align: center;
-}
-
 main {
   display: flex;
-  justify-content: space-between;
+  gap: 40px;
   padding: 20px;
+  align-items: flex-start;
 }
 
 .map-container {
   position: relative;
-  width: 50%;
+  flex: 1;
+  max-width: 50%;
 }
 
-.map-image {
+.map-container img {
   width: 100%;
   height: auto;
+  display: block;
+  border: 1px solid #ccc;
 }
 
 .map-markers {
@@ -258,28 +223,13 @@ main {
 }
 
 .login-container {
-  width: 45%;
-}
-
-.login-method-switch {
-  margin-bottom: 15px;
-}
-
-.login-method-switch button {
-  padding: 6px 15px;
-  margin-right: 10px;
-  border: 1px solid #000;
-  background-color: #fff;
-  cursor: pointer;
-}
-
-.login-method-switch button.active {
-  background-color: #000;
-  color: #fff;
+  flex: 1;
+  max-width: 400px;
 }
 
 .form-group {
   margin-bottom: 15px;
+  width: 100%;
 }
 
 .form-group label {
@@ -296,18 +246,30 @@ main {
 .code-group {
   display: flex;
   align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.code-group label {
+  width: 70px;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .code-group input {
-  flex-grow: 1;
+  flex: 1;
+  padding: 8px;
+  box-sizing: border-box;
 }
 
 .code-group button {
-  margin-left: 10px;
   padding: 8px 12px;
-  cursor: pointer;
   border: 1px solid #000;
   background-color: #eee;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  width: auto;
 }
 
 button {
@@ -328,13 +290,25 @@ button[type="button"] {
   margin-top: 20px;
 }
 
-.other-login-methods span {
-  margin-right: 10px;
+.login-method-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
 }
 
-.other-login-methods img {
-  width: 24px;
-  height: 24px;
-  margin-right: 10px;
+.login-method-buttons button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+  background-color: #ccc;
+  color: white;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.login-method-buttons button.active {
+  background-color: #000;
+  color: #fff;
 }
 </style>
