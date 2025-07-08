@@ -1,12 +1,12 @@
 // Vue 路由配置
 import { createRouter, createWebHistory } from 'vue-router'
-import LoginByPassword from '@/views/LoginByPassword.vue'
+import Login from '@/views/Login.vue'
 
 const routes = [
   {
     path: '/login',
-    name: 'LoginByPassword',
-    component: LoginByPassword,
+    name: 'Login',
+    component: Login,
   },
   // 其他路由...
 ]
