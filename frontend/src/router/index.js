@@ -2,6 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
 import FaceRecognition from '@/components/FaceRecognition.vue'
+import WarningInfo from '@/views/WarningInfo.vue'
 
 const routes = [
   {
@@ -17,6 +18,11 @@ const routes = [
     path: '/face',
     name: 'FaceRecognition',
     component: FaceRecognition
+  },
+   {
+    path: '/warning',
+    name: 'WarningInfo',
+    component: WarningInfo
   }
 ]
 

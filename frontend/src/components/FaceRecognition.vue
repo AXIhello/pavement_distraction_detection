@@ -11,6 +11,9 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const video = ref(null)
 let ws = null
@@ -37,9 +40,20 @@ async function startCamera() {
     }
 
     ws.onmessage = (e) => {
-      const result = JSON.parse(e.data)
-      console.log('识别结果:', result)
-    }
+  const result = JSON.parse(e.data)
+  console.log('识别结果:', result)
+
+  if (result.success) {
+    // 停止摄像头 & 关闭 WebSocket
+    clearInterval(streamInterval)
+    stream.getTracks().forEach(track => track.stop())
+    ws.close()
+
+    // 跳转到首页
+    router.push('/home')
+  }
+}
+
 
     ws.onclose = () => {
       clearInterval(streamInterval)
