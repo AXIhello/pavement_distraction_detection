@@ -7,7 +7,7 @@
     <main>
       <!-- 地图区域 -->
       <div class="map-container">
-        <img src="/images/map.png" alt="地图" class="map-image" />
+        <img :src="map" alt="地图图标" />
         <div class="map-markers">
           <div class="marker" style="left: 10%; top: 30%;">1</div>
           <div class="marker" style="left: 20%; top: 50%;">2</div>
@@ -47,8 +47,8 @@
         <!-- 其他登录方式 -->
         <div class="other-login-methods">
           <span>其他登录方式</span>
-          <img src="/icons/phone-icon.png" alt="Phone" />
-          <img src="/icons/email-icon.png" alt="Email" />
+          <!-- <img src="/icons/phone-icon.png" alt="Phone" />
+          <img src="/icons/email-icon.png" alt="Email" /> -->
         </div>
       </div>
     </main>
@@ -57,7 +57,7 @@
 
 <script setup>
 import { ref } from 'vue';
-
+import map from '@/assets/images/map.png'
 const account = ref('');
 const password = ref('');
 const identity = ref(false);
