@@ -77,6 +77,7 @@
           <!-- 你可以加第三方登录按钮等 -->
         </div>
       </div>
+      <FaceRecognition v-if="showFaceModal" @close="showFaceModal = false" />
     </main>
   </div>
 </template>
@@ -84,6 +85,7 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
+import FaceRecognition from '@/components/FaceRecognition.vue'
 
 const loginMethod = ref('password') // 登录方式，默认账号密码登录
 
@@ -165,6 +167,7 @@ async function handleLogin() {
       if (data.success) {
         message.value = data.message
         messageColor.value = 'green'
+        showFaceModal.value = true
       } else {
         message.value = data.message
         messageColor.value = 'red'

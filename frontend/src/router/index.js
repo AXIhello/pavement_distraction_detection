@@ -1,25 +1,23 @@
-// Vue 路由配置
+// src/router/index.js（或你配置路由的文件）
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
-import FaceRecognition from '@/components/FaceRecognition.vue'  // 摄像头组件的路径
+import FaceRecognition from '@/components/FaceRecognition.vue'
 
 const routes = [
+  {
+    path: '/',
+    redirect: '/login' // ✅ 首次进入默认跳转到登录页
+  },
   {
     path: '/login',
     name: 'Login',
     component: Login,
   },
   {
-    path: '/',
-    redirect: '/face'  // 默认打开人脸识别页
-  },
-  {
     path: '/face',
     name: 'FaceRecognition',
     component: FaceRecognition
   }
-
-  // 其他路由...
 ]
 
 const router = createRouter({
