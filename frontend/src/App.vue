@@ -1,4 +1,4 @@
-<!--Vue -->路由配置
+<!--Vue 路由配置 -->
 <script>
 export default {
   name: "App"
