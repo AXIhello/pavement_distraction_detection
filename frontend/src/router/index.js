@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
 import FaceRecognition from '@/components/FaceRecognition.vue'
 import Home from '@/views/Home.vue'
-import WarningInfo from '@/views/WarningInfo.vue'
+import FaceRegister from '@/views/FaceRegister.vue'
 
 const routes = [
   {
@@ -25,10 +25,10 @@ const routes = [
     name: 'Home',
     component: Home
   },
-   {
-    path: '/warning',
-    name: 'WarningInfo',
-    component: WarningInfo
+  {
+    path: '/face_register',
+    name: 'FaceRegister',
+    component: FaceRegister
   }
 ]
 
