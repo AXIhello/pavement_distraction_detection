@@ -13,14 +13,15 @@ if env == 'production':
     config_class = ProductionConfig
 else:
     config_class = DevelopmentConfig
-
 app = Flask(__name__)
 app.config.from_object(config_class)
-
 # 初始化日志系统
 setup_logging(app)
 # 获取一个应用级别的日志器
 app_logger = get_logger(__name__)
+
+# 测试日志写入
+app_logger.info("测试日志写入：如果你看到这条日志，说明日志文件写入正常！")
 
 # 配置 Swagger UI
 api = Api(app,
