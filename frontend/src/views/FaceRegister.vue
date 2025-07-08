@@ -75,7 +75,7 @@ function capturePhoto() {
   const ctx = canvas.getContext('2d')
   ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
 
-  capturedPhoto.value = canvas.toDataURL('image/jpeg')
+  capturedPhoto.value = canvas.toDataURL('image/png')
   photoCaptured.value = true
   message.value = '已拍照，准备保存或重拍'
   stopCamera()
