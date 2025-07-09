@@ -8,6 +8,7 @@ import Detect from '@/views/Detect.vue'
 import Admin from '@/views/Admin.vue'
 import RoadLog from '@/components/RoadWarn.vue'
 import Log from '@/views/Log.vue'
+import FirstPage from '@/views/FirstPage.vue'
 
 const routes = [
   {
@@ -49,14 +50,11 @@ const routes = [
     name:'Road',
     component: RoadLog
   },
-  // { 
-  //   path: '/traffic',
-  //   name:'Traffic',
-  //   component: TrafficView 
-  // },
-  // { 
-  //   path: '/log', 
-  //   component: LogView },
+  {
+    path:'/first_page',
+    name:'FirstPage',
+    component:FirstPage
+  },
   { 
     path: '/home',
     name: 'Home', 

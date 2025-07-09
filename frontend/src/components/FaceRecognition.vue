@@ -10,18 +10,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 
 const router = useRouter()
-
 const video = ref(null)
+
 let socket = null
 let streamInterval = null
 let stream = null
+
 async function startCamera() {
   try {
+    // 打开摄像头
     stream = await navigator.mediaDevices.getUserMedia({ video: true })
     video.value.srcObject = stream
 
@@ -29,11 +31,9 @@ async function startCamera() {
     socket = io('http://127.0.0.1:8000')
 
     socket.on('connect', () => {
-      console.log('SocketIO 连接成功');
-
+      console.log('SocketIO 已连接')
       startImageStream()
-    });
-
+    })
 
     socket.on('face_result', (result) => {
       console.log('识别结果:', result);
@@ -60,19 +60,19 @@ async function startCamera() {
         // 跳转到首页
         router.push('/home')
       } else {
-        console.log('识别结果:', result.message);
+        console.warn('识别失败:', result.message || '未识别到人脸')
       }
-    });
+    })
 
     socket.on('disconnect', () => {
-      console.log('SocketIO 连接断开');
-      clearInterval(streamInterval)
-    });
+      console.log('SocketIO 断开')
+      stopCamera()
+    })
 
     socket.on('connect_error', (error) => {
-      console.error('SocketIO 连接错误:', error);
-      clearInterval(streamInterval)
-    });
+      console.error('SocketIO 连接失败:', error)
+      stopCamera()
+    })
 
   } catch (err) {
     alert('无法访问摄像头：' + err.message)
@@ -81,24 +81,36 @@ async function startCamera() {
 
 function startImageStream() {
   video.value.onloadedmetadata = () => {
-    console.log('视频元数据加载完成，开始发送图像流')
+    console.log('视频元数据已加载，开始推送图片流')
+
     streamInterval = setInterval(() => {
       if (video.value.videoWidth === 0 || video.value.videoHeight === 0) {
-        console.error('摄像头未正确初始化')
+        console.error('摄像头未准备好')
         return
       }
+
       const canvas = document.createElement('canvas')
       canvas.width = video.value.videoWidth
       canvas.height = video.value.videoHeight
+
       const ctx = canvas.getContext('2d')
       ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+
       const base64Image = canvas.toDataURL('image/jpeg')
       socket.emit('face_recognition', { image: base64Image })
     }, 200)
   }
 }
 
-
+function stopCamera() {
+  clearInterval(streamInterval)
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop())
+  }
+  if (socket) {
+    socket.disconnect()
+  }
+}
 </script>
 
 <style scoped>

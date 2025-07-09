@@ -1,6 +1,6 @@
-<template> 
+<template>
   <Header2 ref="headerRef" />
-  <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }"> 
+  <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }">
     <h2>上传并分析路障</h2>
 
     <!-- 模式选择 -->
@@ -11,29 +11,14 @@
 
     <!-- 上传或录制视频预览 -->
     <div class="video-preview">
-      <video
-        v-if="mode === 'upload' && videoURL"
-        :src="videoURL"
-        controls
-        autoplay
-        muted
-        playsinline
-        @loadedmetadata="onVideoLoaded"
-      ></video>
+      <!-- 上传视频 -->
+      <video v-if="mode === 'upload' && videoURL" :src="videoURL" controls autoplay muted playsinline @loadedmetadata="onVideoLoaded"></video>
 
-      <video
-        v-if="mode === 'record' && recordedBlob"
-        :src="recordedURL"
-        controls
-        playsinline
-      ></video>
+      <!-- 录制视频 -->
+      <video v-if="mode === 'record'" ref="liveVideo" controls playsinline></video>
 
-      <video
-        v-if="(mode === 'upload' && !videoURL) || (mode === 'record' && !recordedBlob)"
-        class="empty-video"
-        muted
-        playsinline
-      ></video>
+      <!-- 空视频 -->
+      <video v-if="(mode === 'upload' && !videoURL) || (mode === 'record' && !recordedBlob)" class="empty-video" muted playsinline></video>
     </div>
 
     <!-- 上传视频操作 -->
@@ -53,8 +38,7 @@
 
     <!-- 操作按钮 -->
     <div class="actions" v-if="videoURL || recordedBlob">
-      <button @click="uploadVideo" :disabled="uploading">上传帧图像</button>
-      <button @click="analyzeVideo" :disabled="!(uploaded.value) || analyzing">分析视频</button>
+      <button @click="analyze_video" :disabled="uploading">上传帧图像</button>
     </div>
 
     <!-- 状态 -->
@@ -64,20 +48,21 @@
     </div>
 
     <!-- 结果 -->
-    <div class="results" v-if="result">
-      <h3>分析结果：</h3>
-      <ul>
-        <li><strong>类别：</strong>{{ result.category }}</li>
-        <li><strong>位置：</strong>{{ result.location }}</li>
-        <li><strong>数量：</strong>{{ result.count }}</li>
-      </ul>
+    <div class="image-slider" v-if="annotatedImages.length">
+  <img :src="annotatedImages[currentImageIndex]" class="annotated-frame" />
     </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Header2 from '@/components/Navigation.vue'
+
+const detectionResult = ref(null)       // 后端传回来的 JSON 数据
+const annotatedImages = ref([])         // 处理后的图像（base64）列表
+const currentImageIndex = ref(0)        // 当前显示哪张
+let displayTimer = null                 // 定时器
 
 const mode = ref('upload')
 const videoFile = ref(null)
@@ -134,27 +119,43 @@ function removeVideo() {
 }
 
 async function startRecording() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-  liveVideo.value.srcObject = stream
-  mediaRecorder.value = new MediaRecorder(stream)
-  chunks = []
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    liveVideo.value.srcObject = stream // 将媒体流传递给 video 元素
+    mediaRecorder.value = new MediaRecorder(stream)
+    chunks = [] // 清空之前的录制数据
 
-  mediaRecorder.value.ondataavailable = e => chunks.push(e.data)
-  mediaRecorder.value.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' })
-    recordedBlob.value = blob
-    recordedURL.value = URL.createObjectURL(blob)
-    videoURL.value = recordedURL.value
-    liveVideo.value.srcObject.getTracks().forEach(track => track.stop())
+    // 每当有可用数据时，保存音视频数据到 chunks 数组
+    mediaRecorder.value.ondataavailable = e => {
+      if (e.data.size > 0) {
+        chunks.push(e.data) // 保存数据
+      }
+    }
+
+    // 在录制停止时，生成完整的视频 Blob
+    mediaRecorder.value.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' })
+      recordedBlob.value = blob
+      recordedURL.value = URL.createObjectURL(blob) // 生成视频 URL
+      videoURL.value = recordedURL.value
+      liveVideo.value.srcObject.getTracks().forEach(track => track.stop()) // 停止所有媒体轨道
+    }
+
+    mediaRecorder.value.start() // 开始录制
+    isRecording.value = true
+    console.log('录制已开始')
+  } catch (err) {
+    console.error('录制失败:', err)
+    alert('录制失败，请检查摄像头权限或设备设置')
   }
-
-  mediaRecorder.value.start()
-  isRecording.value = true
 }
 
 function stopRecording() {
-  mediaRecorder.value.stop()
-  isRecording.value = false
+  if (mediaRecorder.value && mediaRecorder.value.state === 'recording') {
+    mediaRecorder.value.stop() // 停止录制
+    isRecording.value = false
+    console.log('录制已停止')
+  }
 }
 
 function clearRecording() {
@@ -163,6 +164,8 @@ function clearRecording() {
   videoURL.value = ''
   uploaded.value = false
   result.value = null
+  isRecording.value = false
+  chunks = [] // 清空录制数据
 }
 
 function onVideoLoaded() {}
@@ -220,7 +223,7 @@ async function extractFrames() {
   })
 }
 
-async function uploadVideo() {
+async function analyze_video() {
   if (!videoURL.value) return alert('请先上传或录制视频')
 
   uploading.value = true
@@ -231,18 +234,32 @@ async function uploadVideo() {
     const frames = await extractFrames()
     const formData = new FormData()
 
-    frames.forEach((blob, index) => {
-      formData.append(`frame_${index}`, blob, `frame_${index}.jpg`)
-    })
+    const base64List = []
+    for (let i = 0; i < frames.length; i++) {
+      const blob = frames[i]
+      const base64 = await blobToBase64(blob)
+      base64List.push(base64.split(',')[1]) // 去掉 data:image/jpeg;base64,
+    }
 
-    const res = await fetch('http://127.0.0.1:8000/api/upload_frames', {
+    formData.append('images', base64List.join(','))
+
+    const res = await fetch('http://127.0.0.1:8000/api/pavement_detection/analyze_video', {
       method: 'POST',
       body: formData
     })
 
     const data = await res.json()
-    uploaded.value = data.success
-    if (!data.success) alert('上传失败：' + data.message)
+    uploaded.value = data.status === 'success'
+
+    if (!uploaded.value) {
+      alert('上传失败：' + data.message)
+      return
+    }
+
+    detectionResult.value = data.frames
+    await generateAnnotatedImages(frames, detectionResult.value)
+    startDisplayingImages()
+
   } catch (err) {
     alert('上传出错：' + err.message)
   } finally {
@@ -250,28 +267,63 @@ async function uploadVideo() {
   }
 }
 
-async function analyzeVideo() {
-  analyzing.value = true
-  result.value = null
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.readAsDataURL(blob)
+  })
+}
 
-  try {
-    const res = await fetch('http://127.0.0.1:8000/api/analyze_video')
-    const data = await res.json()
-    if (data.success) {
-      result.value = {
-        category: data.category,
-        location: data.location,
-        count: data.count
+async function generateAnnotatedImages(blobs, detectionFrames) {
+  annotatedImages.value = []
+
+  for (let i = 0; i < blobs.length; i++) {
+    const imgBlob = blobs[i]
+    const imgURL = URL.createObjectURL(imgBlob)
+    const image = new Image()
+
+    await new Promise((resolve) => {
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(image, 0, 0)
+
+        // 获取该帧的检测数据
+        const frameData = detectionFrames.find(f => f.frame_index === i)
+        if (frameData && frameData.detections.length > 0) {
+          for (const d of frameData.detections) {
+            const [x1, y1, x2, y2] = d.bbox
+            ctx.strokeStyle = 'red'
+            ctx.lineWidth = 3
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+
+            ctx.fillStyle = 'rgba(255,0,0,0.6)'
+            ctx.font = '18px sans-serif'
+            ctx.fillText(`${d.class} (${(d.confidence * 100).toFixed(1)}%)`, x1, y1 - 6)
+          }
+        }
+
+        annotatedImages.value.push(canvas.toDataURL('image/jpeg'))
+        resolve()
       }
-    } else {
-      alert('分析失败：' + data.message)
-    }
-  } catch (err) {
-    alert('分析错误：' + err.message)
-  } finally {
-    analyzing.value = false
+      image.src = imgURL
+    })
   }
 }
+
+function startDisplayingImages() {
+  if (displayTimer) clearInterval(displayTimer)
+  currentImageIndex.value = 0
+  displayTimer = setInterval(() => {
+    if (annotatedImages.value.length > 0) {
+      currentImageIndex.value = (currentImageIndex.value + 1) % annotatedImages.value.length
+    }
+  }, 1000)
+}
+
 </script>
 
 <style scoped>
@@ -357,5 +409,23 @@ button:hover:not(:disabled) {
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 8px;
+}
+.image-slider {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 960px;
+  height: 360px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.annotated-frame {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 </style>

@@ -1,6 +1,8 @@
 <template>
   <div class="navigation">
-    <div class="text-wrapper">交通检测系统</div>
+    <div class="logo-title" @click="goToFirstPage">
+      交通检测系统
+    </div>
     <div class="items">
       <router-link
         to="/detect"
@@ -33,7 +35,10 @@ import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
 const route = useRoute()
 
-function goToHome() {
+function goToFirstPage() {
+  router.push('/first_page')
+}
+function goToHome(){
   router.push('/home')
 }
 
@@ -45,45 +50,51 @@ function isActive(path) {
 <style scoped>
 .navigation {
   background-color: var(--navigation-bar, #EFE7DC);
-  height: 82px;               
+  height: 82px;
   width: 100%;
   position: fixed;
   top: 0;
   left: 0;
   z-index: 1000;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); 
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  box-sizing: border-box; /* 包含 padding */
 }
 
-.text-wrapper {
+.logo-title {
   color: #000000;
   font-family: "Inter-Medium", Helvetica, sans-serif;
-  font-size: 22.5px;          
-  font-weight: 500;
-  position: absolute;
-  top: 23.5px;                
-  left: 40px;                 
+  font-size: 28px; /* 增大字体大小 */
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
   white-space: nowrap;
-  line-height: 33.75px;       
+}
+
+.logo-title:hover {
+  opacity: 0.7;
 }
 
 .items {
   display: flex;
   align-items: center;
-  gap: 16px;                  
-  position: absolute;
-  top: 21.5px;                
-  right: 40px;                
-  height: 39px;               
+  gap: 16px;
+  justify-content: flex-end; /* 确保右侧对齐 */
+  max-width: calc(100% - 220px); /* 限制右侧区域宽度，减去左侧区域的宽度（logo宽度） */
+  width: 100%;
+  overflow: hidden; /* 防止超出 */
 }
 
 .nav-item {
   color: #000000;
   font-family: "Inter-Medium", Helvetica, sans-serif;
-  font-size: 12px;            
+  font-size: 14px;
   font-weight: 500;
   text-decoration: none;
-  padding: 5px 8px;           
-  border-radius: 3px;         
+  padding: 5px 8px;
+  border-radius: 3px;
   transition: background-color 0.3s;
 }
 
@@ -101,18 +112,18 @@ function isActive(path) {
   align-items: center;
   justify-content: center;
   background-color: #000000;
-  border-radius: 4px;         
-  padding: 7px 12px;          
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); 
+  border-radius: 4px;
+  padding: 7px 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
   cursor: pointer;
 }
 
 .text-wrapper-3 {
   color: #ffffff;
   font-family: "Inter-Medium", Helvetica, sans-serif;
-  font-size: 12px;            
+  font-size: 12px;
   font-weight: 500;
-  line-height: 18px;          
+  line-height: 18px;
   white-space: nowrap;
 }
 </style>
