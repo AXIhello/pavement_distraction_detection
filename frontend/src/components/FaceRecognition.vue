@@ -36,13 +36,28 @@ async function startCamera() {
     })
 
     socket.on('face_result', (result) => {
-      console.log('后端返回识别结果:', result)
+      console.log('识别结果:', result);
 
-      if (result.success && result.face) {
-        const { name, confidence } = result.face
-        console.log(`识别成功: ${name}（置信度: ${confidence}）`)
 
-        stopCamera()
+      if (result.success) {
+        const face = result.faces[0];
+        if (face.name === '陌生人') {
+          alert('告警：检测到陌生人！');
+      // 停止摄像头 & 关闭 SocketIO
+          clearInterval(streamInterval)
+          stream.getTracks().forEach(track => track.stop())
+          socket.disconnect()
+      // 跳转到登录界面
+          router.push('/login')
+          return;
+    }
+        console.log('识别成功:', result.faces);
+        // 停止摄像头 & 关闭 SocketIO
+        clearInterval(streamInterval)
+        stream.getTracks().forEach(track => track.stop())
+        socket.disconnect()
+
+        // 跳转到首页
         router.push('/home')
       } else {
         console.warn('识别失败:', result.message || '未识别到人脸')
