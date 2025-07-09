@@ -1,6 +1,6 @@
-<template> 
+<template>
   <Header2 ref="headerRef" />
-  <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }"> 
+  <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }">
     <h2>上传并分析路障</h2>
 
     <!-- 模式选择 -->
@@ -53,8 +53,7 @@
 
     <!-- 操作按钮 -->
     <div class="actions" v-if="videoURL || recordedBlob">
-      <button @click="uploadVideo" :disabled="uploading">上传帧图像</button>
-      <button @click="analyzeVideo" :disabled="!(uploaded.value) || analyzing">分析视频</button>
+      <button @click="analyze_video" :disabled="uploading">上传帧图像</button>
     </div>
 
     <!-- 状态 -->
@@ -220,7 +219,7 @@ async function extractFrames() {
   })
 }
 
-async function uploadVideo() {
+async function analyze_video() {
   if (!videoURL.value) return alert('请先上传或录制视频')
 
   uploading.value = true
@@ -235,7 +234,7 @@ async function uploadVideo() {
       formData.append(`frame_${index}`, blob, `frame_${index}.jpg`)
     })
 
-    const res = await fetch('http://127.0.0.1:8000/api/upload_frames', {
+    const res = await fetch('http://127.0.0.1:8000/api/analyze_video', {
       method: 'POST',
       body: formData
     })
@@ -247,29 +246,6 @@ async function uploadVideo() {
     alert('上传出错：' + err.message)
   } finally {
     uploading.value = false
-  }
-}
-
-async function analyzeVideo() {
-  analyzing.value = true
-  result.value = null
-
-  try {
-    const res = await fetch('http://127.0.0.1:8000/api/analyze_video')
-    const data = await res.json()
-    if (data.success) {
-      result.value = {
-        category: data.category,
-        location: data.location,
-        count: data.count
-      }
-    } else {
-      alert('分析失败：' + data.message)
-    }
-  } catch (err) {
-    alert('分析错误：' + err.message)
-  } finally {
-    analyzing.value = false
   }
 }
 </script>
