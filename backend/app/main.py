@@ -72,16 +72,12 @@ api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 @socketio.on('connect')
 def handle_connect():
     app_logger.info("SocketIO 客户端连接")
-    emit('connected', {'status': 'connected', 'message': '连接成功'})
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
     app_logger.info("SocketIO 客户端断开连接")
 
-@socketio.on('test')
-def handle_test(data):
-    app_logger.info(f"收到测试消息: {data}")
-    emit('test_response', {'status': 'test', 'message': '测试成功'})
 
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
@@ -124,11 +120,6 @@ def handle_face_recognition(data):
     except Exception as e:
         app_logger.error(f"人脸识别处理错误: {e}", exc_info=True)
         emit('face_result', {"success": False, "message": str(e)})
-
-
-# 示例：记录一些启动日志
-app_logger.info("Flask 应用启动中...")
-app_logger.debug(f"当前运行环境: {env}")
 
 
 # --- Flask 路由和错误处理保持不变 ---

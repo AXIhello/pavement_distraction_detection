@@ -19,10 +19,10 @@ const router = useRouter()
 const video = ref(null)
 let socket = null
 let streamInterval = null
-
+let stream = null
 async function startCamera() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+    stream = await navigator.mediaDevices.getUserMedia({ video: true })
     video.value.srcObject = stream
 
     // 连接 SocketIO
@@ -30,19 +30,10 @@ async function startCamera() {
 
     socket.on('connect', () => {
       console.log('SocketIO 连接成功');
-      // 发送测试消息
-      socket.emit('test', { message: 'hello' });
+
+      startImageStream()
     });
 
-    socket.on('connected', (data) => {
-      console.log('连接确认:', data);
-    });
-
-    socket.on('test_response', (data) => {
-      console.log('测试响应:', data);
-      // 开始发送图像数据
-      startImageStream();
-    });
 
     socket.on('face_result', (result) => {
       console.log('识别结果:', result);
@@ -77,26 +68,25 @@ async function startCamera() {
 }
 
 function startImageStream() {
-  // 等待视频加载完成后再开始发送
-  setTimeout(() => {
+  video.value.onloadedmetadata = () => {
+    console.log('视频元数据加载完成，开始发送图像流')
     streamInterval = setInterval(() => {
-      console.log('视频尺寸:', video.value.videoWidth, video.value.videoHeight);
       if (video.value.videoWidth === 0 || video.value.videoHeight === 0) {
-          console.error('摄像头未正确初始化');
-          return;
+        console.error('摄像头未正确初始化')
+        return
       }
       const canvas = document.createElement('canvas')
       canvas.width = video.value.videoWidth
       canvas.height = video.value.videoHeight
       const ctx = canvas.getContext('2d')
       ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
-
       const base64Image = canvas.toDataURL('image/jpeg')
-      console.log('发送图像大小:', base64Image.length);
       socket.emit('face_recognition', { image: base64Image })
     }, 200)
-  }, 1000) // 等待1秒让视频完全加载
+  }
 }
+
+
 </script>
 
 <style scoped>

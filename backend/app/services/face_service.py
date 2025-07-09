@@ -21,17 +21,9 @@ class FaceRecognitionService:
         self.face_reco_model = None
         self.features_known_list = []
         self.face_name_known_list = []
-        self._is_initialized = False
+
 
     def initialize_models(self):
-        """
-        加载 Dlib 模型和已知人脸数据库。
-        这个方法在应用启动时调用一次。
-        """
-        if self._is_initialized:
-            logger.info("FaceRecognitionService 已初始化，跳过重复初始化。")
-            return
-
         logger.info("正在加载 Dlib 人脸识别模型...")
         try:
             # 假设 data 文件夹在 backend 目录下，路径是相对于 backend
@@ -57,17 +49,11 @@ class FaceRecognitionService:
             logger.info("Dlib 模型加载完成。")
 
             self._load_face_database(features_csv_path)
-            self._is_initialized = True
-
-        except FileNotFoundError as e:
-            logger.error(f"Dlib 或人脸数据库文件缺失: {e}")
-            self.detector = None
-            self.predictor = None
-            self.face_reco_model = None
-            self.features_known_list = []
-            self.face_name_known_list = []
-        except Exception as e:
-            logger.error(f"初始化 FaceRecognitionService 失败: {e}", exc_info=True)
+        except (FileNotFoundError, Exception) as e:
+            if isinstance(e, FileNotFoundError):
+                logger.error(f"Dlib 或人脸数据库文件缺失: {e}")
+            else:
+                logger.error(f"初始化 FaceRecognitionService 失败: {e}", exc_info=True)
             self.detector = None
             self.predictor = None
             self.face_reco_model = None
