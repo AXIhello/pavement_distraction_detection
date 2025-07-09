@@ -1,5 +1,6 @@
 <template>
   <div class="table-wrapper">
+  <div class="title">路障告警</div>
     <!-- 独立的状态切换按钮组 -->
     <div class="status-toggle">
       <button
@@ -177,7 +178,18 @@ onMounted(() => {
   margin-top: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-
+.title {
+  position: sticky;
+  top: 20px;
+  left: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #1f2937;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 8px 16px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
 /* 独立的状态切换按钮组 */
 .status-toggle {
   /* 取消绝对定位 */

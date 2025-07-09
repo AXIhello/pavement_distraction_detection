@@ -6,7 +6,7 @@ import Home from '@/views/Home.vue'
 import FaceRegister from '@/views/FaceRegister.vue'
 import Detect from '@/views/Detect.vue'
 import Admin from '@/views/Admin.vue'
-import RoadLog from '@/components/RoadLog.vue'
+import RoadLog from '@/components/RoadWarn.vue'
 import Log from '@/views/Log.vue'
 
 const routes = [
