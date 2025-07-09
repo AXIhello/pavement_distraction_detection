@@ -1,11 +1,19 @@
 # backend/app/main.py
 from flask import Flask, request
 from flask_restx import Api
+from flask_sqlalchemy import SQLAlchemy
 import os
+from sqlalchemy import text
+
+# 添加上级目录到 Python 路径中，以便导入其他模块
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # 导入配置和日志设置
-from .app_config import DevelopmentConfig, ProductionConfig
+from app.app_config import DevelopmentConfig, ProductionConfig
 from app.utils.logger import setup_logging, get_logger
+from app.extensions import db
+from app.core.models import User  # 确保模型在 db.create_all 前被导入
 
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
@@ -15,6 +23,9 @@ else:
     config_class = DevelopmentConfig
 app = Flask(__name__)
 app.config.from_object(config_class)
+
+db.init_app(app)
+
 # 初始化日志系统
 setup_logging(app)
 # 获取一个应用级别的日志器
@@ -60,4 +71,14 @@ def log_response_info(response):
 # ... 其他 Flask 路由或错误处理 ...
 
 if __name__ == '__main__':
-    app.run() # host和port可以在config中设置或直接写在这里
+    with app.app_context():
+        try:
+            db.session.execute(text('SELECT 1'))
+            print("当前注册模型表：", db.metadata.tables.keys())
+            db.create_all()
+            print("当前注册模型表：", db.metadata.tables.keys())
+            app_logger.info("数据库连接成功，所有表已创建（或已存在）")
+        except Exception as e:
+            app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
+            raise
+    app.run()   # app.run() # host和port可以在config中设置或直接写在这里
