@@ -5,6 +5,7 @@ import FaceRecognition from '@/components/FaceRecognition.vue'
 import Home from '@/views/Home.vue'
 import FaceRegister from '@/views/FaceRegister.vue'
 import Detect from '@/views/Detect.vue'
+import Admin from '@/views/Admin.vue'
 
 const routes = [
   {
@@ -35,6 +36,11 @@ const routes = [
     path: '/detect',
     name: 'Detect',
     component: Detect
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: Admin
   }
 ]
 
