@@ -2,6 +2,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/Login.vue'
 import FaceRecognition from '@/components/FaceRecognition.vue'
+import Home from '@/views/Home.vue'
+import FaceRegister from '@/views/FaceRegister.vue'
+import Detect from '@/views/Detect.vue'
+import Admin from '@/views/Admin.vue'
 
 const routes = [
   {
@@ -17,6 +21,26 @@ const routes = [
     path: '/face',
     name: 'FaceRecognition',
     component: FaceRecognition
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: Home
+  },
+  {
+    path: '/face_register',
+    name: 'FaceRegister',
+    component: FaceRegister
+  },
+  {
+    path: '/detect',
+    name: 'Detect',
+    component: Detect
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: Admin
   }
 ]
 

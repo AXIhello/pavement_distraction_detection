@@ -72,7 +72,7 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
-import Header from '@/components/header.vue'
+import Header from '@/components/Header.vue'
 
 const loginMethod = ref('password')
 const account = ref('')
