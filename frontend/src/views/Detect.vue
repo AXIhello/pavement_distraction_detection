@@ -1,6 +1,7 @@
-<template>
-  <div class="detect-container">
-    <h2>视频检测页面</h2>
+<template> 
+  <Header2 ref="headerRef" />
+  <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }"> 
+    <h2>上传并分析路障</h2>
 
     <!-- 模式选择 -->
     <div class="mode-select">
@@ -8,16 +9,41 @@
       <label><input type="radio" value="record" v-model="mode" /> 现场录制</label>
     </div>
 
-    <!-- 本地上传 -->
+    <!-- 上传或录制视频预览 -->
+    <div class="video-preview">
+      <video
+        v-if="mode === 'upload' && videoURL"
+        :src="videoURL"
+        controls
+        autoplay
+        muted
+        playsinline
+        @loadedmetadata="onVideoLoaded"
+      ></video>
+
+      <video
+        v-if="mode === 'record' && recordedBlob"
+        :src="recordedURL"
+        controls
+        playsinline
+      ></video>
+
+      <video
+        v-if="(mode === 'upload' && !videoURL) || (mode === 'record' && !recordedBlob)"
+        class="empty-video"
+        muted
+        playsinline
+      ></video>
+    </div>
+
+    <!-- 上传视频操作 -->
     <div v-if="mode === 'upload'" class="upload-section">
       <input type="file" accept="video/*" @change="handleVideoChange" v-if="!videoFile" />
       <button @click="removeVideo" v-if="videoFile">卸载视频</button>
     </div>
 
-    <!-- 现场录制 -->
+    <!-- 录制视频操作 -->
     <div v-if="mode === 'record'" class="record-section">
-      <video ref="liveVideo" autoplay playsinline muted v-show="!recordedBlob"></video>
-      <video :src="recordedURL" controls v-if="recordedBlob"></video>
       <div class="record-buttons">
         <button @click="startRecording" v-if="!isRecording">开始录制</button>
         <button @click="stopRecording" v-if="isRecording">停止录制</button>
@@ -25,17 +51,10 @@
       </div>
     </div>
 
-    <!-- 视频预览区域 -->
-    <div class="video-preview" v-if="videoURL">
-      <div class="video-wrapper">
-        <video ref="previewRef" :src="videoURL" controls @loadedmetadata="onVideoLoaded" />
-      </div>
-    </div>
-
     <!-- 操作按钮 -->
-    <div class="actions" v-if="videoURL">
+    <div class="actions" v-if="videoURL || recordedBlob">
       <button @click="uploadVideo" :disabled="uploading">上传帧图像</button>
-      <button @click="analyzeVideo" :disabled="!uploaded || analyzing">分析视频</button>
+      <button @click="analyzeVideo" :disabled="!(uploaded.value) || analyzing">分析视频</button>
     </div>
 
     <!-- 状态 -->
@@ -57,7 +76,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import Header2 from '@/components/navigation.vue'
 
 const mode = ref('upload')
 const videoFile = ref(null)
@@ -66,7 +86,6 @@ const uploaded = ref(false)
 const uploading = ref(false)
 const analyzing = ref(false)
 const result = ref(null)
-const previewRef = ref(null)
 
 const liveVideo = ref(null)
 const isRecording = ref(false)
@@ -74,6 +93,28 @@ const mediaRecorder = ref(null)
 const recordedBlob = ref(null)
 const recordedURL = ref('')
 let chunks = []
+
+const headerRef = ref(null)
+const headerHeight = ref(0)
+
+function updateHeaderHeight() {
+  nextTick(() => {
+    if (headerRef.value?.$el) {
+      headerHeight.value = headerRef.value.$el.offsetHeight
+    } else if (headerRef.value instanceof HTMLElement) {
+      headerHeight.value = headerRef.value.offsetHeight
+    }
+  })
+}
+
+onMounted(() => {
+  updateHeaderHeight()
+  window.addEventListener('resize', updateHeaderHeight)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateHeaderHeight)
+})
 
 function handleVideoChange(e) {
   const file = e.target.files[0]
@@ -175,7 +216,7 @@ async function extractFrames() {
       seekAndCapture()
     })
 
-    video.onerror = () => reject('视频加载失败')
+    video.onerror = () => reject(new Error('视频加载失败'))
   })
 }
 
@@ -242,34 +283,56 @@ async function analyzeVideo() {
   background: #fefef9;
   border-radius: 12px;
 }
+
+h2 {
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
 .mode-select {
   margin-bottom: 12px;
   font-size: 14px;
 }
+
 .upload-section,
 .record-section {
   margin-bottom: 20px;
 }
+
 .record-buttons {
   display: flex;
   gap: 10px;
   margin-top: 10px;
 }
-video {
-  width: 100%;
-  max-height: 360px;
-  border-radius: 8px;
-  background: #000;
-}
+
 .video-preview {
   margin: 20px 0;
   position: relative;
+  width: 100%;
+  max-width: 960px;
+  height: 360px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
 }
+
+.video-preview video,
+.video-preview .empty-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  border-radius: 8px;
+  display: block;
+}
+
 .actions {
   display: flex;
   gap: 16px;
   margin-bottom: 20px;
 }
+
 button {
   padding: 8px 16px;
   background-color: #333;
@@ -277,10 +340,18 @@ button {
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  transition: background-color 0.2s;
 }
+
 button:disabled {
   background-color: #aaa;
+  cursor: not-allowed;
 }
+
+button:hover:not(:disabled) {
+  background-color: #555;
+}
+
 .results {
   background: #f8f8e8;
   padding: 12px;
