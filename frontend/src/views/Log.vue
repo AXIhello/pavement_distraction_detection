@@ -9,7 +9,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import Navigation from '@/components/navigation.vue'
+import Navigation from '@/components/Navigation.vue'
 import RoadLog from '@/components/RoadLog.vue'
 
 const navRef = ref(null)

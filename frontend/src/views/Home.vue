@@ -20,7 +20,7 @@
   
   <script setup>
   import { ref, onMounted } from 'vue'
-  import Header from '@/components/navigation.vue'
+  import Header from '@/components/Navigation.vue'
   
   const user = ref({})
   const loading = ref(true)

@@ -77,7 +77,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import Header2 from '@/components/navigation.vue'
+import Header2 from '@/components/Navigation.vue'
 
 const mode = ref('upload')
 const videoFile = ref(null)
