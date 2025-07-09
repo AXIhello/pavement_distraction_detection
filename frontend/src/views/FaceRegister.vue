@@ -48,6 +48,7 @@ let stream = null
 
 // 打开摄像头
 async function startCamera() {
+
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true })
     video.value.srcObject = stream

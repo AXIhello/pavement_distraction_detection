@@ -10,13 +10,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { io } from 'socket.io-client'
 
 const router = useRouter()
 
 const video = ref(null)
-let ws = null
+let socket = null
 let streamInterval = null
 
 async function startCamera() {
@@ -24,43 +25,77 @@ async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true })
     video.value.srcObject = stream
 
-    ws = new WebSocket('ws://127.0.0.1:8000/ws/face')
+    // 连接 SocketIO
+    socket = io('http://127.0.0.1:8000')
 
-    ws.onopen = () => {
-      streamInterval = setInterval(() => {
-        const canvas = document.createElement('canvas')
-        canvas.width = video.value.videoWidth
-        canvas.height = video.value.videoHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+    socket.on('connect', () => {
+      console.log('SocketIO 连接成功');
+      // 发送测试消息
+      socket.emit('test', { message: 'hello' });
+    });
 
-        const base64Image = canvas.toDataURL('image/jpeg')
-        ws.send(JSON.stringify({ image: base64Image }))
-      }, 200)
-    }
+    socket.on('connected', (data) => {
+      console.log('连接确认:', data);
+    });
 
-    ws.onmessage = (e) => {
-  const result = JSON.parse(e.data)
-  console.log('识别结果:', result)
+    socket.on('test_response', (data) => {
+      console.log('测试响应:', data);
+      // 开始发送图像数据
+      startImageStream();
+    });
 
-  if (result.success) {
-    // 停止摄像头 & 关闭 WebSocket
-    clearInterval(streamInterval)
-    stream.getTracks().forEach(track => track.stop())
-    ws.close()
+    socket.on('face_result', (result) => {
+      console.log('识别结果:', result);
 
-    // 跳转到首页
-    router.push('/home')
-  }
-}
+      if (result.success) {
+        console.log('识别成功:', result.faces);
+        // 停止摄像头 & 关闭 SocketIO
+        clearInterval(streamInterval)
+        stream.getTracks().forEach(track => track.stop())
+        socket.disconnect()
 
+        // 跳转到首页
+        router.push('/home')
+      } else {
+        console.log('识别结果:', result.message);
+      }
+    });
 
-    ws.onclose = () => {
+    socket.on('disconnect', () => {
+      console.log('SocketIO 连接断开');
       clearInterval(streamInterval)
-    }
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('SocketIO 连接错误:', error);
+      clearInterval(streamInterval)
+    });
+
   } catch (err) {
     alert('无法访问摄像头：' + err.message)
   }
+}
+
+function startImageStream() {
+  // 等待视频加载完成后再开始发送
+  setTimeout(() => {
+    streamInterval = setInterval(() => {
+      console.log('视频尺寸:', video.value.videoWidth, video.value.videoHeight);
+      if (video.value.videoWidth === 0 || video.value.videoHeight === 0) {
+          console.error('摄像头未正确初始化');
+          return;
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = video.value.videoWidth
+      canvas.height = video.value.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+
+      const base64Image = canvas.toDataURL('image/jpeg')
+      console.log('发送图像大小:', base64Image.length);
+      socket.emit('face_recognition', { image: base64Image })
+    }, 200)
+  }, 1000) // 等待1秒让视频完全加载
 }
 </script>
 
