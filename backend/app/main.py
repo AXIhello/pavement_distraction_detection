@@ -78,30 +78,43 @@ def handle_connect():
 def handle_disconnect():
     app_logger.info("SocketIO 客户端断开连接")
 
-
+import time
+from collections import defaultdict, deque
+recent_results = defaultdict(lambda: deque())
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
+    from flask import  request
+    sid = request.sid
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
         if not base64_image:
             emit('face_result', {'success': False, 'message': '没有图像数据'})
             return
-
         # 调用人脸识别服务进行处理
         recognition_results = face_recognition_service.recognize_face(base64_image)
-
-        # 判断识别结果，统一返回格式
-        if (
-                isinstance(recognition_results, list)
-                and recognition_results
-                and recognition_results[0].get("name") != "未检测到人脸"
-                and recognition_results[0].get("status") != "error"
-        ):
-            emit('face_result', {
-                "success": True,
-                "faces": recognition_results
-            })
+        if not recognition_results or not isinstance(recognition_results,list):
+            return
+        name = recognition_results[0].get('name')
+        now = time.time()
+        dq = recent_results[sid]
+        dq.append((now,name))
+        #移除超过1秒的旧帧
+        while dq and now-dq[0][0]>2.0:
+            dq.popleft()
+        if len(dq)>=3:
+            last_three = list(dq)[-3:]
+            if all(n==name for t,n in last_three):
+                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")     
+            # 检查是否有陌生人
+                if name == "陌生人":
+                    app_logger.warning("告警：检测到陌生人！")
+            # 判断识别结果，统一返回格式
+                emit('face_result', {
+                    "success": True,
+                    "faces": recognition_results
+                })
+                dq.clear() #防止重复弹窗
         elif (
                 isinstance(recognition_results, list)
                 and recognition_results
