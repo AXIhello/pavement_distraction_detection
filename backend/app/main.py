@@ -2,8 +2,8 @@
 from flask import Flask, request
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 import os
-from sqlalchemy import text
 
 # 添加上级目录到 Python 路径中，以便导入其他模块
 import sys
@@ -23,6 +23,7 @@ else:
     config_class = DevelopmentConfig
 app = Flask(__name__)
 app.config.from_object(config_class)
+CORS(app)    # 允许跨域请求
 
 db.init_app(app)
 
@@ -39,7 +40,8 @@ api = Api(app,
           version='1.0',
           title='综合管理平台 API',
           description='人脸识别、路面病害、交通分析及日志告警',
-          doc='/doc')
+          doc='/doc',
+          prefix='/api')
 
 # 导入并注册 API 命名空间
 from app.api.auth import ns as auth_ns
@@ -73,8 +75,6 @@ def log_response_info(response):
 if __name__ == '__main__':
     with app.app_context():
         try:
-            db.session.execute(text('SELECT 1'))
-            print("当前注册模型表：", db.metadata.tables.keys())
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")

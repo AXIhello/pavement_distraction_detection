@@ -1,6 +1,8 @@
 # 认证相关接口
 # backend/app/api/auth.py
 from flask_restx import Namespace, Resource, fields
+from app.core.models import User
+from app.core.security import create_jwt_token
 
 # 1. 定义一个命名空间 'ns'
 ns = Namespace('auth', description='认证相关操作')
@@ -33,10 +35,11 @@ class UserLogin(Resource):
         password = data.get('password')
 
         # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
-        if username == 'testuser' and password == 'password123':
-            # 假设生成了一个token
-            access_token = "some_generated_jwt_token_for_" + username
-            return {'access_token': access_token, 'token_type': 'bearer'}
+        # 已更换为数据库查询
+        user = User.query.filter_by(username=username).first()
+        if user and user.password == password:  # 实际应加密处理
+            access_token = create_jwt_token(user.id)
+            return {'success': True, 'message': '登录成功', 'access_token': access_token}
         else:
             ns.abort(401, message="无效的用户名或密码")
 
