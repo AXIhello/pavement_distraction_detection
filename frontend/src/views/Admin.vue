@@ -102,7 +102,7 @@
   <script setup>
   import { ref, onMounted, computed } from 'vue'
   import { useRouter } from 'vue-router'
-  import Header from '@/components/header.vue'
+  import Header from '@/components/Header.vue'
   
   const router = useRouter()
   

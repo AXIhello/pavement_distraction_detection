@@ -3,9 +3,9 @@
 from flask_restx import Namespace, Resource, fields
 from flask import request
 # 导入你的 LoggingService
-from app.services.logging_service import LoggingService
+from ..services.logging_service import LoggingService
 # 导入你的日志器
-from app.utils.logger import get_logger
+from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 

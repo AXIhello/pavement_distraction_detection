@@ -5,8 +5,12 @@ import FaceRecognition from '@/components/FaceRecognition.vue'
 import Home from '@/views/Home.vue'
 import FaceRegister from '@/views/FaceRegister.vue'
 import Detect from '@/views/Detect.vue'
+<<<<<<< HEAD
 import RoadLog from '@/components/RoadLog.vue'
 import Log from '@/views/Log.vue'
+=======
+import Admin from '@/views/Admin.vue'
+>>>>>>> f2d8d892afb38b2c5f84f46559192be2c61ab609
 
 const routes = [
   {
@@ -39,6 +43,7 @@ const routes = [
     component: Detect
   },
   {
+<<<<<<< HEAD
     path:'/road',
     name:'Road',
     component: RoadLog
@@ -62,6 +67,12 @@ const routes = [
     component:Log
   },
     
+=======
+    path: '/admin',
+    name: 'Admin',
+    component: Admin
+  }
+>>>>>>> f2d8d892afb38b2c5f84f46559192be2c61ab609
 ]
 
 
