@@ -71,7 +71,7 @@ api = Api(app,
 # 导入并注册 API 命名空间
 from .api.auth import ns as auth_ns
 from .api.face_recognition import ns as face_ns
-from .api.pavement_detection import ns as pavement_ns
+from .api.pavement_detection import ns as pavement_ns, get_pavement_socketio_handlers
 from .api.traffic_analysis import ns as traffic_ns
 from .api.logging_alerts import ns as logging_alerts_ns  # 导入日志告警命名空间
 
@@ -81,6 +81,8 @@ api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 
+# 获取路面检测的Socket.IO处理器
+pavement_handlers = get_pavement_socketio_handlers()
 
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
@@ -95,6 +97,7 @@ def handle_disconnect():
 import time
 from collections import defaultdict, deque
 recent_results = defaultdict(lambda: deque())
+
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
     from flask import  request
@@ -119,7 +122,7 @@ def handle_face_recognition(data):
         if len(dq)>=3:
             last_three = list(dq)[-3:]
             if all(n==name for t,n in last_three):
-                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")     
+                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")
             # 检查是否有陌生人
                 if name == "陌生人":
                     app_logger.warning("告警：检测到陌生人！")
@@ -147,6 +150,21 @@ def handle_face_recognition(data):
     except Exception as e:
         app_logger.error(f"人脸识别处理错误: {e}", exc_info=True)
         emit('face_result', {"success": False, "message": str(e)})
+
+
+# --- 路面检测 Socket.IO 事件处理 ---
+@socketio.on('video_frame')
+def handle_video_frame(data):
+    """处理路面检测视频帧"""
+    app_logger.info("收到路面检测视频帧")
+    pavement_handlers['video_frame'](data)
+
+
+@socketio.on('video_stream_end')
+def handle_video_stream_end(data):
+    """处理视频流结束"""
+    app_logger.info("收到视频流结束信号")
+    pavement_handlers['video_stream_end'](data)
 
 
 # --- Flask 路由和错误处理保持不变 ---
