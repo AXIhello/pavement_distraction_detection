@@ -11,29 +11,14 @@
 
     <!-- 上传或录制视频预览 -->
     <div class="video-preview">
-      <video
-        v-if="mode === 'upload' && videoURL"
-        :src="videoURL"
-        controls
-        autoplay
-        muted
-        playsinline
-        @loadedmetadata="onVideoLoaded"
-      ></video>
+      <!-- 上传视频 -->
+      <video v-if="mode === 'upload' && videoURL" :src="videoURL" controls autoplay muted playsinline @loadedmetadata="onVideoLoaded"></video>
 
-      <video
-        v-if="mode === 'record' && recordedBlob"
-        :src="recordedURL"
-        controls
-        playsinline
-      ></video>
+      <!-- 录制视频 -->
+      <video v-if="mode === 'record'" ref="liveVideo" controls playsinline></video>
 
-      <video
-        v-if="(mode === 'upload' && !videoURL) || (mode === 'record' && !recordedBlob)"
-        class="empty-video"
-        muted
-        playsinline
-      ></video>
+      <!-- 空视频 -->
+      <video v-if="(mode === 'upload' && !videoURL) || (mode === 'record' && !recordedBlob)" class="empty-video" muted playsinline></video>
     </div>
 
     <!-- 上传视频操作 -->
@@ -133,27 +118,43 @@ function removeVideo() {
 }
 
 async function startRecording() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-  liveVideo.value.srcObject = stream
-  mediaRecorder.value = new MediaRecorder(stream)
-  chunks = []
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    liveVideo.value.srcObject = stream // 将媒体流传递给 video 元素
+    mediaRecorder.value = new MediaRecorder(stream)
+    chunks = [] // 清空之前的录制数据
 
-  mediaRecorder.value.ondataavailable = e => chunks.push(e.data)
-  mediaRecorder.value.onstop = () => {
-    const blob = new Blob(chunks, { type: 'video/webm' })
-    recordedBlob.value = blob
-    recordedURL.value = URL.createObjectURL(blob)
-    videoURL.value = recordedURL.value
-    liveVideo.value.srcObject.getTracks().forEach(track => track.stop())
+    // 每当有可用数据时，保存音视频数据到 chunks 数组
+    mediaRecorder.value.ondataavailable = e => {
+      if (e.data.size > 0) {
+        chunks.push(e.data) // 保存数据
+      }
+    }
+
+    // 在录制停止时，生成完整的视频 Blob
+    mediaRecorder.value.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' })
+      recordedBlob.value = blob
+      recordedURL.value = URL.createObjectURL(blob) // 生成视频 URL
+      videoURL.value = recordedURL.value
+      liveVideo.value.srcObject.getTracks().forEach(track => track.stop()) // 停止所有媒体轨道
+    }
+
+    mediaRecorder.value.start() // 开始录制
+    isRecording.value = true
+    console.log('录制已开始')
+  } catch (err) {
+    console.error('录制失败:', err)
+    alert('录制失败，请检查摄像头权限或设备设置')
   }
-
-  mediaRecorder.value.start()
-  isRecording.value = true
 }
 
 function stopRecording() {
-  mediaRecorder.value.stop()
-  isRecording.value = false
+  if (mediaRecorder.value && mediaRecorder.value.state === 'recording') {
+    mediaRecorder.value.stop() // 停止录制
+    isRecording.value = false
+    console.log('录制已停止')
+  }
 }
 
 function clearRecording() {
@@ -162,6 +163,8 @@ function clearRecording() {
   videoURL.value = ''
   uploaded.value = false
   result.value = null
+  isRecording.value = false
+  chunks = [] // 清空录制数据
 }
 
 function onVideoLoaded() {}
