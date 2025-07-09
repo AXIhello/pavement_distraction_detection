@@ -23,23 +23,37 @@
           <div v-if="loginMethod === 'password'">
             <div class="form-group">
               <label for="account">账号</label>
-              <input type="text" id="account" v-model="account" required />
+              <input 
+                type="text" 
+                id="account" 
+                placeholder="电话号码/邮箱"
+                v-model="account" 
+                required />
             </div>
 
             <div class="form-group">
               <label for="password">密码</label>
-              <input type="password" id="password" v-model="password" required />
+              <input 
+                type="password" 
+                id="password" 
+                v-model="password" 
+                required />
             </div>
           </div>
 
           <div v-else-if="loginMethod === 'sms'">
             <div class="form-group">
-              <label for="phone">手机号</label>
-              <input type="tel" id="phone" v-model="phone" required />
+              <label for="phone">账号</label>
+              <input 
+                type="tel" 
+                id="phone" 
+                placeholder="电话号码/邮箱"
+                v-model="phone" 
+                required />
             </div>
 
             <div class="form-group code-group">
-              <label for="smsCode">验证码：</label>
+              <label for="smsCode">验证码</label>
               <input type="text" id="smsCode" v-model="smsCode" required />
               <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
                 {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
