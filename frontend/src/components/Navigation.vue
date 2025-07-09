@@ -44,7 +44,7 @@ function isActive(path) {
 
 <style scoped>
 .navigation {
-  background-color: var(--navigation-bar, #f5f5f5);
+  background-color: var(--navigation-bar, #EFE7DC);
   height: 82px;               
   width: 100%;
   position: fixed;
@@ -92,7 +92,7 @@ function isActive(path) {
 }
 
 .nav-item.active {
-  background-color: #a9cde3; /* 激活时颜色加深 */
+  background-color: #F1D06F; /* 激活时颜色加深 */
 }
 
 .button {

@@ -102,7 +102,7 @@
   <script setup>
   import { ref, onMounted, computed } from 'vue'
   import { useRouter } from 'vue-router'
-  import Header from '@/components/Header.vue'
+  import Header from '@/components/Navigation.vue'
   
   const router = useRouter()
   
@@ -284,6 +284,28 @@
     margin: 0 auto;
     box-sizing: border-box;
   }
+  /* 固定 Header */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #333;
+  color: white;
+  padding: 10px 0;
+  text-align: center;
+  z-index: 1000;
+}
+
+/* 页面内容区 */
+.admin-container {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 80px; /* 防止被固定的 header 遮挡 */
+}
+
   
   .admin-container {
     background-color: #fff;
