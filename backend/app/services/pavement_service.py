@@ -1,13 +1,11 @@
 # backend/app/services/pavement_service.py
 
-import base64
-import io
 from pathlib import Path
-
 import torch
 from PIL import Image
+import io
+import base64
 
-# 病害类别映射（模型输出类别 -> 中文名）
 id2label = {
     'D00': '横向裂缝',
     'D10': '纵向裂缝',
@@ -18,36 +16,63 @@ id2label = {
     'D50': '井盖'
 }
 
-# 加载 YOLOv5 模型（全局只加载一次）
 model_path = Path('backend/data/weights/road_damage.pt')
 model = torch.hub.load('ultralytics/yolov5', 'custom', path=str(model_path), force_reload=False)
-model.conf = 0.25  # 置信度阈值，可调
+model.conf = 0.25
 
 
-def detect_pavement_damage(base64_image_str: str):
+def detect_batch_images(base64_images):
     """
-    执行推理，返回检测结果列表
-    :param base64_image_str: 前端传来的 Base64 图片字符串（带data:image开头）
-    :return: List[Dict]
+    对多帧 Base64 图像进行检测，并返回标注后的 Base64 图像
+    :param base64_images: List[str]
+    :return: List[Dict] 每帧检测结果
     """
-    if not base64_image_str.startswith('data:image'):
-        raise ValueError("Base64 字符串格式错误")
+    results = []
 
-    header, encoded = base64_image_str.split(',', 1)
-    image_bytes = base64.b64decode(encoded)
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    for i, base64_str in enumerate(base64_images):
+        if not base64_str.startswith('data:image'):
+            raise ValueError(f"第 {i} 帧不是有效的 Base64 图像。")
 
-    results = model(image, size=640)
-    df = results.pandas().xyxy[0]  # DataFrame
+        header, encoded = base64_str.split(',', 1)
+        image_bytes = base64.b64decode(encoded)
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    result_list = []
-    for _, row in df.iterrows():
-        label_key = row['name']
-        result_list.append({
-            'class': id2label.get(label_key, label_key),
-            'confidence': round(float(row['confidence']), 3),
-            'bbox': [round(float(row['xmin']), 2), round(float(row['ymin']), 2),
-                     round(float(row['xmax']), 2), round(float(row['ymax']), 2)]
-        })
+        detections = []
+        try:
+            output = model(image, size=640)
+            df = output.pandas().xyxy[0]
 
-    return result_list
+            for _, row in df.iterrows():
+                label_key = row['name']
+                # 修改模型内的类别名为中文（这一步用于渲染）
+                output.names[row['class']] = id2label.get(label_key, label_key)
+
+                detections.append({
+                    'class': id2label.get(label_key, label_key),
+                    'confidence': round(float(row['confidence']), 3),
+                    'bbox': [round(float(row['xmin']), 2), round(float(row['ymin']), 2),
+                             round(float(row['xmax']), 2), round(float(row['ymax']), 2)]
+                })
+
+            # 渲染图像（中文类别已通过 output.names 替换）
+            rendered = output.render()[0]  # ndarray (BGR)
+            image_pil = Image.fromarray(rendered[..., ::-1])  # 转为 RGB
+
+            buffered = io.BytesIO()
+            image_pil.save(buffered, format="JPEG")
+            image_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode()
+
+            results.append({
+                'frame_index': i,
+                'detections': detections,
+                'image_base64': image_base64
+            })
+
+        except Exception as e:
+            results.append({
+                'frame_index': i,
+                'detections': [{'error': f'第{i}帧处理失败: {str(e)}'}],
+                'image_base64': None
+            })
+
+    return results
