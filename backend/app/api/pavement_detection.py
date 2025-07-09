@@ -30,7 +30,7 @@ detection_response_model = ns.model('DetectionResponse', {
 })
 
 
-@ns.route('/detect')
+@ns.route('/analyze_video')
 class DetectPavementBatch(Resource):
     @ns.doc('多帧路面病害检测')
     @ns.expect(parser)

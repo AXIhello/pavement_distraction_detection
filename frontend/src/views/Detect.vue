@@ -48,20 +48,21 @@
     </div>
 
     <!-- 结果 -->
-    <div class="results" v-if="result">
-      <h3>分析结果：</h3>
-      <ul>
-        <li><strong>类别：</strong>{{ result.category }}</li>
-        <li><strong>位置：</strong>{{ result.location }}</li>
-        <li><strong>数量：</strong>{{ result.count }}</li>
-      </ul>
+    <div class="image-slider" v-if="annotatedImages.length">
+  <img :src="annotatedImages[currentImageIndex]" class="annotated-frame" />
     </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Header2 from '@/components/Navigation.vue'
+
+const detectionResult = ref(null)       // 后端传回来的 JSON 数据
+const annotatedImages = ref([])         // 处理后的图像（base64）列表
+const currentImageIndex = ref(0)        // 当前显示哪张
+let displayTimer = null                 // 定时器
 
 const mode = ref('upload')
 const videoFile = ref(null)
@@ -233,24 +234,96 @@ async function analyze_video() {
     const frames = await extractFrames()
     const formData = new FormData()
 
-    frames.forEach((blob, index) => {
-      formData.append(`frame_${index}`, blob, `frame_${index}.jpg`)
-    })
+    const base64List = []
+    for (let i = 0; i < frames.length; i++) {
+      const blob = frames[i]
+      const base64 = await blobToBase64(blob)
+      base64List.push(base64.split(',')[1]) // 去掉 data:image/jpeg;base64,
+    }
 
-    const res = await fetch('http://127.0.0.1:8000/api/analyze_video', {
+    formData.append('images', base64List.join(','))
+
+    const res = await fetch('http://127.0.0.1:8000/api/pavement_detection/analyze_video', {
       method: 'POST',
       body: formData
     })
 
     const data = await res.json()
-    uploaded.value = data.success
-    if (!data.success) alert('上传失败：' + data.message)
+    uploaded.value = data.status === 'success'
+
+    if (!uploaded.value) {
+      alert('上传失败：' + data.message)
+      return
+    }
+
+    detectionResult.value = data.frames
+    await generateAnnotatedImages(frames, detectionResult.value)
+    startDisplayingImages()
+
   } catch (err) {
     alert('上传出错：' + err.message)
   } finally {
     uploading.value = false
   }
 }
+
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function generateAnnotatedImages(blobs, detectionFrames) {
+  annotatedImages.value = []
+
+  for (let i = 0; i < blobs.length; i++) {
+    const imgBlob = blobs[i]
+    const imgURL = URL.createObjectURL(imgBlob)
+    const image = new Image()
+
+    await new Promise((resolve) => {
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = image.width
+        canvas.height = image.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(image, 0, 0)
+
+        // 获取该帧的检测数据
+        const frameData = detectionFrames.find(f => f.frame_index === i)
+        if (frameData && frameData.detections.length > 0) {
+          for (const d of frameData.detections) {
+            const [x1, y1, x2, y2] = d.bbox
+            ctx.strokeStyle = 'red'
+            ctx.lineWidth = 3
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+
+            ctx.fillStyle = 'rgba(255,0,0,0.6)'
+            ctx.font = '18px sans-serif'
+            ctx.fillText(`${d.class} (${(d.confidence * 100).toFixed(1)}%)`, x1, y1 - 6)
+          }
+        }
+
+        annotatedImages.value.push(canvas.toDataURL('image/jpeg'))
+        resolve()
+      }
+      image.src = imgURL
+    })
+  }
+}
+
+function startDisplayingImages() {
+  if (displayTimer) clearInterval(displayTimer)
+  currentImageIndex.value = 0
+  displayTimer = setInterval(() => {
+    if (annotatedImages.value.length > 0) {
+      currentImageIndex.value = (currentImageIndex.value + 1) % annotatedImages.value.length
+    }
+  }, 1000)
+}
+
 </script>
 
 <style scoped>
@@ -336,5 +409,23 @@ button:hover:not(:disabled) {
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 8px;
+}
+.image-slider {
+  margin-top: 20px;
+  width: 100%;
+  max-width: 960px;
+  height: 360px;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.annotated-frame {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 </style>
