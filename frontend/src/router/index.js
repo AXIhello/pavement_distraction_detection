@@ -5,6 +5,8 @@ import FaceRecognition from '@/components/FaceRecognition.vue'
 import Home from '@/views/Home.vue'
 import FaceRegister from '@/views/FaceRegister.vue'
 import Detect from '@/views/Detect.vue'
+import RoadLog from '@/components/RoadLog.vue'
+import Log from '@/views/Log.vue'
 
 const routes = [
   {
@@ -35,8 +37,33 @@ const routes = [
     path: '/detect',
     name: 'Detect',
     component: Detect
-  }
+  },
+  {
+    path:'/road',
+    name:'Road',
+    component: RoadLog
+  },
+  // { 
+  //   path: '/traffic',
+  //   name:'Traffic',
+  //   component: TrafficView 
+  // },
+  // { 
+  //   path: '/log', 
+  //   component: LogView },
+  { 
+    path: '/home',
+    name: 'Home', 
+    component: Home 
+  },
+  {
+    path: '/log',
+    name:'Log',
+    component:Log
+  },
+    
 ]
+
 
 const router = createRouter({
   history: createWebHistory(),
