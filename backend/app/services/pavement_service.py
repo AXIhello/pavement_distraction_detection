@@ -16,8 +16,8 @@ id2label = {
     'D50': '井盖'
 }
 
-model_path = Path('backend/data/weights/road_damage.pt')
-model = torch.hub.load('ultralytics/yolov5', 'custom', path=str(model_path), force_reload=False)
+model_path = Path('data/weights/road_damage.pt')
+model = torch.hub.load('yolov5', 'custom', path=str(model_path),source='local')
 model.conf = 0.25
 
 

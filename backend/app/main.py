@@ -12,16 +12,16 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # 导入配置和日志设置
-from app.app_config import DevelopmentConfig, ProductionConfig
-from app.utils.logger import setup_logging, get_logger
-from app.extensions import db
-from app.core.models import User  # 确保模型在 db.create_all 前被导入
+from .app_config import DevelopmentConfig, ProductionConfig
+from .utils.logger import setup_logging, get_logger
+from .extensions import db
+from .core.models import User  # 确保模型在 db.create_all 前被导入
 
 # 导入 Flask-SocketIO
 from flask_socketio import SocketIO, emit
 
 # 导入人脸识别服务
-from app.services.face_service import FaceRecognitionService
+from .services.face_service import FaceRecognitionService
 
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
@@ -69,11 +69,11 @@ api = Api(app,
           prefix='/api')
 
 # 导入并注册 API 命名空间
-from app.api.auth import ns as auth_ns
-from app.api.face_recognition import ns as face_ns
-from app.api.pavement_detection import ns as pavement_ns
-from app.api.traffic_analysis import ns as traffic_ns
-from app.api.logging_alerts import ns as logging_alerts_ns  # 导入日志告警命名空间
+from .api.auth import ns as auth_ns
+from .api.face_recognition import ns as face_ns
+from .api.pavement_detection import ns as pavement_ns
+from .api.traffic_analysis import ns as traffic_ns
+from .api.logging_alerts import ns as logging_alerts_ns  # 导入日志告警命名空间
 
 api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
@@ -173,7 +173,6 @@ if __name__ == '__main__':
         except Exception as e:
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
-    app.run()   # app.run() # host和port可以在config中设置或直接写在这里
     app_logger.info("Flask 应用启动中...")
     app_logger.debug(f"当前运行环境: {env}")
 
