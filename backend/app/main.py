@@ -191,8 +191,9 @@ if __name__ == '__main__':
         except Exception as e:
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
+    #app.run()   # app.run() # host和port可以在config中设置或直接写在这里
     app_logger.info("Flask 应用启动中...")
     app_logger.debug(f"当前运行环境: {env}")
 
     # 使用 SocketIO 启动服务器
-    socketio.run(app, host='127.0.0.1', port=8000, debug=True)
+    socketio.run(app, host='127.0.0.1', port=8000, debug=False)

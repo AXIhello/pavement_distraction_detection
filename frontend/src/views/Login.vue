@@ -85,11 +85,12 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
-import Header from '@/components/Header.vue'
+
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+import Header from '@/components/Title.vue'
 
 const loginMethod = ref('password')
 const account = ref('')
@@ -208,6 +209,7 @@ main {
   gap: 40px;
   padding: 20px;
   align-items: flex-start;
+  margin-top: 80px;
 }
 
 .map-container {

@@ -27,7 +27,7 @@
         <button @click="startCamera" v-if="!streaming && !photoCaptured">打开摄像头</button>
         <button @click="capturePhoto" v-if="streaming && !photoCaptured">拍照</button>
         <button @click="clearPhoto" v-if="photoCaptured">重拍</button>
-        <button @click="savePhoto" :disabled="!capturedPhoto || !name">保存</button>
+        <button @click="savePhoto" :disabled="!capturedPhoto || !name || loading">{{ loading ? '处理中...' : '保存' }}</button>
       </div>
 
       <p class="message">{{ message }}</p>
@@ -94,16 +94,17 @@ function clearPhoto() {
   startCamera()
 }
 
-
+const loading = ref(false)
 // 保存人脸数据
 async function savePhoto() {
   if (!capturedPhoto.value || !name.value) {
     message.value = '请先拍照并输入姓名'
     return
   }
-
+  loading.value = true
+  message.value = '正在处理中，请稍候...'
   try {
-    const res = await fetch('http://127.0.0.1:8000/api/face_register', {
+    const res = await fetch('http://127.0.0.1:8000/api/face/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -120,6 +121,8 @@ async function savePhoto() {
     }
   } catch (err) {
     message.value = '请求失败，请检查后端服务'
+  }finally{
+    loading.value = false
   }
 }
 </script>
