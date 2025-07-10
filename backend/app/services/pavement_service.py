@@ -30,9 +30,9 @@ if not model_path.exists():
 else:
     print(f"[INFO] 找到模型文件: {model_path}")
     try:
-        print("🔄 [INFO] 正在加载YOLOv5官方推理接口模型...")
+        print(" [INFO] 正在加载YOLOv5官方推理接口模型...")
         # 使用 torch.hub.load 加载自定义模型
-        model = torch.hub.load('ultralytics/yolov5', 'custom', path=str(model_path))
+        model = torch.hub.load('yolov5', 'custom', path=str(model_path),source='local')
         model.conf = 0.25 # 设置置信度阈值
         print("[SUCCESS] YOLOv5模型加载成功（ultralytics官方接口）")
     except Exception as e:
