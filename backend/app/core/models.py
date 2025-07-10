@@ -1,6 +1,6 @@
 # 数据库模型定义
 # app/models
-from app.extensions import db
+from ..extensions import db
 
 class User(db.Model):
     __tablename__ = 'users'

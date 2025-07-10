@@ -4,7 +4,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
 
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123@127.0.0.1:3306/test_db'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:12345678@127.0.0.1:3306/test_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # ... 其他配置 ...
