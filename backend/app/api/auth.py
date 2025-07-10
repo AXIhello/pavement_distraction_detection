@@ -3,6 +3,9 @@
 from flask_restx import Namespace, Resource, fields
 from app.core.models import User
 from app.core.security import create_jwt_token
+from flask import current_app
+from app.utils.email_service import send_email_code, verify_email_code
+
 
 # 1. 定义一个命名空间 'ns'
 ns = Namespace('auth', description='认证相关操作')
@@ -57,7 +60,62 @@ class UserLogin(Resource):
                 'success': False,
                 'message': '无效的用户名或密码'
             }, 401
-        
+
+# 邮箱验证码发送请求模型
+send_email_code_model = ns.model('SendEmailCode', {
+    'email': fields.String(description='邮箱地址'),
+    'phone': fields.String(description='手机号或邮箱')
+})
+
+# 邮箱验证码登录请求模型
+email_login_model = ns.model('EmailLogin', {
+    'email': fields.String(required=True, description='邮箱地址'),
+    'code': fields.String(required=True, description='验证码')
+})
+
+@ns.route('/send_email_code')
+class SendEmailCode(Resource):
+    @ns.doc('发送邮箱验证码')
+    @ns.expect(send_email_code_model, validate=True)
+    def post(self):
+        """发送邮箱验证码"""
+        data = ns.payload
+        email = data.get('email') or data.get('phone')
+        print("收到邮箱：", email)
+        if not email:
+            return {'success': False, 'message': '邮箱地址不能为空'}, 400
+        try:
+            send_email_code(email)
+            return {'success': True, 'message': '验证码已发送'}
+        except Exception as e:
+            return {'success': False, 'message': f'发送失败：{str(e)}'}, 500
+
+@ns.route('/login_email')
+class LoginWithEmailCode(Resource):
+    @ns.doc('邮箱验证码登录')
+    @ns.expect(email_login_model, validate=True)
+    @ns.marshal_with(login_response_model)
+    def post(self):
+        """邮箱验证码登录（仅限已注册用户）"""
+        data = ns.payload
+        email = data.get('email')
+        code = data.get('code')
+
+        if not verify_email_code(email, code):
+            return {'success': False, 'message': '验证码无效或已过期'}, 401
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+
+        token = create_jwt_token(user.id)
+        return {
+            'success': True,
+            'message': '登录成功',
+            'access_token': token,
+            'token_type': 'bearer'
+        }
+
         
 # 你可能还会有注册、刷新token等其他接口
 # @ns.route('/register')

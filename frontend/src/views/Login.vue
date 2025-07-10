@@ -78,7 +78,6 @@
           </div>
         </div>
       </div>
-      <FaceRecognition v-if="showFaceModal" @close="showFaceModal = false" />
     </main>
   </div>
 </template>
@@ -86,6 +85,11 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
+
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
 import Header from '@/components/Title.vue'
 
 const loginMethod = ref('password')
@@ -106,7 +110,7 @@ function sendSmsCode() {
   }
   message.value = ''
 
-  fetch('http://127.0.0.1:5000/api/send_sms_code', {
+  fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone: phone.value })
@@ -142,7 +146,7 @@ async function handleLogin() {
 
   if (loginMethod.value === 'password') {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/auth/login', {
+      const res = await fetch('http://127.0.0.1:8000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -154,7 +158,7 @@ async function handleLogin() {
       if (data.success) {
         message.value = data.message
         messageColor.value = 'green'
-        showFaceModal.value = true
+        router.push('/first_page')
       } else {
         message.value = data.message
         messageColor.value = 'red'
@@ -170,11 +174,11 @@ async function handleLogin() {
       return
     }
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/login_by_sms', {
+      const res = await fetch('http://127.0.0.1:8000/api/auth/login_email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone: phone.value,
+          email: phone.value,
           code: smsCode.value
         })
       })
@@ -182,6 +186,7 @@ async function handleLogin() {
       if (data.success) {
         message.value = data.message
         messageColor.value = 'green'
+        router.push('/first_page')
       } else {
         message.value = data.message
         messageColor.value = 'red'
