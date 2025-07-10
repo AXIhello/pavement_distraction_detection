@@ -12,10 +12,10 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # 导入配置和日志设置
-from .app_config import DevelopmentConfig, ProductionConfig
-from .utils.logger import setup_logging, get_logger
-from .extensions import db
-from .core.models import User  # 确保模型在 db.create_all 前被导入
+from app.app_config import DevelopmentConfig, ProductionConfig
+from app.utils.logger import setup_logging, get_logger
+from app.extensions import db
+from app.core.models import User  # 确保模型在 db.create_all 前被导入
 
 # 导入 Flask-SocketIO
 from flask_socketio import SocketIO, emit

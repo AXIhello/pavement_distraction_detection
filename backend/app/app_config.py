@@ -4,8 +4,16 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
 
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123@127.0.0.1:3306/test_db'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:000000@localhost:3306/test_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # 邮件验证码发送邮箱配置
+    SMTP_CONFIG = {
+    "server": "smtp.qq.com",
+    "port": 465,
+    "from_email": "2330881321@qq.com",
+    "auth_code": "skhkuriqzfqkeccb"
+}
 
     # ... 其他配置 ...
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024
