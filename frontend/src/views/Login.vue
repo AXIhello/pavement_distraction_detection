@@ -38,7 +38,7 @@
                 <input 
                   type="text" 
                   id="account" 
-                  placeholder="邮箱"
+                  placeholder="账号"
                   v-model="account" 
                   required />
               </div>
@@ -59,7 +59,7 @@
                 <input 
                   type="tel" 
                   id="phone" 
-                  placeholder="邮箱"
+                  placeholder="账号"
                   v-model="phone" 
                   required />
               </div>
@@ -106,7 +106,7 @@
                 <input 
                   type="text" 
                   id="reg-account" 
-                  placeholder="邮箱"
+                  placeholder="账号"
                   v-model="regAccount" 
                   required />
               </div>
@@ -232,12 +232,32 @@ const regMessageColor = ref('red')
 const regCountdown = ref(0)
 let regTimer = null
 
+//验证邮箱格式
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+//验证密码强度（先不启用）
+function isStrongPassword(password) {
+  // 至少 8 位，包含大写、小写、数字、特殊字符
+  const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/
+  return strongRegex.test(password)
+}
+
+
 function sendSmsCode() {
   if (!phone.value) {
     message.value = '请输入邮箱'
     messageColor.value = 'red'
     return
   }
+  if (!isValidEmail(phone.value)) {
+  message.value = '邮箱格式不正确'
+  messageColor.value = 'red'
+  return
+}
+
   message.value = ''
 
   fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
@@ -266,6 +286,12 @@ function sendRegSmsCode() {
     regMessageColor.value = 'red'
     return
   }
+  if (!isValidEmail(phone.value)) {
+  message.value = '邮箱格式不正确'
+  messageColor.value = 'red'
+  return
+}
+
   regMessage.value = ''
 
   fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
@@ -342,6 +368,13 @@ async function handleLogin() {
       messageColor.value = 'red'
       return
     }
+    
+    if (!isValidEmail(phone.value)) {
+  message.value = '请输入正确的邮箱格式'
+  messageColor.value = 'red'
+  return
+}
+
     try {
       const res = await fetch('http://127.0.0.1:8000/api/auth/login_email', {
         method: 'POST',
@@ -406,6 +439,12 @@ async function handleRegister() {
       regMessageColor.value = 'red'
       return
     }
+    if (!isValidEmail(regPhone.value)) {
+  regMessage.value = '请输入正确的邮箱格式'
+  regMessageColor.value = 'red'
+  return
+}
+
     if (regPasswordSms.value !== regConfirmPasswordSms.value) {
       regMessage.value = '两次输入的密码不一致'
       regMessageColor.value = 'red'
