@@ -41,6 +41,13 @@
       <div class="progress-fill" :style="{ width: (processedFrames / totalFrames) * 100 + '%' }"></div>
     </div>
 
+    <!-- 分析完成提示 -->
+<div v-if="showCompleteNotice" class="popup-notice">
+  分析完毕
+</div>
+<!-- 分析结果标题 -->
+<h3 v-if="annotatedImages.length" class="result-title">分析结果</h3>
+
     <!-- 分析结果图像 -->
     <div class="image-slider" v-if="annotatedImages.length">
       <div class="image-controls">
@@ -58,6 +65,8 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { io } from 'socket.io-client'
 import Header2 from '@/components/Navigation.vue'
+
+const showCompleteNotice = ref(false)
 
 const headerRef = ref(null)
 const headerHeight = ref(0)
@@ -82,6 +91,18 @@ function updateHeaderHeight() {
     }
   })
 }
+onBeforeRouteLeave((to, from, next) => {
+  if (hasUnsavedChanges()) {
+    const answer = window.confirm('该界面的内容将不会保存，是否离开？')
+    if (answer) {
+      next()
+    } else {
+      next(false)
+    }
+  } else {
+    next()
+  }
+})
 
 onMounted(() => {
   updateHeaderHeight()
@@ -142,10 +163,17 @@ function startAnalysis() {
     }
   })
 
-  socket.on('analysis_complete', () => {
-    console.log('分析完成')
+  //对服务器结束信号的监听
+  socket.on('stream_complete', () => {
+    console.log('服务器通知：视频分析已完成')
     processing.value = false
     extractionComplete.value = false
+
+    showCompleteNotice.value = true
+  // 1 秒后自动隐藏
+  setTimeout(() => {
+    showCompleteNotice.value = false
+  }, 1000)
   })
 
   socket.on('disconnect', () => {
@@ -268,6 +296,29 @@ function toggleAutoPlay() {
     }
   }
 }
+
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
+
+const router = useRouter()
+
+// 判断当前是否有未保存内容（例如有视频且分析中或未完成）
+function hasUnsavedChanges() {
+  return videoFile.value && processing.value
+}
+
+// 浏览器关闭/刷新/标签页关闭时触发
+function handleBeforeUnload(event) {
+  if (hasUnsavedChanges()) {
+    event.preventDefault()
+    event.returnValue = '' // 一定要设置，否则无法弹出提示
+    return ''
+  }
+  // 不返回值或null时不弹框
+  return null
+}
+
+
+
 </script>
 
 <style scoped>
@@ -295,7 +346,7 @@ function toggleAutoPlay() {
 
 .actions button {
   padding: 10px 20px;
-  background: #007bff;
+  background: #000000;
   color: white;
   border: none;
   border-radius: 5px;
@@ -345,7 +396,7 @@ function toggleAutoPlay() {
 
 .image-controls button {
   padding: 5px 10px;
-  background: #28a745;
+  background: #cfa97e;
   color: white;
   border: none;
   border-radius: 3px;
@@ -361,4 +412,33 @@ function toggleAutoPlay() {
   border: 2px solid #007bff;
   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
+.popup-notice {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #f5e9d7;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  font-size: 18px;
+  opacity: 1;
+  animation: fadeOut 2s forwards;
+  z-index: 999;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.result-title {
+  margin-top: 20px;
+  font-size: 22px;
+  color: #333;
+  text-align: center;
+}
+
+
 </style>
