@@ -4,6 +4,10 @@
     <div class="video-container">
       <video ref="video" autoplay playsinline></video>
     </div>
+    <div class="progress-bar">
+      <div class="progress-inner" :style="{ width: progress + '%' }"></div>
+    </div>
+    <p class="progress-status">{{ progressStatus }}</p>
     <button @click="startCamera">开启摄像头识别</button>
     <p class="tip">请正对摄像头，系统将自动识别您的人脸</p>
   </div>
@@ -20,6 +24,14 @@ const video = ref(null)
 let socket = null
 let streamInterval = null
 let stream = null
+let isWaitingForResult = false // 是否正在等待结果
+let frameCount = 0 // 当前批次已发送的帧数
+const FRAMES_PER_BATCH = 5 // 每批次发送5帧
+const BATCH_INTERVAL = 200 // 批次内每帧间隔200ms
+const WAIT_TIME = 1000 // 等待结果时间1000ms
+
+const progress = ref(0) // 进度条百分比
+const progressStatus = ref('识别准备中...') // 状态提示
 
 async function startCamera() {
   try {
@@ -32,25 +44,33 @@ async function startCamera() {
 
     socket.on('connect', () => {
       console.log('SocketIO 已连接')
+      progress.value = 0
+      progressStatus.value = '识别中...'
       startImageStream()
     })
 
     socket.on('face_result', (result) => {
       console.log('识别结果:', result);
-
+      isWaitingForResult = false // 收到结果，停止等待
+      progress.value = 100
+      progressStatus.value = '识别完成'
+      setTimeout(() => {
+        progress.value = 0
+        progressStatus.value = '识别中...'
+      }, 1000)
 
       if (result.success) {
         const face = result.faces[0];
         if (face.name === '陌生人') {
           alert('告警：检测到陌生人！');
-      // 停止摄像头 & 关闭 SocketIO
+          // 停止摄像头 & 关闭 SocketIO
           clearInterval(streamInterval)
           stream.getTracks().forEach(track => track.stop())
           socket.disconnect()
-      // 跳转到登录界面
+          // 跳转到登录界面
           router.push('/login')
           return;
-    }
+        }
         console.log('识别成功:', result.faces);
         // 停止摄像头 & 关闭 SocketIO
         clearInterval(streamInterval)
@@ -89,6 +109,12 @@ function startImageStream() {
         return
       }
 
+      // 如果正在等待结果，跳过
+      if (isWaitingForResult) {
+        return
+      }
+
+      // 发送一帧图片
       const canvas = document.createElement('canvas')
       canvas.width = video.value.videoWidth
       canvas.height = video.value.videoHeight
@@ -97,8 +123,31 @@ function startImageStream() {
       ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
 
       const base64Image = canvas.toDataURL('image/jpeg')
+      console.log(`发送第 ${frameCount + 1} 帧...`)
       socket.emit('face_recognition', { image: base64Image })
-    }, 200)
+      
+      frameCount++
+      progress.value = Math.round((frameCount / FRAMES_PER_BATCH) * 100)
+      progressStatus.value = '识别中...'
+
+      // 如果发送了5帧，开始等待结果
+      if (frameCount >= FRAMES_PER_BATCH) {
+        console.log('已发送5帧，等待1秒看结果...')
+        isWaitingForResult = true
+        frameCount = 0
+        progress.value = 100
+        progressStatus.value = '识别中，请稍候...'
+        // 1秒后如果没有结果，继续发送下一批
+        setTimeout(() => {
+          if (isWaitingForResult) {
+            console.log('1秒内无结果，继续发送下一批...')
+            isWaitingForResult = false
+            progress.value = 0
+            progressStatus.value = '识别中...'
+          }
+        }, WAIT_TIME)
+      }
+    }, BATCH_INTERVAL) // 每200ms发送一帧
   }
 }
 
@@ -110,6 +159,8 @@ function stopCamera() {
   if (socket) {
     socket.disconnect()
   }
+  progress.value = 0
+  progressStatus.value = '识别准备中...'
 }
 </script>
 
@@ -140,6 +191,25 @@ function stopCamera() {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #eee;
+  border-radius: 5px;
+  margin: 16px 0 8px 0;
+  overflow: hidden;
+}
+.progress-inner {
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.2s;
+}
+.progress-status {
+  font-size: 14px;
+  color: #888;
+  text-align: center;
 }
 
 video {
