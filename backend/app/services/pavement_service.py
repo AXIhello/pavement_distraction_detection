@@ -34,7 +34,7 @@ else:
         print(" [INFO] 正在加载YOLOv5官方推理接口模型...")
         # 使用 torch.hub.load 加载自定义模型
         model = torch.hub.load('yolov5', 'custom', path=str(model_path),source='local')
-        model.conf = 0.35 # 设置置信度阈值
+        model.conf = 0.30 # 设置置信度阈值
         print("[SUCCESS] YOLOv5模型加载成功（ultralytics官方接口）")
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {str(e)}")
