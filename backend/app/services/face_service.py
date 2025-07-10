@@ -26,8 +26,7 @@ class FaceRecognitionService:
     def initialize_models(self):
         logger.info("正在加载 Dlib 人脸识别模型...")
         try:
-            # 假设 data 文件夹在 backend 目录下，路径是相对于 backend
-            # 如果你的 data 文件夹在项目根目录，需要调整路径为 '../data/data_dlib/...'
+
             dlib_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'data_dlib')
             features_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data',
                                              'features_all.csv')
@@ -62,43 +61,26 @@ class FaceRecognitionService:
 
     def _load_face_database(self, path_features_known_csv):
         """
-        从 CSV 文件加载已知人脸特征和名字。
+        从数据库加载已知人脸特征和名字。
         """
         self.features_known_list = []
         self.face_name_known_list = []
-        if os.path.exists(path_features_known_csv):
-            try:
-                # 检查文件是否为空
-                if os.path.getsize(path_features_known_csv) == 0:
-                    logger.warning(f"人脸数据库文件 '{path_features_known_csv}' 为空，跳过加载。")
-                    return
-                
-                csv_rd = pd.read_csv(path_features_known_csv, header=None)
-                
-                # 检查是否有数据
-                if csv_rd.empty:
-                    logger.warning(f"人脸数据库文件 '{path_features_known_csv}' 没有数据，跳过加载。")
-                    return
-                
-                for i in range(csv_rd.shape[0]):
-                    features_someone_arr = []
-                    face_name_known_list_item = csv_rd.iloc[i][0]
-                    # 处理姓名可能需要转换或映射
-                    self.face_name_known_list.append(str(face_name_known_list_item))  # 确保姓名是字符串
-                    for j in range(1, 129):
-                        if pd.isna(csv_rd.iloc[i][j]) or str(csv_rd.iloc[i][j]) == '':
-                            features_someone_arr.append(0.0)
-                        else:
-                            features_someone_arr.append(float(csv_rd.iloc[i][j]))
-                    self.features_known_list.append(np.array(features_someone_arr, dtype=np.float64))
-                logger.info(
-                    f"人脸数据库 '{path_features_known_csv}' 加载完成，已包含 {len(self.features_known_list)} 张已知人脸。")
-            except Exception as e:
-                logger.error(f"加载人脸数据库 '{path_features_known_csv}' 失败: {e}", exc_info=True)
-                self.features_known_list = []
-                self.face_name_known_list = []
-        else:
-            logger.warning(f"人脸数据库文件 '{path_features_known_csv}' 未找到！请先运行特征提取脚本。")
+        
+        try:
+            # 从数据库服务获取所有特征
+            from .face_db_service import FaceDatabaseService
+            features_data = FaceDatabaseService.get_all_features()
+            
+            for name, feature_vector in features_data:
+                self.face_name_known_list.append(name)
+                self.features_known_list.append(feature_vector.astype(np.float64))
+            
+            logger.info(f"从数据库加载人脸特征完成，已包含 {len(self.features_known_list)} 张已知人脸。")
+            
+        except Exception as e:
+            logger.error(f"从数据库加载人脸特征失败: {e}", exc_info=True)
+            self.features_known_list = []
+            self.face_name_known_list = []
 
     def _return_euclidean_distance(self, feature_1, feature_2):
         """
@@ -153,7 +135,7 @@ class FaceRecognitionService:
                             dist = self._return_euclidean_distance(face_descriptor_np, known_feature)
                             if dist < min_dist:
                                 min_dist = dist
-                                if min_dist < 0.4:  # 设置一个阈值，小于这个距离认为是同一个人
+                                if min_dist < 0.5:  # 设置一个阈值，小于这个距离认为是同一个人
                                     recognized_name = self.face_name_known_list[j]
                                 else:
                                     recognized_name = "陌生人"
