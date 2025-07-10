@@ -7,6 +7,7 @@ import io
 import base64
 import os
 import numpy as np
+from typing import List, Dict
 
 # 类别ID到中文标签的映射
 id2label = {
@@ -40,7 +41,7 @@ else:
         model = None
 
 
-def detect_single_image(base64_image: str) -> dict:
+def detect_single_image(base64_image: str) -> Dict:
     """
     对单帧 Base64 图像进行检测
     :param base64_image: str Base64编码的图像
@@ -67,7 +68,7 @@ def detect_single_image(base64_image: str) -> dict:
 
         # 使用PIL加载图像并转换为RGB，然后强制resize到640x640
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        image = image.resize((640, 640))
+        # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
         image_np = np.array(image) # 转换为NumPy数组供YOLOv5模型使用
 
         # 执行检测
@@ -115,7 +116,7 @@ def detect_single_image(base64_image: str) -> dict:
         }
 
 
-def detect_batch_images(base64_images: list[str]) -> list[dict]:
+def detect_batch_images(base64_images: List[str]) -> List[Dict]:
     """
     对多帧 Base64 图像进行检测，并返回标注后的 Base64 图像
     :param base64_images: List[str] Base64编码的图像列表
@@ -142,7 +143,7 @@ def detect_batch_images(base64_images: list[str]) -> list[dict]:
             _, encoded = base64_str.split(',', 1)
             image_bytes = base64.b64decode(encoded)
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            image = image.resize((640, 640))
+            # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
             image_np = np.array(image)
 
             detections = []
