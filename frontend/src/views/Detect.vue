@@ -153,7 +153,7 @@ function resetState() {
   extractionComplete.value = false
   processing.value = false
   autoPlay.value = false
-  
+
   allDetections.value = []
   uniqueDetectionClasses.value = []
 }
@@ -258,7 +258,7 @@ function extractFramesOffline() {
         // 等待视频帧完全加载
         video.addEventListener('canplay', () => {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-          const base64 = canvas.toDataURL('image/jpeg', 0.8) // 添加压缩质量
+          const base64 = canvas.toDataURL('image/jpeg', 1.0) // 添加压缩质量
           
           socket.emit('video_frame', { image: base64 })
           
