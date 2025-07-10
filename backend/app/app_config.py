@@ -8,7 +8,6 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # ... 其他配置 ...
-    MAX_CONTENT_LENGTH = 500 * 1024 * 1024
 
     # 日志配置
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO') # 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)

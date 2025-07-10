@@ -67,7 +67,7 @@ def detect_single_image(base64_image: str) -> dict:
 
         # 使用PIL加载图像并转换为RGB，然后强制resize到640x640
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        image = image.resize((640, 640))
+        # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
         image_np = np.array(image) # 转换为NumPy数组供YOLOv5模型使用
 
         # 执行检测
@@ -142,7 +142,7 @@ def detect_batch_images(base64_images: list[str]) -> list[dict]:
             _, encoded = base64_str.split(',', 1)
             image_bytes = base64.b64decode(encoded)
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            image = image.resize((640, 640))
+            # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
             image_np = np.array(image)
 
             detections = []
