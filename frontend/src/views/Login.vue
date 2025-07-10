@@ -15,66 +15,178 @@
         </div>
       </div>
 
-      <!-- 登录表单 -->
-      <div class="login-container">
-        <h2>登录</h2>
+      <!-- 登录注册容器 -->
+      <div class="auth-container">
+        <!-- 主标签页 -->
+        <div class="main-tabs">
+          <button 
+            :class="{ active: mainTab === 'login' }" 
+            @click="mainTab = 'login'">登录</button>
+          <button 
+            :class="{ active: mainTab === 'register' }" 
+            @click="mainTab = 'register'">注册</button>
+        </div>
 
-        <form @submit.prevent="handleLogin">
-          <div v-if="loginMethod === 'password'">
-            <div class="form-group">
-              <label for="account">账号</label>
-              <input 
-                type="text" 
-                id="account" 
-                placeholder="电话号码/邮箱"
-                v-model="account" 
-                required />
+        <!-- 登录表单 -->
+        <div v-if="mainTab === 'login'" class="form-container">
+          <h2>登录</h2>
+
+          <form @submit.prevent="handleLogin">
+            <div v-if="loginMethod === 'password'">
+              <div class="form-group">
+                <label for="account">账号</label>
+                <input 
+                  type="text" 
+                  id="account" 
+                  placeholder="邮箱"
+                  v-model="account" 
+                  required />
+              </div>
+
+              <div class="form-group">
+                <label for="password">密码</label>
+                <input 
+                  type="password" 
+                  id="password" 
+                  v-model="password" 
+                  required />
+              </div>
             </div>
 
-            <div class="form-group">
-              <label for="password">密码</label>
-              <input 
-                type="password" 
-                id="password" 
-                v-model="password" 
-                required />
+            <div v-else-if="loginMethod === 'sms'">
+              <div class="form-group">
+                <label for="phone">账号</label>
+                <input 
+                  type="tel" 
+                  id="phone" 
+                  placeholder="邮箱"
+                  v-model="phone" 
+                  required />
+              </div>
+
+              <div class="form-group code-group">
+                <label for="smsCode">验证码</label>
+                <input type="text" id="smsCode" v-model="smsCode" required />
+                <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
+                  {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit">登录</button>
+
+            <p :style="{ color: messageColor }">{{ message }}</p>
+          </form>
+
+          <div class="other-login-methods">
+            <span>其他登录方式</span>
+            <div class="login-method-buttons">
+              <button 
+                :class="{ active: loginMethod === 'password' }" 
+                @click="loginMethod = 'password'">账号密码登录</button>
+              <button 
+                :class="{ active: loginMethod === 'sms' }" 
+                @click="loginMethod = 'sms'">邮箱验证码登录</button>
+            </div>
+            <div class="register-hint">
+              <span>没有账号？</span>
+              <button type="button" class="link-button" @click="mainTab = 'register'">去注册</button>
             </div>
           </div>
+        </div>
 
-          <div v-else-if="loginMethod === 'sms'">
-            <div class="form-group">
-              <label for="phone">账号</label>
-              <input 
-                type="tel" 
-                id="phone" 
-                placeholder="电话号码/邮箱"
-                v-model="phone" 
-                required />
+        <!-- 注册表单 -->
+        <div v-else-if="mainTab === 'register'" class="form-container">
+          <h2>注册</h2>
+
+          <form @submit.prevent="handleRegister">
+            <div v-if="registerMethod === 'password'">
+              <div class="form-group">
+                <label for="reg-account">账号</label>
+                <input 
+                  type="text" 
+                  id="reg-account" 
+                  placeholder="邮箱"
+                  v-model="regAccount" 
+                  required />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-password">密码</label>
+                <input 
+                  type="password" 
+                  id="reg-password" 
+                  v-model="regPassword" 
+                  required />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-confirm-password">确认密码</label>
+                <input 
+                  type="password" 
+                  id="reg-confirm-password" 
+                  v-model="regConfirmPassword" 
+                  required />
+              </div>
             </div>
 
-            <div class="form-group code-group">
-              <label for="smsCode">验证码</label>
-              <input type="text" id="smsCode" v-model="smsCode" required />
-              <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
-                {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
-              </button>
+            <div v-else-if="registerMethod === 'sms'">
+              <div class="form-group">
+                <label for="reg-phone">账号</label>
+                <input 
+                  type="tel" 
+                  id="reg-phone" 
+                  placeholder="邮箱"
+                  v-model="regPhone" 
+                  required />
+              </div>
+
+              <div class="form-group code-group">
+                <label for="reg-smsCode">验证码</label>
+                <input type="text" id="reg-smsCode" v-model="regSmsCode" required />
+                <button type="button" :disabled="regCountdown > 0" @click="sendRegSmsCode">
+                  {{ regCountdown > 0 ? `${regCountdown}s 后重发` : '获取验证码' }}
+                </button>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-password-sms">密码</label>
+                <input 
+                  type="password" 
+                  id="reg-password-sms" 
+                  v-model="regPasswordSms" 
+                  required />
+              </div>
+
+              <div class="form-group">
+                <label for="reg-confirm-password-sms">确认密码</label>
+                <input 
+                  type="password" 
+                  id="reg-confirm-password-sms" 
+                  v-model="regConfirmPasswordSms" 
+                  required />
+              </div>
             </div>
-          </div>
 
-          <button type="submit">登录</button>
+            <button type="submit">注册</button>
 
-          <p :style="{ color: messageColor }">{{ message }}</p>
-        </form>
+            <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
+          </form>
 
-        <div class="other-login-methods">
-          <span>其他登录方式</span>
-          <div class="login-method-buttons">
-            <button 
-              :class="{ active: loginMethod === 'password' }" 
-              @click="loginMethod = 'password'">账号密码登录</button>
-            <button 
-              :class="{ active: loginMethod === 'sms' }" 
-              @click="loginMethod = 'sms'">手机验证码登录</button>
+          <div class="other-login-methods">
+            <span>其他注册方式</span>
+            <div class="login-method-buttons">
+              <button 
+                :class="{ active: registerMethod === 'password' }" 
+                @click="registerMethod = 'password'">账号密码注册</button>
+              <button 
+                :class="{ active: registerMethod === 'sms' }" 
+                @click="registerMethod = 'sms'">邮箱验证码注册</button>
+            </div>
+            <div class="register-hint">
+              <span>已有账号？</span>
+              <button type="button" class="link-button" @click="mainTab = 'login'">去登录</button>
+            </div>
           </div>
         </div>
       </div>
@@ -92,6 +204,10 @@ const router = useRouter()
 
 import Header from '@/components/Title.vue'
 
+// 主标签页
+const mainTab = ref('login')
+
+// 登录相关
 const loginMethod = ref('password')
 const account = ref('')
 const password = ref('')
@@ -102,9 +218,23 @@ const messageColor = ref('red')
 const countdown = ref(0)
 let timer = null
 
+// 注册相关
+const registerMethod = ref('password')
+const regAccount = ref('')
+const regPassword = ref('')
+const regConfirmPassword = ref('')
+const regPhone = ref('')
+const regSmsCode = ref('')
+const regPasswordSms = ref('')
+const regConfirmPasswordSms = ref('')
+const regMessage = ref('')
+const regMessageColor = ref('red')
+const regCountdown = ref(0)
+let regTimer = null
+
 function sendSmsCode() {
   if (!phone.value) {
-    message.value = '请输入手机号'
+    message.value = '请输入邮箱'
     messageColor.value = 'red'
     return
   }
@@ -130,6 +260,34 @@ function sendSmsCode() {
     })
 }
 
+function sendRegSmsCode() {
+  if (!regPhone.value) {
+    regMessage.value = '请输入邮箱'
+    regMessageColor.value = 'red'
+    return
+  }
+  regMessage.value = ''
+
+  fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: regPhone.value })
+  }).then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        regMessage.value = '验证码已发送'
+        regMessageColor.value = 'green'
+        startRegCountdown()
+      } else {
+        regMessage.value = data.message || '发送验证码失败'
+        regMessageColor.value = 'red'
+      }
+    }).catch(() => {
+      regMessage.value = '请求失败，请检查后端服务'
+      regMessageColor.value = 'red'
+    })
+}
+
 function startCountdown() {
   countdown.value = 60
   timer = setInterval(() => {
@@ -137,6 +295,17 @@ function startCountdown() {
     if (countdown.value <= 0) {
       clearInterval(timer)
       timer = null
+    }
+  }, 1000)
+}
+
+function startRegCountdown() {
+  regCountdown.value = 60
+  regTimer = setInterval(() => {
+    regCountdown.value--
+    if (regCountdown.value <= 0) {
+      clearInterval(regTimer)
+      regTimer = null
     }
   }, 1000)
 }
@@ -169,7 +338,7 @@ async function handleLogin() {
     }
   } else {
     if (!phone.value || !smsCode.value) {
-      message.value = '请输入手机号和验证码'
+      message.value = '请输入邮箱和验证码'
       messageColor.value = 'red'
       return
     }
@@ -194,6 +363,78 @@ async function handleLogin() {
     } catch (error) {
       message.value = '请求失败，请检查后端服务是否启动'
       messageColor.value = 'red'
+    }
+  }
+}
+
+async function handleRegister() {
+  regMessage.value = ''
+
+  if (registerMethod.value === 'password') {
+    if (regPassword.value !== regConfirmPassword.value) {
+      regMessage.value = '两次输入的密码不一致'
+      regMessageColor.value = 'red'
+      return
+    }
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: regAccount.value,
+          password: regPassword.value
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        regMessage.value = data.message
+        regMessageColor.value = 'green'
+        setTimeout(() => {
+          mainTab.value = 'login'
+        }, 1500)
+      } else {
+        regMessage.value = data.message
+        regMessageColor.value = 'red'
+      }
+    } catch (error) {
+      regMessage.value = '请求失败，请检查后端服务是否启动'
+      regMessageColor.value = 'red'
+    }
+  } else {
+    if (!regPhone.value || !regSmsCode.value) {
+      regMessage.value = '请输入邮箱和验证码'
+      regMessageColor.value = 'red'
+      return
+    }
+    if (regPasswordSms.value !== regConfirmPasswordSms.value) {
+      regMessage.value = '两次输入的密码不一致'
+      regMessageColor.value = 'red'
+      return
+    }
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/auth/register_email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: regPhone.value,
+          code: regSmsCode.value,
+          password: regPasswordSms.value
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        regMessage.value = data.message
+        regMessageColor.value = 'green'
+        setTimeout(() => {
+          mainTab.value = 'login'
+        }, 1500)
+      } else {
+        regMessage.value = data.message
+        regMessageColor.value = 'red'
+      }
+    } catch (error) {
+      regMessage.value = '请求失败，请检查后端服务是否启动'
+      regMessageColor.value = 'red'
     }
   }
 }
@@ -242,9 +483,41 @@ main {
   font-size: 12px;
 }
 
-.login-container {
+.auth-container {
   flex: 1;
   max-width: 400px;
+}
+
+.main-tabs {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #eee;
+}
+
+.main-tabs button {
+  flex: 1;
+  padding: 15px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.main-tabs button.active {
+  color: #000;
+  border-bottom-color: #000;
+}
+
+.main-tabs button:hover {
+  color: #000;
+}
+
+.form-container {
+  width: 100%;
 }
 
 .form-group {
@@ -330,5 +603,32 @@ button[type="button"] {
 .login-method-buttons button.active {
   background-color: #000;
   color: #fff;
+}
+
+.register-hint {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+}
+
+.register-hint span {
+  margin-right: 5px;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 12px;
+  padding: 0;
+  width: auto;
+  margin: 0;
+}
+
+.link-button:hover {
+  color: #0056b3;
 }
 </style>
