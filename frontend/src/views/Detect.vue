@@ -3,19 +3,35 @@
   <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }">
     <h2>上传并分析路障</h2>
 
+    <!-- 模式选择按钮 -->
+    <div class="upload-mode">
+      <button :class="{ active: mode === 'upload' }" @click="selectUploadMode">上传视频</button>
+      <button :class="{ active: mode === 'record' }" @click="selectRecordMode">现场录制</button>
+    </div>
+
     <!-- 上传视频 -->
-    <div class="upload-section">
+    <div class="upload-section" v-if="mode === 'upload'">
       <input type="file" accept="video/*" @change="handleVideoChange" v-if="!videoFile" />
       <button @click="removeVideo" v-if="videoFile">卸载视频</button>
     </div>
 
+    <!-- 现场录制 -->
+    <div class="record-section" v-if="mode === 'record'">
+      <video ref="recordPreview" autoplay muted playsinline></video>
+      <div class="record-buttons">
+        <button @click="startRecording" :disabled="recording">开始录制</button>
+        <button @click="stopRecording" :disabled="!recording">停止录制</button>
+        <button @click="cancelRecording" v-if="recordedBlob">取消录制</button>
+      </div>
+    </div>
+
     <!-- 视频预览 -->
-    <div class="video-preview" v-if="videoURL">
+    <div class="video-preview" v-if="videoURL && !recording">
       <video :src="videoURL" controls muted playsinline ref="videoEl"></video>
     </div>
 
     <!-- 操作按钮 -->
-    <div class="actions" v-if="videoFile && !processing">
+    <div class="actions" v-if="videoFile && !processing && !recording">
       <button @click="startAnalysis" :disabled="processing">开始分析</button>
     </div>
 
@@ -36,7 +52,6 @@
     <!-- 分析结果 -->
     <h3 v-if="frameResults.length" class="result-title">分析结果</h3>
 
-
     <!-- 图像轮播与检测详情 -->
     <div class="image-slider" v-if="frameResults.length">
       <div class="image-controls">
@@ -47,25 +62,25 @@
       </div>
 
       <div class="image-result">
-  <div class="image-column">
-    <img :src="frameResults[currentImageIndex].image" class="annotated-frame" />
-  </div>
-  <div class="info-column detection-info">
-    <h4>检测结果：</h4>
-    <ul v-if="frameResults[currentImageIndex].detections.length">
-      <li v-for="(det, i) in frameResults[currentImageIndex].detections" :key="i">
-        类别：<strong>{{ det.class }}</strong><br />
-        置信度：{{ (det.confidence * 100).toFixed(1) }}%<br />
-        坐标：[{{ det.bbox.join(', ') }}]
-      </li>
-    </ul>
-    <p v-else>无检测结果</p>
-  </div>
-</div>
-
+        <div class="image-column">
+          <img :src="frameResults[currentImageIndex].image" class="annotated-frame" />
+        </div>
+        <div class="info-column detection-info">
+          <h4>检测结果：</h4>
+          <ul v-if="frameResults[currentImageIndex].detections.length">
+            <li v-for="(det, i) in frameResults[currentImageIndex].detections" :key="i">
+              类别：<strong>{{ det.class }}</strong><br />
+              置信度：{{ (det.confidence * 100).toFixed(1) }}%<br />
+              坐标：[{{ det.bbox.join(', ') }}]
+            </li>
+          </ul>
+          <p v-else>无检测结果</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
+
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -74,6 +89,8 @@ import Header2 from '@/components/Navigation.vue'
 
 const headerRef = ref(null)
 const headerHeight = ref(0)
+
+const mode = ref('upload') // 上传 或 录制
 
 const videoFile = ref(null)
 const videoURL = ref('')
@@ -94,6 +111,16 @@ const uniqueDetectionClasses = ref([])
 
 let socket = null
 
+// 录制相关
+const recordPreview = ref(null)
+const mediaRecorder = ref(null)
+const recordedChunks = ref([])
+const recordedBlob = ref(null)
+const recording = ref(false)
+const mediaStream = ref(null)
+
+// --- UI 相关 ---
+
 function updateHeaderHeight() {
   nextTick(() => {
     if (headerRef.value?.$el) {
@@ -112,8 +139,22 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateHeaderHeight)
   window.removeEventListener('beforeunload', handleBeforeUnload)
   stopAnalysis()
+  stopCamera()
 })
 
+// 模式切换
+function selectUploadMode() {
+  resetAll()
+  mode.value = 'upload'
+}
+
+function selectRecordMode() {
+  resetAll()
+  mode.value = 'record'
+  startCamera()
+}
+
+// 处理上传视频文件
 function handleVideoChange(e) {
   const file = e.target.files[0]
   if (file) {
@@ -130,6 +171,67 @@ function removeVideo() {
   stopAnalysis()
 }
 
+// 录制相关
+
+async function startCamera() {
+  try {
+    mediaStream.value = await navigator.mediaDevices.getUserMedia({ video: true })
+    if (recordPreview.value) {
+      recordPreview.value.srcObject = mediaStream.value
+    }
+  } catch (err) {
+    alert('无法访问摄像头：' + err.message)
+  }
+}
+
+function stopCamera() {
+  if (mediaStream.value) {
+    mediaStream.value.getTracks().forEach(track => track.stop())
+    mediaStream.value = null
+  }
+  if (recordPreview.value) {
+    recordPreview.value.srcObject = null
+  }
+}
+
+function startRecording() {
+  if (!mediaStream.value) {
+    alert('摄像头未启动')
+    return
+  }
+  recordedChunks.value = []
+  const options = { mimeType: 'video/webm; codecs=vp8' }
+  const recorder = new MediaRecorder(mediaStream.value, options)
+  mediaRecorder.value = recorder
+  recording.value = true
+
+  recorder.ondataavailable = e => {
+    if (e.data.size > 0) recordedChunks.value.push(e.data)
+  }
+
+  recorder.onstop = () => {
+    recordedBlob.value = new Blob(recordedChunks.value, { type: 'video/webm' })
+    videoFile.value = new File([recordedBlob.value], 'recorded.webm', { type: 'video/webm' })
+    videoURL.value = URL.createObjectURL(recordedBlob.value)
+    stopCamera()
+    recording.value = false
+  }
+
+  recorder.start()
+}
+
+function stopRecording() {
+  if (mediaRecorder.value && recording.value) {
+    mediaRecorder.value.stop()
+  }
+}
+
+function cancelRecording() {
+  resetAll()
+  stopCamera()
+}
+
+// 重置状态
 function resetState() {
   frameResults.value = []
   currentImageIndex.value = 0
@@ -142,8 +244,19 @@ function resetState() {
   uniqueDetectionClasses.value = []
 }
 
+function resetAll() {
+  videoFile.value = null
+  videoURL.value = ''
+  recordedBlob.value = null
+  recording.value = false
+  stopCamera()
+  resetState()
+}
+
+// --- 分析功能 ---
+
 function startAnalysis() {
-  if (!videoURL.value) return alert('请先上传视频')
+  if (!videoURL.value) return alert('请先上传或录制视频')
 
   processing.value = true
   extractionComplete.value = false
@@ -288,7 +401,7 @@ function toggleAutoPlay() {
     }, 1000)
   } else {
     clearInterval(autoPlayTimer.value)
-    autoPlayTimer.value = null
+        autoPlayTimer.value = null
   }
 }
 
@@ -303,9 +416,12 @@ function handleBeforeUnload(e) {
   }
 }
 onBeforeRouteLeave((to, from, next) => {
-  hasUnsavedChanges() ? (window.confirm('未完成分析将丢失，确定离开？') ? next() : next(false)) : next()
+  hasUnsavedChanges()
+    ? (window.confirm('未完成分析将丢失，确定离开？') ? next() : next(false))
+    : next()
 })
 </script>
+
 <style scoped>
 .detect-container {
   max-width: 960px;
@@ -316,11 +432,58 @@ onBeforeRouteLeave((to, from, next) => {
   border-radius: 12px;
 }
 
-.video-preview video {
+.upload-mode {
+  margin-bottom: 16px;
+  display: flex;          /* 横向排列 */
+  justify-content: flex-start; /* 靠左 */
+  align-items: center;    /* 垂直居中 */
+  gap: 12px;              /* 按钮之间的间距 */
+  width: fit-content;     /* 宽度仅包裹按钮内容 */
+}
+
+.upload-mode button {
+  padding: 8px 16px;
+  margin-right: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #ddd;
+  color: #333;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.upload-mode button.active {
+  background: #1e2124;
+  color: white;
+}
+
+.video-preview video,
+.record-section video {
   width: 100%;
   max-height: 360px;
   object-fit: contain;
   border-radius: 8px;
+  background: rgb(212, 209, 201);
+}
+
+.record-buttons {
+  margin-top: 12px;
+}
+
+.record-buttons button {
+  padding: 10px 20px;
+  margin-right: 10px;
+  background: #000000;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.record-buttons button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
 }
 
 .actions {
@@ -360,7 +523,7 @@ onBeforeRouteLeave((to, from, next) => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #007bff, #0056b3);
+  background: linear-gradient(90deg, #e7a74d, #b37700);
   transition: width 0.3s ease;
 }
 
@@ -370,12 +533,6 @@ onBeforeRouteLeave((to, from, next) => {
   color: #333;
   text-align: center;
 }
-
-/* .detection-summary {
-  margin-top: 16px;
-  font-weight: bold;
-  text-align: center;
-} */
 
 .image-slider {
   margin-top: 20px;
@@ -441,7 +598,7 @@ onBeforeRouteLeave((to, from, next) => {
   left: 50%;
   transform: translateX(-50%);
   background-color: #f5e9d7;
-  color: white;
+  color: #333;
   padding: 12px 24px;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
@@ -450,14 +607,16 @@ onBeforeRouteLeave((to, from, next) => {
   animation: fadeOut 2s forwards;
   z-index: 999;
 }
+
 .image-result {
   display: flex;
   flex-direction: row;
   gap: 20px;
   align-items: flex-start;
   margin-top: 16px;
-  flex-wrap: wrap; /* 让它在小屏幕也能垂直展示 */
+  flex-wrap: wrap;
 }
+
 .image-column {
   flex: 0 0 50%;
   max-width: 50%;
@@ -467,8 +626,6 @@ onBeforeRouteLeave((to, from, next) => {
   flex: 1;
   max-width: 50%;
 }
-
-
 
 @keyframes fadeOut {
   0% {
