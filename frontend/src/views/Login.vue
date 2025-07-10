@@ -78,7 +78,6 @@
           </div>
         </div>
       </div>
-      <FaceRecognition v-if="showFaceModal" @close="showFaceModal = false" />
     </main>
   </div>
 </template>
@@ -86,7 +85,12 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
-import Header from '@/components/Header.vue'
+
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+import Header from '@/components/Title.vue'
 
 const loginMethod = ref('password')
 const account = ref('')
@@ -154,7 +158,7 @@ async function handleLogin() {
       if (data.success) {
         message.value = data.message
         messageColor.value = 'green'
-        showFaceModal.value = true
+        router.push('/first_page')
       } else {
         message.value = data.message
         messageColor.value = 'red'
@@ -182,6 +186,7 @@ async function handleLogin() {
       if (data.success) {
         message.value = data.message
         messageColor.value = 'green'
+        router.push('/first_page')
       } else {
         message.value = data.message
         messageColor.value = 'red'
@@ -204,6 +209,7 @@ main {
   gap: 40px;
   padding: 20px;
   align-items: flex-start;
+  margin-top: 80px;
 }
 
 .map-container {

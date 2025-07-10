@@ -68,7 +68,18 @@ class FaceRecognitionService:
         self.face_name_known_list = []
         if os.path.exists(path_features_known_csv):
             try:
+                # 检查文件是否为空
+                if os.path.getsize(path_features_known_csv) == 0:
+                    logger.warning(f"人脸数据库文件 '{path_features_known_csv}' 为空，跳过加载。")
+                    return
+                
                 csv_rd = pd.read_csv(path_features_known_csv, header=None)
+                
+                # 检查是否有数据
+                if csv_rd.empty:
+                    logger.warning(f"人脸数据库文件 '{path_features_known_csv}' 没有数据，跳过加载。")
+                    return
+                
                 for i in range(csv_rd.shape[0]):
                     features_someone_arr = []
                     face_name_known_list_item = csv_rd.iloc[i][0]

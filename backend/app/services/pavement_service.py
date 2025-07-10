@@ -7,6 +7,7 @@ import io
 import base64
 import os
 import numpy as np
+from typing import List, Dict
 
 # 类别ID到中文标签的映射
 id2label = {
@@ -40,7 +41,7 @@ else:
         model = None
 
 
-def detect_single_image(base64_image: str) -> dict:
+def detect_single_image(base64_image: str) -> Dict:
     """
     对单帧 Base64 图像进行检测
     :param base64_image: str Base64编码的图像
@@ -115,7 +116,7 @@ def detect_single_image(base64_image: str) -> dict:
         }
 
 
-def detect_batch_images(base64_images: list[str]) -> list[dict]:
+def detect_batch_images(base64_images: List[str]) -> List[Dict]:
     """
     对多帧 Base64 图像进行检测，并返回标注后的 Base64 图像
     :param base64_images: List[str] Base64编码的图像列表
