@@ -66,8 +66,9 @@ def detect_single_image(base64_image: str) -> Dict:
         _, encoded = base64_image.split(',', 1)
         image_bytes = base64.b64decode(encoded)
 
-        # 使用PIL加载图像并转换为RGB，然后强制resize到640x640
+        # 使用PIL加载图像并转换为RGB
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
         # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
         image_np = np.array(image) # 转换为NumPy数组供YOLOv5模型使用
 
@@ -92,11 +93,13 @@ def detect_single_image(base64_image: str) -> Dict:
 
         # 渲染图像（YOLOv5的render方法会使用更新后的中文类别名）
         rendered = output.render()[0]  # 返回的是ndarray (BGR格式)
-        image_pil = Image.fromarray(rendered[..., ::-1])  # 将BGR转换为RGB格式的PIL图像
+        image_pil = Image.fromarray(rendered)  # 正确，不用转换
+
 
         # 将标注后的图像转换为Base64编码
         buffered = io.BytesIO()
         image_pil.save(buffered, format="JPEG")
+
         annotated_image_base64 = base64.b64encode(buffered.getvalue()).decode()
 
         result = {
