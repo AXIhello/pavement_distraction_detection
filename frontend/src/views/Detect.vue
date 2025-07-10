@@ -48,6 +48,17 @@
 <!-- 分析结果标题 -->
 <h3 v-if="annotatedImages.length" class="result-title">分析结果</h3>
 
+<!-- 检测类别汇总展示：仅在分析完成后显示 -->
+<div
+  v-if="uniqueDetectionClasses.length"
+  class="detection-summary"
+  style="margin-top: 16px; font-weight: bold; text-align: center;"
+>
+  共检测到 {{ uniqueDetectionClasses.length }} 种路面障碍：
+  {{ uniqueDetectionClasses.join(', ') }}
+</div>
+
+
     <!-- 分析结果图像 -->
     <div class="image-slider" v-if="annotatedImages.length">
       <div class="image-controls">
@@ -65,6 +76,10 @@
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { io } from 'socket.io-client'
 import Header2 from '@/components/Navigation.vue'
+
+const allDetections = ref([])            // 收集所有帧中的 detections
+const uniqueDetectionClasses = ref([])   // 最终展示用的去重类别列表
+
 
 const showCompleteNotice = ref(false)
 
@@ -138,6 +153,9 @@ function resetState() {
   extractionComplete.value = false
   processing.value = false
   autoPlay.value = false
+  
+  allDetections.value = []
+  uniqueDetectionClasses.value = []
 }
 
 function startAnalysis() {
@@ -161,20 +179,35 @@ function startAnalysis() {
     if (result?.annotated_image) {
       annotatedImages.value.push(`data:image/jpeg;base64,${result.annotated_image}`)
     }
+    if (result?.detections) {
+    allDetections.value.push(...result.detections)
+  }
   })
 
   //对服务器结束信号的监听
   socket.on('stream_complete', () => {
-    console.log('服务器通知：视频分析已完成')
-    processing.value = false
-    extractionComplete.value = false
+  console.log('服务器通知：视频分析已完成')
+  processing.value = false
+  extractionComplete.value = false
 
-    showCompleteNotice.value = true
-  // 1 秒后自动隐藏
+  //处理 detection 类型汇总
+  const seen = new Set()
+  uniqueDetectionClasses.value = allDetections.value
+    .map(d => d.class)
+    .filter(cls => {
+      if (!seen.has(cls)) {
+        seen.add(cls)
+        return true
+      }
+      return false
+    })
+
+  showCompleteNotice.value = true
   setTimeout(() => {
     showCompleteNotice.value = false
   }, 1000)
-  })
+})
+
 
   socket.on('disconnect', () => {
     console.log('socket 断开')
