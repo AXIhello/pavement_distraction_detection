@@ -3,6 +3,7 @@
     <Navigation ref="navRef" />
     <main class="main-content">
       <RoadLog />
+      <LoginLog />
     </main>
   </div>
 </template>
@@ -11,6 +12,7 @@
 import { ref } from 'vue'
 import Navigation from '@/components/Navigation.vue'
 import RoadLog from '@/components/RoadWarn.vue'
+import LoginLog from '@/components/LoginWarn.vue'
 
 const navRef = ref(null)
 </script>
@@ -37,12 +39,14 @@ Navigation {
   margin: auto;
   padding-left: 1rem;
   padding-right: 1rem;
-  
-  /* 给主内容区域留出空间，避免被导航栏遮挡 */
-  padding-top: 80px; /* 假设导航栏高度是80px，视实际情况调整 */
-  
+  padding-top: 80px; /* 避免导航栏遮挡 */
+
   display: flex;
-  justify-content: center; /* 水平居中 */
-  align-items: center;     /* 垂直居中 */
+  flex-direction: column;   /* 改成纵向排列 */
+  gap: 20px;               /* 两个组件之间间距 */
+  
+  /* 如果你希望组件宽度撑满 main-content 宽度 */
+  align-items: stretch;
 }
+
 </style>
