@@ -34,7 +34,7 @@ else:
         print(" [INFO] 正在加载YOLOv5官方推理接口模型...")
         # 使用 torch.hub.load 加载自定义模型
         model = torch.hub.load('yolov5', 'custom', path=str(model_path),source='local')
-        model.conf = 0.25 # 设置置信度阈值
+        model.conf = 0.30 # 设置置信度阈值
         print("[SUCCESS] YOLOv5模型加载成功（ultralytics官方接口）")
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {str(e)}")
@@ -92,7 +92,7 @@ def detect_single_image(base64_image: str) -> Dict:
             })
 
         # 渲染图像（YOLOv5的render方法会使用更新后的中文类别名）
-        rendered = output.render()[0]  # 返回的是ndarray (BGR格式)
+        rendered = output.render()[0]  # 返回的是ndarray
         image_pil = Image.fromarray(rendered)  # 正确，不用转换
 
 
@@ -165,7 +165,7 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
                 })
 
             rendered = output.render()[0]
-            image_pil = Image.fromarray(rendered[..., ::-1])
+            image_pil = Image.fromarray(rendered)
 
             buffered = io.BytesIO()
             image_pil.save(buffered, format="JPEG")
