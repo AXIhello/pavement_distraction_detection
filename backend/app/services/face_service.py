@@ -8,6 +8,7 @@ import pandas as pd
 import base64
 import json  # 用于处理 base64 解码和编码
 import logging
+import tensorflow as tf
 
 # 获取日志器
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class FaceRecognitionService:
         self.detector = None
         self.predictor = None
         self.face_reco_model = None
+        self.deepfake_model = None
         self.features_known_list = []
         self.face_name_known_list = []
 
@@ -26,7 +28,6 @@ class FaceRecognitionService:
     def initialize_models(self):
         logger.info("正在加载 Dlib 人脸识别模型...")
         try:
-
             dlib_data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'data_dlib')
             features_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data',
                                              'features_all.csv')
@@ -34,7 +35,7 @@ class FaceRecognitionService:
             # 检查 Dlib 模型文件是否存在
             predictor_path = os.path.join(dlib_data_path, 'shape_predictor_68_face_landmarks.dat')
             reco_model_path = os.path.join(dlib_data_path, 'dlib_face_recognition_resnet_model_v1.dat')
-
+            deepfake_model_path = os.path.join(dlib_data_path, 'xception_deepfake_image_5o.h5')
             if not os.path.exists(predictor_path):
                 logger.error(f"Dlib 模型文件未找到: {predictor_path}")
                 raise FileNotFoundError(f"Missing Dlib predictor: {predictor_path}")
@@ -53,11 +54,17 @@ class FaceRecognitionService:
                 logger.error(f"Dlib 或人脸数据库文件缺失: {e}")
             else:
                 logger.error(f"初始化 FaceRecognitionService 失败: {e}", exc_info=True)
+
             self.detector = None
             self.predictor = None
             self.face_reco_model = None
             self.features_known_list = []
             self.face_name_known_list = []
+        try:
+            self.deepfake_model = tf.keras.models.load_model(deepfake_model_path)
+        except Exception as e:
+            logger.error(f"加载deepfake检测模型失败: {e}")
+            self.deepfake_model = None
 
     def _load_face_database(self, path_features_known_csv):
         """
@@ -101,7 +108,6 @@ class FaceRecognitionService:
             return [{"status": "error", "message": "Dlib models not loaded."}]
 
         try:
-            # 移除 "data:image/jpeg;base64," 前缀
             header, encoded_image = base64_image_data.split(',')
 
             # 解码 Base64 图像
@@ -120,6 +126,14 @@ class FaceRecognitionService:
             recognition_results = []
             if len(faces) > 0:
                 for i, d in enumerate(faces):
+                    #裁剪人脸区域
+                    face_img = img_rgb[d.top():d.bottom(), d.left():d.right()]
+                    if face_img.size == 0:
+                        continue
+                    face_img_resized = cv2.resize(face_img, (224, 224))
+                    #送入deepfake监测模型
+                    face_img_processed =  tf.keras.applications.xception.preprocess_input(face_img_resized)
+                    pred = self.deepfake_model.predict(np.expand_dims(face_img_processed, axis=0))
                     # 提取人脸特征点
                     shape = self.predictor(img_rgb, d)
                     # 提取 128D 人脸特征
@@ -140,13 +154,21 @@ class FaceRecognitionService:
                                 else:
                                     recognized_name = "陌生人"
 
+                    fake_prob = float(pred[0][0]) if pred is not None else None
+                    deepfake_label = "FAKE" if fake_prob is not None and fake_prob >= 0.5 else "REAL"
+                    if deepfake_label == "FAKE":
+                        logger.warning(f"!!! DeepFake警告: {recognized_name}，概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
                         "distance": round(min_dist, 3) if min_dist != float('inf') else None,
-                        "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()}
+                        "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()},
+                        "deepfake_prob": fake_prob,
+                        "deepfake_label": deepfake_label
                     })
-                    logger.info(f"检测到人脸: {recognized_name} (距离: {min_dist:.3f})")
+                    logger.info(
+                        f"检测到人脸: {recognized_name} (距离: {min_dist:.3f}), deepfake_label: {deepfake_label}, deepfake_prob: {fake_prob:.4f}"
+                    )
 
             else:
                 logger.info("未检测到人脸。")
