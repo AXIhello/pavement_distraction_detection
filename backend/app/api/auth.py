@@ -1,7 +1,7 @@
 # 认证相关接口
 # backend/app/api/auth.py
 from flask_restx import Namespace, Resource, fields
-from app.core.models import User
+from app.core.models import User, find_user_by_username, find_user_by_email, create_user
 from app.core.security import create_jwt_token
 from flask import current_app
 from app.utils.email_service import send_email_code, verify_email_code
@@ -17,12 +17,6 @@ login_model = ns.model('Login', {
     'username': fields.String(required=True, description='用户名'),
     'password': fields.String(required=True, description='密码')
 })
-
-# 响应模型 (例如，登录成功后的 token)
-# auth_success_model = ns.model('AuthSuccess', {
-#     'access_token': fields.String(description='JWT 访问令牌'),
-#     'token_type': fields.String(default='bearer')
-# })
 
 login_response_model = ns.model('LoginResponse', {
     'success': fields.Boolean(description='请求是否成功'),
@@ -47,7 +41,7 @@ class UserLogin(Resource):
         # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
         # 已更换为数据库查询
         user = User.query.filter_by(username=username).first()
-        if user and user.password == password:  # 这里建议改成密码哈希校验
+        if user and user.check_password(password):  # 这里建议改成密码哈希校验
             access_token = create_jwt_token(user.id)
             return {
                 'success': True,
@@ -115,7 +109,40 @@ class LoginWithEmailCode(Resource):
             'access_token': token,
             'token_type': 'bearer'
         }
+    
+# 注册
+register_model = ns.model('Register', {
+    'username': fields.String(required=True),
+    'email': fields.String(required=True),
+    'password': fields.String(required=True),
+})
 
+# 通用响应模型
+base_response_model = ns.model('BaseResponse', {
+    'success': fields.Boolean(description='请求是否成功'),
+    'message': fields.String(description='返回的消息')
+})
+
+
+@ns.route('/register')
+class UserRegister(Resource):
+    @ns.doc('用户注册')
+    @ns.expect(register_model)
+    @ns.marshal_with(base_response_model)
+    def post(self):
+        data = ns.payload
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+
+        if find_user_by_username(username):
+            return {'success': False, 'message': '用户名已存在'}, 400
+        
+        if find_user_by_email(email):
+            return {'success': False, 'message': '邮箱已被注册'}, 400
+
+        create_user(username,email,password)
+        return {'success': True, 'message': '注册成功'}
         
 # 你可能还会有注册、刷新token等其他接口
 # @ns.route('/register')
