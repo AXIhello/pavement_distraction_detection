@@ -1,15 +1,30 @@
 <template>
   <div class="face-camera">
     <h2>人脸识别</h2>
-    <div class="video-container">
+
+    <!-- 摄像头画面 -->
+    <div class="video-container" v-if="!recognitionFinished">
       <video ref="video" autoplay playsinline></video>
     </div>
-    <div class="progress-bar">
+
+    <!-- 进度条 -->
+    <div class="progress-bar" v-if="!recognitionFinished">
       <div class="progress-inner" :style="{ width: progress + '%' }"></div>
     </div>
-    <p class="progress-status">{{ progressStatus }}</p>
-    <button @click="startCamera">开启摄像头识别</button>
-    <p class="tip">请正对摄像头，系统将自动识别您的人脸</p>
+    <p class="progress-status" v-if="!recognitionFinished">{{ progressStatus }}</p>
+
+    <!-- 识别前界面 -->
+    <div v-if="!recognitionFinished">
+      <p class="tip">请正对摄像头，系统将自动识别您的人脸</p>
+      <button @click="startCamera">开启摄像头识别</button>
+      <button style="margin-top: 12px;" @click="() => router.push('/first_page')">返回</button>
+    </div>
+
+    <!-- 识别完成界面 -->
+    <div v-else>
+      <p class="tip">识别成功，欢迎：<strong>{{ recognizedName }}</strong></p>
+      <button @click="() => router.push('/first_page')">下一步</button>
+    </div>
   </div>
 </template>
 
@@ -18,7 +33,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 
-
+const recognizedName = ref('')
+const recognitionFinished = ref(false)
 const router = useRouter()
 const video = ref(null)
 
@@ -81,15 +97,16 @@ async function startCamera() {
           router.push('/login')
           return;
         }
-        
+
         console.log('识别成功:', result.faces);
+        const faceName = face.name || ''
+        recognizedName.value = faceName
+        recognitionFinished.value = true
         // 停止摄像头 & 关闭 SocketIO
         clearInterval(streamInterval)
         stream.getTracks().forEach(track => track.stop())
         socket.disconnect()
 
-        // 跳转到首页
-        router.push('/first_page')
       } else {
         console.warn('识别失败:', result.message || '未识别到人脸')
       }
@@ -136,7 +153,7 @@ function startImageStream() {
       const base64Image = canvas.toDataURL('image/jpeg')
       console.log(`发送第 ${frameCount + 1} 帧...`)
       socket.emit('face_recognition', { image: base64Image })
-      
+
       frameCount++
       progress.value = Math.round((frameCount / FRAMES_PER_BATCH) * 100)
       progressStatus.value = '识别中...'
