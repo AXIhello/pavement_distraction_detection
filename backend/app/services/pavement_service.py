@@ -9,6 +9,11 @@ import os
 import numpy as np
 from typing import List, Dict
 
+from ..services.alert_service import save_alert_frame, update_alert_video, create_alert_video
+from datetime import datetime
+from app.extensions import db
+
+
 # 类别ID到中文标签的映射
 id2label = {
     'D00': '纵向裂缝',
@@ -151,6 +156,17 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             'status': 'error',
             'message': '模型未加载，无法进行批量检测'
         } for i in range(len(base64_images))]
+    
+    # 1️. 自动生成保存路径
+    now = datetime.now()
+    timestamp = now.strftime('%Y%m%d_%H%M%S')
+    save_dir = Path(f'data/alert_videos/video_{timestamp}')
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. 路面病害告警
+    video_id = create_alert_video('road',f'video_{timestamp}', str(save_dir), len(base64_images), 0, None)
+
+    alert_count = 0 
 
     for i, base64_str in enumerate(base64_images):
         try:
@@ -199,6 +215,12 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             image_draw.save(buffered, format="JPEG")
             image_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode()
 
+            # 3️. 有检测结果就保存图像 & 写入 AlertFrame
+            # 如果一帧有多个目标，只保存第一个目标的置信度和类别？
+            if detections:
+                alert_count += 1
+                save_alert_frame('road',video_id, i, image_base64, detections[0].confidences, detections[0].class_name,detections[0].bbox)
+
             results.append({
                 'frame_index': i,
                 'detections': detections,
@@ -214,5 +236,9 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
                 'status': 'error',
                 'message': f'第{i}帧处理失败: {str(e)}'
             })
+
+    # 4️. 更新告警帧数量、提交数据库
+    update_alert_video('road',video_id, alert_count)
+
 
     return results
