@@ -11,8 +11,8 @@ from typing import List, Dict
 
 # 类别ID到中文标签的映射
 id2label = {
-    'D00': '横向裂缝',
-    'D10': '纵向裂缝',
+    'D00': '纵向裂缝',
+    'D10': '横向裂缝',
     'D20': '龟裂',
     'D40': '车辙/颠簸/坑洼/松散',
     'D43': '斑马线模糊',
@@ -69,7 +69,7 @@ def detect_single_image(base64_image: str) -> Dict:
         # 使用PIL加载图像并转换为RGB
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
+        #image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
         image_np = np.array(image) # 转换为NumPy数组供YOLOv5模型使用
 
         # 执行检测
