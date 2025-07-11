@@ -179,7 +179,15 @@ const countdown = ref(0)
 let timer = null
 
 // 注册相关
+// 注册相关状态
+const regAccount = ref('')
 const regEmail = ref('')
+const regPassword = ref('')
+const regConfirmPassword = ref('')
+const regMessage = ref('')
+const regMessageColor = ref('red')
+
+
 
 
 //验证邮箱格式
