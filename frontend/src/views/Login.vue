@@ -95,100 +95,60 @@
           </div>
         </div>
 
-        <!-- 注册表单 -->
-        <div v-else-if="mainTab === 'register'" class="form-container">
-          <h2>注册</h2>
+       <!-- 注册表单 -->
+<div v-else-if="mainTab === 'register'" class="form-container">
+  <h2>注册</h2>
 
-          <form @submit.prevent="handleRegister">
-            <div v-if="registerMethod === 'password'">
-              <div class="form-group">
-                <label for="reg-account">账号</label>
-                <input 
-                  type="text" 
-                  id="reg-account" 
-                  placeholder="账号"
-                  v-model="regAccount" 
-                  required />
-              </div>
+  <form @submit.prevent="handleRegister">
+    <div class="form-group">
+      <label for="reg-account">账号</label>
+      <input 
+        type="text" 
+        id="reg-account" 
+        placeholder="账号"
+        v-model="regAccount" 
+        required />
+    </div>
 
-              <div class="form-group">
-                <label for="reg-password">密码</label>
-                <input 
-                  type="password" 
-                  id="reg-password" 
-                  v-model="regPassword" 
-                  required />
-              </div>
+    <div class="form-group">
+      <label for="reg-email">邮箱</label>
+      <input 
+        type="email" 
+        id="reg-email" 
+        placeholder="邮箱"
+        v-model="regEmail" 
+        required />
+    </div>
 
-              <div class="form-group">
-                <label for="reg-confirm-password">确认密码</label>
-                <input 
-                  type="password" 
-                  id="reg-confirm-password" 
-                  v-model="regConfirmPassword" 
-                  required />
-              </div>
-            </div>
+    <div class="form-group">
+      <label for="reg-password">密码</label>
+      <input 
+        type="password" 
+        id="reg-password" 
+        v-model="regPassword" 
+        required />
+    </div>
 
-            <div v-else-if="registerMethod === 'sms'">
-              <div class="form-group">
-                <label for="reg-phone">账号</label>
-                <input 
-                  type="tel" 
-                  id="reg-phone" 
-                  placeholder="邮箱"
-                  v-model="regPhone" 
-                  required />
-              </div>
+    <div class="form-group">
+      <label for="reg-confirm-password">确认密码</label>
+      <input 
+        type="password" 
+        id="reg-confirm-password" 
+        v-model="regConfirmPassword" 
+        required />
+    </div>
 
-              <div class="form-group code-group">
-                <label for="reg-smsCode">验证码</label>
-                <input type="text" id="reg-smsCode" v-model="regSmsCode" required />
-                <button type="button" :disabled="regCountdown > 0" @click="sendRegSmsCode">
-                  {{ regCountdown > 0 ? `${regCountdown}s 后重发` : '获取验证码' }}
-                </button>
-              </div>
+    <button type="submit">注册</button>
 
-              <div class="form-group">
-                <label for="reg-password-sms">密码</label>
-                <input 
-                  type="password" 
-                  id="reg-password-sms" 
-                  v-model="regPasswordSms" 
-                  required />
-              </div>
+    <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
+  </form>
 
-              <div class="form-group">
-                <label for="reg-confirm-password-sms">确认密码</label>
-                <input 
-                  type="password" 
-                  id="reg-confirm-password-sms" 
-                  v-model="regConfirmPasswordSms" 
-                  required />
-              </div>
-            </div>
+  <div class="register-hint">
+    <span>已有账号？</span>
+    <button type="button" class="link-button" @click="mainTab = 'login'">去登录</button>
+  </div>
+</div>
 
-            <button type="submit">注册</button>
-
-            <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
-          </form>
-
-          <div class="other-login-methods">
-            <span>其他注册方式</span>
-            <div class="login-method-buttons">
-              <button 
-                :class="{ active: registerMethod === 'password' }" 
-                @click="registerMethod = 'password'">账号密码注册</button>
-              <button 
-                :class="{ active: registerMethod === 'sms' }" 
-                @click="registerMethod = 'sms'">邮箱验证码注册</button>
-            </div>
-            <div class="register-hint">
-              <span>已有账号？</span>
-              <button type="button" class="link-button" @click="mainTab = 'login'">去登录</button>
-            </div>
-          </div>
-        </div>
       </div>
     </main>
   </div>
@@ -219,18 +179,16 @@ const countdown = ref(0)
 let timer = null
 
 // 注册相关
-const registerMethod = ref('password')
+// 注册相关状态
 const regAccount = ref('')
+const regEmail = ref('')
 const regPassword = ref('')
 const regConfirmPassword = ref('')
-const regPhone = ref('')
-const regSmsCode = ref('')
-const regPasswordSms = ref('')
-const regConfirmPasswordSms = ref('')
 const regMessage = ref('')
 const regMessageColor = ref('red')
-const regCountdown = ref(0)
-let regTimer = null
+
+
+
 
 //验证邮箱格式
 function isValidEmail(email) {
@@ -403,80 +361,51 @@ async function handleLogin() {
 async function handleRegister() {
   regMessage.value = ''
 
-  if (registerMethod.value === 'password') {
-    if (regPassword.value !== regConfirmPassword.value) {
-      regMessage.value = '两次输入的密码不一致'
-      regMessageColor.value = 'red'
-      return
-    }
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: regAccount.value,
-          password: regPassword.value
-        })
-      })
-      const data = await res.json()
-      if (data.success) {
-        regMessage.value = data.message
-        regMessageColor.value = 'green'
-        setTimeout(() => {
-          mainTab.value = 'login'
-        }, 1500)
-      } else {
-        regMessage.value = data.message
-        regMessageColor.value = 'red'
-      }
-    } catch (error) {
-      regMessage.value = '请求失败，请检查后端服务是否启动'
-      regMessageColor.value = 'red'
-    }
-  } else {
-    if (!regPhone.value || !regSmsCode.value) {
-      regMessage.value = '请输入邮箱和验证码'
-      regMessageColor.value = 'red'
-      return
-    }
-    if (!isValidEmail(regPhone.value)) {
-  regMessage.value = '请输入正确的邮箱格式'
-  regMessageColor.value = 'red'
-  return
-}
+  if (!regAccount.value || !regEmail.value || !regPassword.value || !regConfirmPassword.value) {
+    regMessage.value = '请填写所有字段'
+    regMessageColor.value = 'red'
+    return
+  }
 
-    if (regPasswordSms.value !== regConfirmPasswordSms.value) {
-      regMessage.value = '两次输入的密码不一致'
-      regMessageColor.value = 'red'
-      return
-    }
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/register_email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: regPhone.value,
-          code: regSmsCode.value,
-          password: regPasswordSms.value
-        })
+  if (!isValidEmail(regEmail.value)) {
+    regMessage.value = '邮箱格式不正确'
+    regMessageColor.value = 'red'
+    return
+  }
+
+  if (regPassword.value !== regConfirmPassword.value) {
+    regMessage.value = '两次输入的密码不一致'
+    regMessageColor.value = 'red'
+    return
+  }
+
+  try {
+    const res = await fetch('http://127.0.0.1:8000/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: regAccount.value,
+        email: regEmail.value,
+        password: regPassword.value
       })
-      const data = await res.json()
-      if (data.success) {
-        regMessage.value = data.message
-        regMessageColor.value = 'green'
-        setTimeout(() => {
-          mainTab.value = 'login'
-        }, 1500)
-      } else {
-        regMessage.value = data.message
-        regMessageColor.value = 'red'
-      }
-    } catch (error) {
-      regMessage.value = '请求失败，请检查后端服务是否启动'
+    })
+    const data = await res.json()
+    if (data.success) {
+      regMessage.value = data.message
+      regMessageColor.value = 'green'
+      setTimeout(() => {
+        mainTab.value = 'login'
+      }, 1500)
+    } else {
+      regMessage.value = data.message
       regMessageColor.value = 'red'
     }
+  } catch (error) {
+    regMessage.value = '请求失败，请检查后端服务是否启动'
+    regMessageColor.value = 'red'
   }
 }
+
 </script>
 
 <style>

@@ -73,45 +73,59 @@ def detect_single_image(base64_image: str) -> Dict:
 
         # 使用PIL加载图像并转换为RGB
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-
-        #image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
-        image_np = np.array(image) # 转换为NumPy数组供YOLOv5模型使用
+        orig_w, orig_h = image.size  # 记录原始尺寸
+        image_resized = image.resize((640, 640))
+        image_np = np.array(image_resized)
 
         # 执行检测
         output = model(image_np)
-
-        # 解析检测结果
         df = output.pandas().xyxy[0]
+
+        w_scale = orig_w / 640
+        h_scale = orig_h / 640
 
         detections = []
         for _, row in df.iterrows():
             label_key = row['name']
-            # 修改模型内部的类别名为中文，以便渲染时显示中文标签
+            # 修改模型内的类别名为中文（这一步用于渲染）
             output.names[row['class']] = id2label.get(label_key, label_key)
+
+            # 坐标还原
+            xmin_r = row['xmin'] * w_scale
+            ymin_r = row['ymin'] * h_scale
+            xmax_r = row['xmax'] * w_scale
+            ymax_r = row['ymax'] * h_scale
 
             detections.append({
                 'class': id2label.get(label_key, label_key),
                 'confidence': round(float(row['confidence']), 3),
-                'bbox': [round(float(row['xmin']), 2), round(float(row['ymin']), 2),
-                         round(float(row['xmax']), 2), round(float(row['ymax']), 2)]
+                'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
             })
 
-        # 渲染图像（YOLOv5的render方法会使用更新后的中文类别名）
-        rendered = output.render()[0]  # 返回的是ndarray
-        image_pil = Image.fromarray(rendered)  # 正确，不用转换
+        print("🔍 [DEBUG] 开始在原图上渲染标注...")
+        # 在原图上绘制还原后的检测框
+        from PIL import ImageDraw
+        image_draw = image.copy()
+        draw = ImageDraw.Draw(image_draw)
+        for det in detections:
+            bbox = det['bbox']
+            draw.rectangle(bbox, outline='red', width=2)
+        print("✅ [DEBUG] 原图渲染完成")
 
-
-        # 将标注后的图像转换为Base64编码
+        # 转换为base64
+        print("🔍 [DEBUG] 转换为base64...")
         buffered = io.BytesIO()
-        image_pil.save(buffered, format="JPEG")
-
+        image_draw.save(buffered, format="JPEG")
         annotated_image_base64 = base64.b64encode(buffered.getvalue()).decode()
+        print(f"✅ [DEBUG] Base64转换完成，长度: {len(annotated_image_base64)}")
 
         result = {
             'status': 'success',
             'detections': detections,
             'annotated_image': annotated_image_base64
         }
+
+        print(f"🎉 [SUCCESS] 检测完成，返回结果: status={result['status']}, 检测数量={len(detections)}")
         return result
 
     except Exception as e:
@@ -162,8 +176,11 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             _, encoded = base64_str.split(',', 1)
             image_bytes = base64.b64decode(encoded)
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            # image = image.resize((640, 640))  # 移除强制resize，保持原图分辨率
-            image_np = np.array(image)
+            orig_w, orig_h = image.size  # 记录原始尺寸
+            image_resized = image.resize((640, 640))
+            image_np = np.array(image_resized)
+            w_scale = orig_w / 640
+            h_scale = orig_h / 640
 
             detections = []
             output = model(image_np)
@@ -171,20 +188,31 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
 
             for _, row in df.iterrows():
                 label_key = row['name']
+                # 修改模型内的类别名为中文（这一步用于渲染）
                 output.names[row['class']] = id2label.get(label_key, label_key)
+
+                # 坐标还原
+                xmin_r = row['xmin'] * w_scale
+                ymin_r = row['ymin'] * h_scale
+                xmax_r = row['xmax'] * w_scale
+                ymax_r = row['ymax'] * h_scale
 
                 detections.append({
                     'class': id2label.get(label_key, label_key),
                     'confidence': round(float(row['confidence']), 3),
-                    'bbox': [round(float(row['xmin']), 2), round(float(row['ymin']), 2),
-                             round(float(row['xmax']), 2), round(float(row['ymax']), 2)]
+                    'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
                 })
 
-            rendered = output.render()[0]
-            image_pil = Image.fromarray(rendered)
+            # 在原图上绘制还原后的检测框
+            from PIL import ImageDraw
+            image_draw = image.copy()
+            draw = ImageDraw.Draw(image_draw)
+            for det in detections:
+                bbox = det['bbox']
+                draw.rectangle(bbox, outline='red', width=2)
 
             buffered = io.BytesIO()
-            image_pil.save(buffered, format="JPEG")
+            image_draw.save(buffered, format="JPEG")
             image_base64 = "data:image/jpeg;base64," + base64.b64encode(buffered.getvalue()).decode()
 
             # 3️. 有检测结果就保存图像 & 写入 AlertFrame
@@ -196,8 +224,7 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             results.append({
                 'frame_index': i,
                 'detections': detections,
-                'image_base64': image_base64,
-                'status': 'success'
+                'image_base64': image_base64
             })
 
         except Exception as e:
