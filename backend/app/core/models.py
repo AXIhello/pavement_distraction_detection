@@ -2,6 +2,7 @@
 # app/models
 from datetime import datetime
 from ..extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -12,6 +13,12 @@ class User(db.Model):
     password = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)       
 
 class FaceFeature(db.Model):
     """
@@ -75,3 +82,18 @@ class AlertFrame(db.Model):
     confidence = db.Column(db.Float, nullable=False)  # 检测置信度（选第一个目标）
     image_path = db.Column(db.String(512), nullable=False)  # 病害图像路径（带标注图）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# -------- 用户相关操作 --------
+
+def find_user_by_username(username):
+    return User.query.filter_by(username=username).first()
+
+def find_user_by_email(email):
+    return User.query.filter_by(email=email).first()
+
+def create_user(username=None, email=None, password=None):
+    user = User(username=username, email=email)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    return user
