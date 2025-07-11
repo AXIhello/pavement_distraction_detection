@@ -1,94 +1,236 @@
 <template>
   <Header2 ref="headerRef" />
   <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }">
-    <h2>上传并分析路障</h2>
+    <div class="page-header">
+      <h2 class="page-title">
+        上传并分析路障
+      </h2>
+    </div>
 
     <!-- 模式选择按钮 -->
     <div class="upload-mode">
-      <button :class="{ active: mode === 'upload' }" @click="selectUploadMode">上传视频</button>
-      <button :class="{ active: mode === 'record' }" @click="selectRecordMode">现场录制</button>
+      <button :class="{ active: mode === 'upload' }" @click="selectUploadMode">
+        <span class="button-icon">📁</span>
+        上传视频
+      </button>
+      <button :class="{ active: mode === 'record' }" @click="selectRecordMode">
+        <span class="button-icon">📹</span>
+        现场录制
+      </button>
     </div>
 
     <!-- 上传视频 -->
     <div class="upload-section" v-if="mode === 'upload'">
-      <input type="file" accept="video/*" @change="handleVideoChange" v-if="!videoFile" />
-      <button @click="removeVideo" v-if="videoFile">卸载视频</button>
+      <div class="upload-area" v-if="!videoFile">
+        <div class="upload-content">
+          <div class="upload-icon">📤</div>
+          <p>点击选择视频文件</p>
+          <input type="file" accept="video/*" @change="handleVideoChange" class="file-input" />
+        </div>
+      </div>
+      <div class="video-actions" v-if="videoFile">
+        <button @click="removeVideo" class="remove-btn">
+          <span class="button-icon">🗑️</span>
+          卸载视频
+        </button>
+      </div>
     </div>
 
     <!-- 现场录制 -->
     <div class="record-section" v-if="mode === 'record'">
-      <video ref="recordPreview" autoplay muted playsinline></video>
+      <div class="video-container">
+        <video ref="recordPreview" autoplay muted playsinline></video>
+        <div class="recording-indicator" v-if="recording">
+          <div class="recording-dot"></div>
+          <span>正在录制...</span>
+        </div>
+      </div>
       <div class="record-buttons">
-        <button @click="startRecording" :disabled="recording">开始录制</button>
-        <button @click="stopRecording" :disabled="!recording">停止录制</button>
-        <button @click="cancelRecording" v-if="recordedBlob">取消录制</button>
+        <button @click="startRecording" :disabled="recording" class="record-btn">
+          <span class="button-icon">⏺️</span>
+          开始录制
+        </button>
+        <button @click="stopRecording" :disabled="!recording" class="stop-btn">
+          <span class="button-icon">⏹️</span>
+          停止录制
+        </button>
+        <button @click="cancelRecording" v-if="recordedBlob" class="cancel-btn">
+          <span class="button-icon">❌</span>
+          取消录制
+        </button>
       </div>
     </div>
 
     <!-- 视频预览 -->
     <div class="video-preview" v-if="videoURL && !recording">
-      <video :src="videoURL" controls muted playsinline ref="videoEl"></video>
+      <div class="video-container">
+        <video :src="videoURL" controls muted playsinline ref="videoEl"></video>
+      </div>
     </div>
 
     <!-- 操作按钮 -->
     <div class="actions" v-if="videoFile && !processing && !recording">
-      <button @click="startAnalysis" :disabled="processing">开始分析</button>
+      <button @click="startAnalysis" :disabled="processing" class="analyze-btn">
+        <span class="button-icon">🔍</span>
+        开始分析
+      </button>
     </div>
 
     <!-- 状态提示 -->
-    <div class="status">
-      <p v-if="processing">正在处理中... <span v-if="totalFrames > 0">({{ processedFrames }}/{{ totalFrames }})</span></p>
-      <p v-if="extractionComplete">帧提取完成，等待服务器处理结果...</p>
+    <div class="status" v-if="processing || extractionComplete">
+      <div class="status-content">
+        <div class="status-text">
+          <p v-if="processing">正在处理中... 
+            <span v-if="totalFrames > 0" class="progress-text">
+              ({{ processedFrames }}/{{ totalFrames }})
+            </span>
+          </p>
+          <p v-if="extractionComplete">帧提取完成，等待服务器处理结果...</p>
+        </div>
+      </div>
     </div>
 
     <!-- 进度条 -->
-    <div class="progress-bar" v-if="processing && totalFrames > 0">
-      <div class="progress-fill" :style="{ width: (processedFrames / totalFrames) * 100 + '%' }"></div>
+    <div class="progress-container" v-if="processing && totalFrames > 0">
+      <div class="progress-bar">
+        <div class="progress-fill" :style="{ width: (processedFrames / totalFrames) * 100 + '%' }"></div>
+      </div>
+      <div class="progress-percentage">{{ Math.round((processedFrames / totalFrames) * 100) }}%</div>
     </div>
 
     <!-- 分析完成提示 -->
-    <div v-if="showCompleteNotice" class="popup-notice">分析完毕</div>
+    <div v-if="showCompleteNotice" class="popup-notice">
+      分析完毕！
+    </div>
 
     <!-- 分析结果 -->
-    <h3 v-if="frameResults.length" class="result-title">分析结果</h3>
-
-    <!-- 图像轮播与检测详情 -->
-    <div class="image-slider" v-if="frameResults.length">
-      <div class="image-controls">
-        <button @click="prevImage" :disabled="frameResults.length <= 1">上一张</button>
-        <span>{{ currentImageIndex + 1 }} / {{ frameResults.length }}</span>
-        <button @click="nextImage" :disabled="frameResults.length <= 1">下一张</button>
-        <button @click="toggleAutoPlay">{{ autoPlay ? '停止自动播放' : '自动播放' }}</button>
+    <div v-if="frameResults.length" class="results-section">
+      <div class="result-header">
+        <h3 class="result-title">
+          分析结果
+        </h3>
+        <div class="result-stats">
+          <div class="stat-item">
+            <span class="stat-label">总帧数:</span>
+            <span class="stat-value">{{ frameResults.length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">告警帧数:</span>
+            <span class="stat-value">{{ framesWithDetections.length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">路障类别:</span>
+            <span class="stat-value">{{ uniqueDetectionClasses.length }}</span>
+          </div>
+        </div>
       </div>
 
-      <div class="image-result">
-        <div class="image-column">
-          <img :src="frameResults[currentImageIndex].image" class="annotated-frame" />
+      <!-- 快速导航 -->
+      <div class="quick-nav">
+        <div class="nav-section">
+          <h4>快速跳转</h4>
+          <div class="nav-controls">
+            <div class="jump-input">
+              <input 
+                type="number" 
+                v-model.number="jumpToFrame" 
+                :min="1" 
+                :max="frameResults.length"
+                placeholder="帧号"
+                @keyup.enter="jumpToSpecificFrame"
+              />
+              <button @click="jumpToSpecificFrame" class="jump-btn">跳转</button>
+            </div>
+              <!-- 有检测帧下拉选择（放底部） -->
+<div v-if="framesWithDetections.length" class="bottom-dropdown">
+  <label for="frameSelect" class="dropdown-label">跳转到有检测结果的帧:</label>
+  <select id="frameSelect" v-model="selectedFrameIndex" @change="jumpToFrameIndex(selectedFrameIndex)">
+    <option v-for="frameIndex in framesWithDetections" :key="frameIndex" :value="frameIndex">
+      第 {{ frameIndex + 1 }} 帧
+    </option>
+  </select>
+</div>
+          </div>
         </div>
-        <div class="info-column detection-info">
-          <h4>检测结果：</h4>
-          <ul v-if="frameResults[currentImageIndex].detections.length">
-            <li v-for="(det, i) in frameResults[currentImageIndex].detections" :key="i">
-              类别：<strong>{{ det.class }}</strong><br />
-              置信度：{{ (det.confidence * 100).toFixed(1) }}%<br />
-              坐标：[{{ det.bbox.join(', ') }}]
-            </li>
-          </ul>
-          <p v-else>无检测结果</p>
+      </div>
+
+      <!-- 图像轮播与检测详情 -->
+      <div class="image-slider">
+        <div class="image-controls">
+          <button @click="prevImage" :disabled="frameResults.length <= 1" class="nav-btn">
+            <span class="button-icon">◀️</span>
+            上一张
+          </button>
+          <div class="frame-info">
+            <span class="current-frame">第 {{ currentImageIndex + 1 }} 帧</span>
+            <span class="total-frames">/ {{ frameResults.length }}</span>
+          </div>
+          <button @click="nextImage" :disabled="frameResults.length <= 1" class="nav-btn">
+            下一张
+            <span class="button-icon">▶️</span>
+          </button>
+          <button @click="toggleAutoPlay" class="auto-play-btn" :class="{ active: autoPlay }">
+            <span class="button-icon">{{ autoPlay ? '⏸️' : '▶️' }}</span>
+            {{ autoPlay ? '停止自动播放' : '自动播放' }}
+          </button>
+        </div>
+
+        <div class="image-result">
+          <div class="image-column">
+            <div class="image-wrapper">
+              <img :src="frameResults[currentImageIndex].image" class="annotated-frame" />
+              <div class="image-overlay" v-if="frameResults[currentImageIndex].detections.length === 0">
+                <div class="no-detection">无检测结果</div>
+              </div>
+            </div>
+          </div>
+          <div class="info-column">
+            <div class="detection-info">
+              <h4 class="detection-title">
+                检测结果
+                <span class="detection-count" v-if="frameResults[currentImageIndex].detections.length">
+                  ({{ frameResults[currentImageIndex].detections.length }} 个)
+                </span>
+              </h4>
+              <div class="detection-list" v-if="frameResults[currentImageIndex].detections.length">
+                <div 
+                  v-for="(det, i) in frameResults[currentImageIndex].detections" 
+                  :key="i"
+                  class="detection-item"
+                >
+                  <div class="detection-header">
+                    <span class="detection-class">{{ det.class }}</span>
+                    <span class="detection-confidence">{{ (det.confidence * 100).toFixed(1) }}%</span>
+                  </div>
+                  <div class="detection-details">
+                    <span class="bbox-label">坐标:</span>
+                    <span class="bbox-values">[{{ det.bbox.join(', ') }}]</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="no-detection-message">
+                <div class="no-detection-icon">🔍</div>
+                <p>本帧未检测到路障</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
+
+
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { io } from 'socket.io-client'
 import Header2 from '@/components/Navigation.vue'
 
 const headerRef = ref(null)
 const headerHeight = ref(0)
+const selectedFrameIndex = ref(null)
 
 const mode = ref('upload') // 上传 或 录制
 
@@ -109,6 +251,9 @@ const frameResults = ref([]) // [{ image, detections }]
 const allDetections = ref([])
 const uniqueDetectionClasses = ref([])
 
+// 新增：跳转功能
+const jumpToFrame = ref(null)
+
 let socket = null
 
 // 录制相关
@@ -118,6 +263,14 @@ const recordedChunks = ref([])
 const recordedBlob = ref(null)
 const recording = ref(false)
 const mediaStream = ref(null)
+
+// 计算属性：有检测结果的帧索引
+const framesWithDetections = computed(() => {
+  return frameResults.value
+    .map((frame, index) => ({ index, hasDetections: frame.detections.length > 0 }))
+    .filter(item => item.hasDetections)
+    .map(item => item.index)
+})
 
 // --- UI 相关 ---
 
@@ -169,6 +322,7 @@ function removeVideo() {
   videoURL.value = ''
   resetState()
   stopAnalysis()
+  document.querySelector('.file-input').value = null
 }
 
 // 录制相关
@@ -242,6 +396,7 @@ function resetState() {
   autoPlay.value = false
   allDetections.value = []
   uniqueDetectionClasses.value = []
+  jumpToFrame.value = null
 }
 
 function resetAll() {
@@ -252,6 +407,22 @@ function resetAll() {
   stopCamera()
   resetState()
 }
+
+// 新增：跳转功能
+function jumpToSpecificFrame() {
+  if (jumpToFrame.value && jumpToFrame.value >= 1 && jumpToFrame.value <= frameResults.value.length) {
+    currentImageIndex.value = jumpToFrame.value - 1
+    jumpToFrame.value = null
+  }
+}
+
+function jumpToFrameIndex(frameIndex) {
+  if (typeof frameIndex === 'string') frameIndex = parseInt(frameIndex)
+  if (frameIndex >= 0 && frameIndex < frameResults.value.length) {
+    currentImageIndex.value = frameIndex
+  }
+}
+
 
 // --- 分析功能 ---
 
@@ -301,7 +472,7 @@ function startAnalysis() {
     showCompleteNotice.value = true
     setTimeout(() => {
       showCompleteNotice.value = false
-    }, 1000)
+    }, 2000)
   })
 
   socket.on('disconnect', stopAnalysis)
@@ -401,7 +572,7 @@ function toggleAutoPlay() {
     }, 1000)
   } else {
     clearInterval(autoPlayTimer.value)
-        autoPlayTimer.value = null
+    autoPlayTimer.value = null
   }
 }
 
@@ -424,100 +595,297 @@ onBeforeRouteLeave((to, from, next) => {
 
 <style scoped>
 .detect-container {
-  max-width: 960px;
+  max-width: 1200px;
   margin: auto;
   padding: 20px;
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #fefef9;
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.page-title {
+  font-size: 28px;
+  color: #333;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.button-icon {
+  margin-right: 8px;
 }
 
 .upload-mode {
-  margin-bottom: 16px;
-  display: flex;          /* 横向排列 */
-  justify-content: flex-start; /* 靠左 */
-  align-items: center;    /* 垂直居中 */
-  gap: 12px;              /* 按钮之间的间距 */
-  width: fit-content;     /* 宽度仅包裹按钮内容 */
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
 }
 
 .upload-mode button {
-  padding: 8px 16px;
-  margin-right: 12px;
-  border: none;
-  border-radius: 6px;
+  padding: 12px 24px;
+  border: 2px solid #ddd;
+  border-radius: 12px;
   cursor: pointer;
-  background: #ddd;
+  background: white;
   color: #333;
   font-weight: 600;
-  transition: background-color 0.3s ease;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.upload-mode button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .upload-mode button.active {
   background: #1e2124;
   color: white;
+  border-color: #1e2124;
+}
+
+.upload-area {
+  border: 2px dashed #cfa97e;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  background: #fefdf9;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.upload-area:hover {
+  border-color: #b37700;
+  background: #fdfbf5;
+}
+
+.upload-content {
+  position: relative;
+  z-index: 2;
+}
+
+.upload-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.file-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.video-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.remove-btn {
+  padding: 10px 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.remove-btn:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+}
+
+.video-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .video-preview video,
 .record-section video {
   width: 100%;
-  max-height: 360px;
+  max-height: 400px;
   object-fit: contain;
-  border-radius: 8px;
   background: rgb(212, 209, 201);
 }
 
+.recording-indicator {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(220, 53, 69, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .record-buttons {
-  margin-top: 12px;
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .record-buttons button {
-  padding: 10px 20px;
-  margin-right: 10px;
-  background: #000000;
-  color: white;
+  padding: 12px 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+}
+
+.record-btn {
+  background: #28a745;
+  color: white;
+}
+
+.record-btn:hover:not(:disabled) {
+  background: #218838;
+}
+
+.stop-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.stop-btn:hover:not(:disabled) {
+  background: #c82333;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
 }
 
 .record-buttons button:disabled {
   background: #ccc;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .actions {
-  margin-top: 20px;
-}
-
-.actions button {
-  padding: 10px 20px;
-  background: #000000;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.actions button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.status {
-  margin-top: 15px;
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 5px;
+  margin-top: 24px;
   text-align: center;
 }
 
+.analyze-btn {
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #1e2124, #2c3136);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.analyze-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.analyze-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.status {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  border-left: 4px solid #cfa97e;
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-icon {
+  font-size: 24px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-text {
+  flex: 1;
+}
+
+.progress-text {
+  font-weight: 600;
+  color: #cfa97e;
+}
+
+.progress-container {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .progress-bar {
-  margin-top: 10px;
-  width: 100%;
-  height: 20px;
+  flex: 1;
+  height: 8px;
   background: #e9ecef;
-  border-radius: 10px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -525,117 +893,527 @@ onBeforeRouteLeave((to, from, next) => {
   height: 100%;
   background: linear-gradient(90deg, #e7a74d, #b37700);
   transition: width 0.3s ease;
-}
-
-.result-title {
-  margin-top: 20px;
-  font-size: 22px;
-  color: #333;
-  text-align: center;
-}
-
-.image-slider {
-  margin-top: 20px;
-}
-
-.image-controls {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.image-controls button {
-  padding: 5px 10px;
-  background: #cfa97e;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.image-controls button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.annotated-frame {
-  width: 100%;
-  max-height: 360px;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 2px solid #007bff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.detection-info {
-  margin-top: 12px;
-  padding: 10px 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background-color: #fefdf9;
-  max-width: 720px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.detection-info ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-.detection-info li {
-  background: #f3f3f3;
-  margin-bottom: 8px;
-  padding: 8px;
   border-radius: 4px;
-  font-family: monospace;
+}
+
+.progress-percentage {
+  font-weight: 600;
+  color: #b37700;
+  min-width: 48px;
 }
 
 .popup-notice {
   position: fixed;
-  top: 80px;
+  top: 100px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #f5e9d7;
+  background: linear-gradient(135deg, #f5e9d7, #e6d3b7);
   color: #333;
-  padding: 12px 24px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 16px 32px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   font-size: 18px;
+  font-weight: 600;
   opacity: 1;
-  animation: fadeOut 2s forwards;
-  z-index: 999;
-}
-
-.image-result {
+  animation: slideDown 0.3s ease, fadeOut 2s 1s forwards;
+  z-index: 1000;
   display: flex;
-  flex-direction: row;
-  gap: 20px;
-  align-items: flex-start;
-  margin-top: 16px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.image-column {
-  flex: 0 0 50%;
-  max-width: 50%;
-}
-
-.info-column {
-  flex: 1;
-  max-width: 50%;
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
 @keyframes fadeOut {
-  0% {
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
+  to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+
+.results-section {
+  margin-top: 32px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.result-title {
+  font-size: 24px;
+  color: #333;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e2124;
+}
+
+.quick-nav {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f0f0f0;
+}
+
+.nav-section h4 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-section h4:before {
+  content: "🚀";
+}
+
+.nav-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.jump-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jump-input input {
+  padding: 8px 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 80px;
+  text-align: center;
+  transition: border-color 0.3s ease;
+}
+
+.jump-input input:focus {
+  outline: none;
+  border-color: #cfa97e;
+}
+
+.jump-btn {
+  padding: 8px 16px;
+  background: #cfa97e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.jump-btn:hover {
+  background: #b37700;
+  transform: translateY(-1px);
+}
+
+.detection-frames {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-label {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.frame-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.frame-tag {
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  min-width: 32px;
+  text-align: center;
+}
+
+.frame-tag:hover {
+  background: #e9ecef;
+  transform: translateY(-1px);
+}
+
+.frame-tag.active {
+  background: #cfa97e;
+  color: white;
+  border-color: #cfa97e;
+}
+
+.image-slider {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f0f0f0;
+}
+
+.image-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.nav-btn {
+  padding: 10px 16px;
+  background: #cfa97e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: #b37700;
+  transform: translateY(-1px);
+}
+
+.nav-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.frame-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.current-frame {
+  color: #1e2124;
+}
+
+.total-frames {
+  color: #666;
+}
+
+.auto-play-btn {
+  padding: 10px 16px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-play-btn:hover {
+  background: #5a6268;
+}
+
+.auto-play-btn.active {
+  background: #28a745;
+}
+
+.auto-play-btn.active:hover {
+  background: #218838;
+}
+
+.image-result {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .image-result {
+    grid-template-columns: 1fr;
   }
 }
+
+.image-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.image-wrapper {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.annotated-frame {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.no-detection {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 12px 24px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.info-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.detection-info {
+  background: #fefdf9;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  height: fit-content;
+}
+
+.detection-title {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detection-count {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.detection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detection-item {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.detection-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.detection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.detection-class {
+  font-weight: 700;
+  color: #1e2124;
+  font-size: 16px;
+}
+
+.detection-confidence {
+  background: linear-gradient(135deg, #e7a74d, #b37700);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.detection-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+}
+
+.bbox-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.bbox-values {
+  color: #1e2124;
+  font-weight: 600;
+}
+
+.no-detection-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.no-detection-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.no-detection-message p {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .detect-container {
+    padding: 16px;
+    margin: 16px;
+  }
+  
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .upload-mode {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .upload-mode button {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .result-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .result-stats {
+    justify-content: center;
+    width: 100%;
+  }
+  
+  .nav-controls {
+    align-items: flex-start;
+  }
+  
+  .jump-input {
+    justify-content: flex-start;
+  }
+  
+  .image-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .nav-btn, .auto-play-btn {
+    justify-content: center;
+  }
+}
+.bottom-dropdown {
+  margin-top: 32px;
+  text-align: center;
+  padding: 16px 0;
+  background: #fffbea;
+  border-top: 1px solid #f0e6c1;
+  border-radius: 0 0 12px 12px;
+}
+
+.dropdown-label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 8px;
+  color: #444;
+}
+
+.bottom-dropdown select {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #cfa97e;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.bottom-dropdown select:focus {
+  outline: none;
+  border-color: #b37700;
+}
+
 </style>

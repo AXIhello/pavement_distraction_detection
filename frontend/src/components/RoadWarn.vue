@@ -1,23 +1,20 @@
 <template>
   <div class="table-wrapper">
-  <div class="title">路障告警</div>
-    <!-- 独立的状态切换按钮组 -->
+    <div class="title">路障告警</div>
+
+    <!-- 状态切换按钮 -->
     <div class="status-toggle">
       <button
         @click="activeTab = 'unprocessed'"
         :class="['status-btn', { active: activeTab === 'unprocessed' }]"
-      >
-        未处理
-      </button>
+      >未处理</button>
       <button
         @click="activeTab = 'processed'"
         :class="['status-btn', { active: activeTab === 'processed' }]"
-      >
-        已处理
-      </button>
+      >已处理</button>
     </div>
 
-    <!-- 综合查询过滤 -->
+    <!-- 筛选区 -->
     <div class="filters">
       <div class="filter-group">
         <label class="filter-label">
@@ -27,20 +24,19 @@
             <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
           </select>
         </label>
-        
+
         <label class="filter-label">
           <span class="label-text">日期:</span>
           <input type="date" v-model="filterDate" class="filter-input" />
         </label>
-        
+
         <button @click="clearFilters" class="clear-btn">
-          <span class="btn-icon">🗑️</span>
-          清除筛选
+          <span class="btn-icon">🗑️</span> 清除筛选
         </button>
       </div>
     </div>
 
-    <!-- 表格容器 -->
+    <!-- 表格展示 -->
     <div class="table-container">
       <table class="data-table">
         <thead>
@@ -48,17 +44,13 @@
             <th @click="sortBy('type')" class="sortable-header">
               <div class="header-content">
                 <span>类型</span>
-                <span v-if="sortKey === 'type'" class="sort-indicator">
-                  {{ sortOrder === 1 ? '▲' : '▼' }}
-                </span>
+                <span v-if="sortKey === 'type'" class="sort-indicator">{{ sortOrder === 1 ? '▲' : '▼' }}</span>
               </div>
             </th>
             <th @click="sortBy('date')" class="sortable-header">
               <div class="header-content">
                 <span>告警时间</span>
-                <span v-if="sortKey === 'date'" class="sort-indicator">
-                  {{ sortOrder === 1 ? '▲' : '▼' }}
-                </span>
+                <span v-if="sortKey === 'date'" class="sort-indicator">{{ sortOrder === 1 ? '▲' : '▼' }}</span>
               </div>
             </th>
             <th class="action-header">查看详情</th>
@@ -66,14 +58,11 @@
         </thead>
         <tbody>
           <tr v-for="item in displayedData" :key="item.id" class="data-row">
-            <td class="type-cell">
-              <span class="type-tag">{{ item.type }}</span>
-            </td>
+            <td class="type-cell"><span class="type-tag">{{ item.type }}</span></td>
             <td class="date-cell">{{ item.date }}</td>
             <td class="action-cell">
               <button @click="viewDetails(item)" class="detail-btn">
-                <span class="btn-icon">👁️</span>
-                查看详情
+                <span class="btn-icon">👁️</span> 查看详情
               </button>
             </td>
           </tr>
@@ -88,12 +77,25 @@
         </tbody>
       </table>
     </div>
+
+    <!-- 分页器 -->
+    <el-pagination
+      v-model:current-page="currentPage"
+      :page-size="perPage"
+      :total="total"
+      layout="total, prev, pager, next"
+      background
+      style="margin: 24px auto; text-align: center"
+      @current-change="fetchData"
+    />
   </div>
 </template>
 
+
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 const activeTab = ref('unprocessed')
 const warnings = ref([])
@@ -104,72 +106,104 @@ const sortOrder = ref(1)
 const filterType = ref('')
 const filterDate = ref('')
 
-// 从后端拉取数据
+const currentPage = ref(1)
+const perPage = 10
+const total = ref(0)
+
+// 拉取接口数据
 async function fetchData() {
   try {
-    const res = await axios.get('/api/warnings')
-    warnings.value = res.data
+    const res = await axios.get('/api/logs_alerts/alerts', {
+      params: {
+        page: currentPage.value,
+        per_page: perPage,
+        type: filterType.value || undefined,
+        status: activeTab.value === 'unprocessed' ? '活跃' : '已处理',
+      }
+    })
+    warnings.value = res.data.alerts.map(item => ({
+      id: item.alert_id,
+      type: item.type,
+      date: item.timestamp,
+      status: item.status,
+      raw: item
+    }))
+    total.value = res.data.total
   } catch (e) {
     console.error('获取数据失败', e)
-    warnings.value = []
+    ElMessage.error('获取告警信息失败')
   }
 }
 
-// 当前标签页数据
-const filteredByTab = computed(() =>
-  warnings.value.filter(item => item.status === activeTab.value)
-)
-
 // 类型选项
 const uniqueTypes = computed(() => {
-  const types = new Set()
-  warnings.value.forEach(item => types.add(item.type))
-  return Array.from(types)
+  const set = new Set()
+  warnings.value.forEach(w => set.add(w.type))
+  return [...set]
 })
 
-// 综合过滤
-const filteredByFilter = computed(() => {
-  return filteredByTab.value.filter(item => {
-    const matchType = filterType.value ? item.type === filterType.value : true
-    const matchDate = filterDate.value
-      ? item.date.startsWith(filterDate.value)
-      : true
-    return matchType && matchDate
-  })
-})
-
-// 排序后最终显示
+// 排序 & 过滤展示
 const displayedData = computed(() => {
-  if (!sortKey.value) return filteredByFilter.value
+  let result = warnings.value
+  if (filterDate.value) {
+    result = result.filter(item => item.date.startsWith(filterDate.value))
+  }
+  if (filterType.value) {
+    result = result.filter(item => item.type === filterType.value)
+  }
 
-  return [...filteredByFilter.value].sort((a, b) => {
+  if (!sortKey.value) return result
+
+  return [...result].sort((a, b) => {
     if (a[sortKey.value] < b[sortKey.value]) return -1 * sortOrder.value
     if (a[sortKey.value] > b[sortKey.value]) return 1 * sortOrder.value
     return 0
   })
 })
 
+// 排序切换
 function sortBy(key) {
   if (sortKey.value === key) {
-    sortOrder.value = -sortOrder.value
+    sortOrder.value *= -1
   } else {
     sortKey.value = key
     sortOrder.value = 1
   }
 }
 
-function viewDetails(item) {
-  alert(`详情\n类型: ${item.type}\n时间: ${item.date}\n状态: ${item.status}`)
+// 查看详情：调用播放接口
+async function viewDetails(item) {
+  try {
+    const res = await axios.get(`/api/logs_alerts/alerts/playback/${item.id}`)
+    const { alert_info, media_url } = res.data
+    await ElMessageBox.alert(
+      `类型: ${alert_info.type}<br>描述: ${alert_info.description}<br>媒体: ${media_url}`,
+      '告警详情',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '确定'
+      }
+    )
+  } catch (e) {
+    console.error('查看详情失败', e)
+    ElMessage.error('查看详情失败')
+  }
 }
 
 function clearFilters() {
   filterType.value = ''
   filterDate.value = ''
+  currentPage.value = 1
+  fetchData()
 }
 
-onMounted(() => {
+// 监听切换状态、筛选变化时自动刷新
+watch([activeTab, filterType, filterDate], () => {
+  currentPage.value = 1
   fetchData()
 })
+
+onMounted(fetchData)
 </script>
 
 <style scoped>
