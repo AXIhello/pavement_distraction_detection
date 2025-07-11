@@ -18,6 +18,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 
+
 const router = useRouter()
 const video = ref(null)
 
@@ -61,6 +62,15 @@ async function startCamera() {
 
       if (result.success) {
         const face = result.faces[0];
+
+        if(face.name==='未知人员'){
+        alert('数据库中没有人脸数据，请先去录入！');
+        clearInterval(streamInterval)
+          stream.getTracks().forEach(track => track.stop())
+          socket.disconnect()
+          router.push('/face_register')
+          return;
+      }
         if (face.name === '陌生人') {
           alert('告警：检测到陌生人！');
           // 停止摄像头 & 关闭 SocketIO
@@ -71,6 +81,7 @@ async function startCamera() {
           router.push('/login')
           return;
         }
+        
         console.log('识别成功:', result.faces);
         // 停止摄像头 & 关闭 SocketIO
         clearInterval(streamInterval)
@@ -78,7 +89,7 @@ async function startCamera() {
         socket.disconnect()
 
         // 跳转到首页
-        router.push('/home')
+        router.push('/first_page')
       } else {
         console.warn('识别失败:', result.message || '未识别到人脸')
       }
