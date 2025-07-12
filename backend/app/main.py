@@ -121,7 +121,7 @@ def handle_face_recognition(data):
             dq.popleft()
         if len(dq)>=3:
             last_three = list(dq)[-3:]
-            if all(n==name for t,n in last_three):
+            if all(n==name for t,n in last_three) and name != '未检测到人脸':
                 app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")
             # 检查是否有陌生人
                 if name == "陌生人":
