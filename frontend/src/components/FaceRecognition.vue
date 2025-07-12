@@ -173,37 +173,37 @@ function connectSocket() {
     progress.value = 0
     progressStatus.value = '识别中...'
   })
-  socket.on('face_result', (result) => {
-    isWaitingForResult = false
-    progress.value = 100
-    progressStatus.value = '识别完成'
-    if (result.success) {
-      const face = result.faces[0]
-      // DeepFake 检测弹窗（优先级最高）
-      if(face.deepfake_label === 'FAKE') {
-        alert(`⚠️ 警告：检测到DeepFake人脸！\n姓名：${face.name || '未知'}\n概率：${(face.deepfake_prob*100).toFixed(2)}%`)
+      socket.on('face_result', (result) => {
+      isWaitingForResult = false
+      progress.value = 100
+      progressStatus.value = '识别完成'
+      if (result.success) {
+        const face = result.faces[0]
+        // DeepFake 检测弹窗（优先级最高）
+        if(face.name === 'deepfake') {
+          alert(`⚠️ 警告：检测到DeepFake人脸！`)
+          stopAll()
+          return
+        }
+        if(face.name==='未知人员'){
+          alert('数据库中没有人脸数据，请先去录入！');
+          stopAll()
+          router.push('/face_register')
+          return;
+        }
+        if (face.name === '陌生人') {
+          alert('告警：检测到陌生人！')
+          stopAll()
+          router.push('/login')
+          return
+        }
+        recognizedName.value = face.name || ''
+        recognitionFinished.value = true
         stopAll()
-        return
+      } else {
+        console.warn('识别失败:', result.message || '未识别到人脸')
       }
-      if(face.name==='未知人员'){
-        alert('数据库中没有人脸数据，请先去录入！');
-        stopAll()
-        router.push('/face_register')
-        return;
-      }
-      if (face.name === '陌生人') {
-        alert('告警：检测到陌生人！')
-        stopAll()
-        router.push('/login')
-        return
-      }
-      recognizedName.value = face.name || ''
-      recognitionFinished.value = true
-      stopAll()
-    } else {
-      console.warn('识别失败:', result.message || '未识别到人脸')
-    }
-  })
+    })
   socket.on('disconnect', () => {
     stopAll()
   })

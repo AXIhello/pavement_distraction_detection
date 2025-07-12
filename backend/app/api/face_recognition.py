@@ -65,6 +65,15 @@ class FaceRegister(Resource):
                 success = FaceDatabaseService.save_feature(name, feat)
                 if success:
                     feature_count = FaceDatabaseService.get_feature_count(name)
+                    
+                    # 重新加载人脸识别服务的数据库
+                    try:
+                        from ..main import face_recognition_service
+                        face_recognition_service._load_face_database()
+                        logger.info(f"人脸录入成功后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
+                    except Exception as e:
+                        logger.error(f"重新加载人脸数据库失败: {e}")
+                    
                     return {'success': True, 'message': f'保存成功: {img_path}，特征已加密存储到数据库（特征数量: {feature_count}）'}
                 else:
                     return {'success': False, 'message': '特征保存到数据库失败'}
@@ -124,6 +133,14 @@ class FaceFeatureDetail(Resource):
         try:
             success = FaceDatabaseService.delete_feature(name)
             if success:
+                # 重新加载人脸识别服务的数据库
+                try:
+                    from ..main import face_recognition_service
+                    face_recognition_service._load_face_database()
+                    logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
+                except Exception as e:
+                    logger.error(f"重新加载人脸数据库失败: {e}")
+                
                 return {'success': True, 'message': f'成功删除 {name} 的人脸特征'}
             else:
                 return {'success': False, 'message': f'未找到 {name} 的特征记录'}

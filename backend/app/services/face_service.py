@@ -143,31 +143,35 @@ class FaceRecognitionService:
                     min_dist = float('inf')
                     recognized_name = "未知人员"
 
-                    # 遍历已知人脸库进行比对
-                    if self.features_known_list:
-                        for j, known_feature in enumerate(self.features_known_list):
-                            dist = self._return_euclidean_distance(face_descriptor_np, known_feature)
-                            if dist < min_dist:
-                                min_dist = dist
-                                if min_dist < 0.5:  # 设置一个阈值，小于这个距离认为是同一个人
-                                    recognized_name = self.face_name_known_list[j]
-                                else:
-                                    recognized_name = "陌生人"
-
+                    # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
-                    deepfake_label = "FAKE" if fake_prob is not None and fake_prob >= 0.5 else "REAL"
-                    if deepfake_label == "FAKE":
-                        logger.warning(f"!!! DeepFake警告: {recognized_name}，概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
+                    is_deepfake = fake_prob is not None and fake_prob >= 0.5
+                    
+                    if is_deepfake:
+                        # 如果是DeepFake，直接返回deepfake身份
+                        recognized_name = "deepfake"
+                        logger.warning(f"!!! DeepFake警告: 概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
+                    else:
+                        # 如果不是DeepFake，进行正常的人脸识别
+                        # 遍历已知人脸库进行比对
+                        if self.features_known_list:
+                            for j, known_feature in enumerate(self.features_known_list):
+                                dist = self._return_euclidean_distance(face_descriptor_np, known_feature)
+                                if dist < min_dist:
+                                    min_dist = dist
+                                    if min_dist < 0.5:  # 设置一个阈值，小于这个距离认为是同一个人
+                                        recognized_name = self.face_name_known_list[j]
+                                    else:
+                                        recognized_name = "陌生人"
+                    
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
                         "distance": round(min_dist, 3) if min_dist != float('inf') else None,
-                        "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()},
-                        "deepfake_prob": fake_prob,
-                        "deepfake_label": deepfake_label
+                        "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()}
                     })
                     logger.info(
-                        f"检测到人脸: {recognized_name} (距离: {min_dist:.3f}), deepfake_label: {deepfake_label}, deepfake_prob: {fake_prob:.4f}"
+                        f"检测到人脸: {recognized_name} (距离: {min_dist:.3f})"
                     )
 
             else:
