@@ -11,7 +11,7 @@ from typing import List, Dict
 
 from ..services.alert_service import save_alert_frame, update_alert_video, create_alert_video
 from datetime import datetime
-from app.extensions import db
+from ..extensions import db
 
 
 # 类别ID到中文标签的映射
@@ -102,22 +102,21 @@ def detect_single_image(base64_image: str) -> Dict:
                 'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
             })
 
-        print("🔍 [DEBUG] 开始在原图上渲染标注...")
         # 在原图上绘制还原后的检测框
         from PIL import ImageDraw
         image_draw = image.copy()
         draw = ImageDraw.Draw(image_draw)
         for det in detections:
             bbox = det['bbox']
+            label = det['class']
             draw.rectangle(bbox, outline='red', width=2)
-        print("✅ [DEBUG] 原图渲染完成")
+            x, y = bbox[0], bbox[1] - 20 if bbox[1] - 20 > 0 else bbox[1] + 2
+            draw.text((x, y), label, fill='red')
 
         # 转换为base64
-        print("🔍 [DEBUG] 转换为base64...")
         buffered = io.BytesIO()
         image_draw.save(buffered, format="JPEG")
         annotated_image_base64 = base64.b64encode(buffered.getvalue()).decode()
-        print(f"✅ [DEBUG] Base64转换完成，长度: {len(annotated_image_base64)}")
 
         result = {
             'status': 'success',
@@ -125,7 +124,6 @@ def detect_single_image(base64_image: str) -> Dict:
             'annotated_image': annotated_image_base64
         }
 
-        print(f"🎉 [SUCCESS] 检测完成，返回结果: status={result['status']}, 检测数量={len(detections)}")
         return result
 
     except Exception as e:
@@ -209,7 +207,10 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             draw = ImageDraw.Draw(image_draw)
             for det in detections:
                 bbox = det['bbox']
+                label = det['class']
                 draw.rectangle(bbox, outline='red', width=2)
+                x, y = bbox[0], bbox[1] - 20 if bbox[1] - 20 > 0 else bbox[1] + 2
+                draw.text((x, y), label, fill='red')
 
             buffered = io.BytesIO()
             image_draw.save(buffered, format="JPEG")
