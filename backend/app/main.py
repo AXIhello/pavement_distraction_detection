@@ -48,6 +48,9 @@ app_logger = get_logger(__name__)
 # 将 app.config 传递给服务，以便服务可以获取路径或其他配置
 face_recognition_service = FaceRecognitionService(app.config)
 
+# 将服务设置为Flask应用的属性，以便在其他模块中访问
+app.face_recognition_service = face_recognition_service
+
 # 在应用上下文启动时初始化 Dlib 模型和人脸数据库
 # 确保在 WSGI 服务器启动前完成初始化
 with app.app_context():

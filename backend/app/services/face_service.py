@@ -153,7 +153,7 @@ class FaceRecognitionService:
 
                     # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
-                    is_deepfake = fake_prob is not None and fake_prob >= 0.5
+                    is_deepfake = fake_prob is not None and fake_prob > 0.6
                     
                     if is_deepfake:
                         # 如果是DeepFake，直接返回deepfake身份

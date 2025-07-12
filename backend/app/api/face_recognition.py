@@ -1,5 +1,5 @@
 from flask_restx import Namespace, Resource, fields
-from flask import request
+from flask import request, current_app
 import os
 import base64
 import re
@@ -68,9 +68,9 @@ class FaceRegister(Resource):
                     
                     # 重新加载人脸识别服务的数据库
                     try:
-                        from ..main import face_recognition_service
-                        face_recognition_service.reload_face_database()
-                        logger.info(f"人脸录入成功后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
+                        service = current_app.face_recognition_service
+                        service.reload_face_database()
+                        logger.info(f"人脸录入成功后重新加载数据库，当前数据库包含 {len(service.features_known_list)} 个特征")
                     except Exception as e:
                         logger.error(f"重新加载人脸数据库失败: {e}")
                     
@@ -135,9 +135,9 @@ class FaceFeatureDetail(Resource):
             if success:
                 # 重新加载人脸识别服务的数据库
                 try:
-                    from ..main import face_recognition_service
-                    face_recognition_service.reload_face_database()
-                    logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
+                    service = current_app.face_recognition_service
+                    service.reload_face_database()
+                    logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(service.features_known_list)} 个特征")
                 except Exception as e:
                     logger.error(f"重新加载人脸数据库失败: {e}")
                 
