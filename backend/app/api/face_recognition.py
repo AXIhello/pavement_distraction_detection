@@ -69,12 +69,12 @@ class FaceRegister(Resource):
                     # 重新加载人脸识别服务的数据库
                     try:
                         from ..main import face_recognition_service
-                        face_recognition_service._load_face_database()
+                        face_recognition_service.reload_face_database()
                         logger.info(f"人脸录入成功后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
                     except Exception as e:
                         logger.error(f"重新加载人脸数据库失败: {e}")
                     
-                    return {'success': True, 'message': f'保存成功: {img_path}，特征已加密存储到数据库（特征数量: {feature_count}）'}
+                    return {'success': True, 'message': f'保存成功: {img_path}，已录入 {feature_count} 张照片，特征已更新'}
                 else:
                     return {'success': False, 'message': '特征保存到数据库失败'}
             else:
@@ -94,7 +94,7 @@ class FaceFeaturesManagement(Resource):
                 count = FaceDatabaseService.get_feature_count(name)
                 features_info.append({
                     'name': name,
-                    'feature_count': count
+                    'photo_count': count  # 改为photo_count更准确
                 })
             return {
                 'success': True, 
@@ -117,7 +117,7 @@ class FaceFeatureDetail(Resource):
                     'success': True,
                     'data': {
                         'name': name,
-                        'feature_count': count,
+                        'photo_count': count,  # 改为photo_count
                         'feature_dimension': len(feature_vector)
                     },
                     'message': '获取成功'
@@ -136,7 +136,7 @@ class FaceFeatureDetail(Resource):
                 # 重新加载人脸识别服务的数据库
                 try:
                     from ..main import face_recognition_service
-                    face_recognition_service._load_face_database()
+                    face_recognition_service.reload_face_database()
                     logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
                 except Exception as e:
                     logger.error(f"重新加载人脸数据库失败: {e}")

@@ -18,6 +18,7 @@ class FaceDatabaseService:
     def save_feature(name: str, feature_vector: np.ndarray) -> bool:
         """
         保存加密后的人脸特征到数据库
+        如果该人已存在特征，则计算新旧特征的平均值
         Args:
             name: 人名
             feature_vector: 128维人脸特征向量
@@ -25,27 +26,32 @@ class FaceDatabaseService:
             是否保存成功
         """
         try:
-            # 加密特征向量
-            encrypted_feature = aes_encryption.encrypt_feature_vector(feature_vector)
-            
             # 检查是否已存在该人的记录
             existing_record = FaceFeature.get_by_name(name)
             
             if existing_record:
+                # 如果已存在，计算新旧特征的平均值
+                old_feature = aes_encryption.decrypt_feature_vector(existing_record.feature_encrypted)
+                # 计算平均值
+                averaged_feature = (old_feature + feature_vector) / 2.0
+                # 加密新的平均特征向量
+                encrypted_feature = aes_encryption.encrypt_feature_vector(averaged_feature)
+                
                 # 更新现有记录
                 existing_record.feature_encrypted = encrypted_feature
                 existing_record.feature_count += 1
                 existing_record.updated_at = db.func.now()
-                logger.info(f"更新 {name} 的人脸特征，特征数量: {existing_record.feature_count}")
+                logger.info(f"更新 {name} 的人脸特征（第 {existing_record.feature_count} 张照片），使用平均值")
             else:
                 # 创建新记录
+                encrypted_feature = aes_encryption.encrypt_feature_vector(feature_vector)
                 new_record = FaceFeature(
                     name=name,
                     feature_encrypted=encrypted_feature,
                     feature_count=1
                 )
                 db.session.add(new_record)
-                logger.info(f"新增 {name} 的人脸特征")
+                logger.info(f"新增 {name} 的人脸特征（第1张照片）")
             
             db.session.commit()
             return True

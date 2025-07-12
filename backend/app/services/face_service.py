@@ -66,9 +66,11 @@ class FaceRecognitionService:
             logger.error(f"加载deepfake检测模型失败: {e}")
             self.deepfake_model = None
 
-    def _load_face_database(self, path_features_known_csv):
+    def _load_face_database(self, path_features_known_csv=None):
         """
         从数据库加载已知人脸特征和名字。
+        Args:
+            path_features_known_csv: CSV文件路径（可选，用于兼容性）
         """
         self.features_known_list = []
         self.face_name_known_list = []
@@ -88,6 +90,12 @@ class FaceRecognitionService:
             logger.error(f"从数据库加载人脸特征失败: {e}", exc_info=True)
             self.features_known_list = []
             self.face_name_known_list = []
+    
+    def reload_face_database(self):
+        """
+        重新加载人脸数据库（无参数版本）
+        """
+        self._load_face_database()
 
     def _return_euclidean_distance(self, feature_1, feature_2):
         """
@@ -163,7 +171,7 @@ class FaceRecognitionService:
                                         recognized_name = self.face_name_known_list[j]
                                     else:
                                         recognized_name = "陌生人"
-                    
+
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
