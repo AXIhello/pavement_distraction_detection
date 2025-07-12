@@ -33,10 +33,19 @@
       >城市交通时空</router-link>
 
       <router-link
-        to="/log"
+        to="/warning"
         class="nav-item"
-        :class="{ active: isActive('/log') }"
-      >日志</router-link>
+        :class="{ active: isActive('/warning') }"
+      >告警</router-link>
+
+<router-link
+  v-if="isAdmin"
+  to="/log"
+  class="nav-item"
+  :class="{ active: isActive('/log') }"
+>
+  日志
+</router-link>
 
       <button class="button" @click="goToHome">
         <div class="text-wrapper-3">用户中心</div>
@@ -54,6 +63,13 @@ const route = useRoute()
 const showDropdown = ref(false)
 const hoverTimeout = ref(null)
 const navRef = ref(null)
+const isAdmin = ref(false)
+
+onMounted(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  isAdmin.value = userInfo.role === 'admin'  // 根据你的用户结构调整
+})
+
 
 function goToFirstPage() {
   router.push('/first_page')
@@ -64,6 +80,7 @@ function goToHome() {
 function isActive(path) {
   return route.path === path
 }
+
 
 // 鼠标进入，清除关闭定时器，显示菜单
 function handleMouseEnter() {
