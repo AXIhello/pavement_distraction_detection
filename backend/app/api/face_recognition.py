@@ -94,7 +94,7 @@ class FaceFeaturesManagement(Resource):
                 count = FaceDatabaseService.get_feature_count(name)
                 features_info.append({
                     'name': name,
-                    'photo_count': count  # 改为photo_count更准确
+                    'photo_count': count
                 })
             return {
                 'success': True, 
