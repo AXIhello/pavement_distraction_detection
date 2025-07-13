@@ -1,20 +1,21 @@
+# backend/app/services/alert_service.py
 from pathlib import Path
 import base64
 import io
 from PIL import Image, ImageDraw
 from datetime import datetime
 from app.extensions import db
-from app.core.models import AlertVideo, AlertFrame
+from app.core.models import AlertVideo, AlertFrame, FaceAlertVideo, FaceAlertFrame
 
 # 还未设计人脸告警相关的模型
 
-def create_alert_video(alert_type: str, video_name: str, save_dir: str, total_frames: int, alert_frame_count: int, user_id: int = None) -> int:
-    if alert_type == 'road':
+def create_alert_video(db_type: str, video_name: str, save_dir: str, total_frames: int, alert_frame_count: int, user_id: int = None) -> int:
+    if db_type == 'road':
         VideoModel = AlertVideo
-    # elif alert_type == 'face':
-    #     VideoModel = FaceAlertVideo
+    elif db_type == 'face':
+        VideoModel = FaceAlertVideo
     else:
-        raise ValueError(f"不支持的告警类型: {alert_type}")
+        raise ValueError(f"不支持的告警类型: {db_type}")
 
     video = VideoModel(
         video_name=video_name,
@@ -28,15 +29,15 @@ def create_alert_video(alert_type: str, video_name: str, save_dir: str, total_fr
     db.session.commit()
     return video.id
 
-def save_alert_frame(alert_type: str, video_id: int, frame_index: int, image_base64: str, confidence: float, disease_type: str = None, face_id: str = None, bboxes: list = None) -> str:
-    if alert_type == 'road':
+def save_alert_frame(db_type: str, video_id: int, frame_index: int, image_base64: str, confidence: float, disease_type: str = None, bboxes: list = None) -> str:
+    if db_type == 'road':
         VideoModel = AlertVideo
         FrameModel = AlertFrame
-    # elif alert_type == 'face':
-    #     VideoModel = FaceAlertVideo
-    #     FrameModel = FaceAlertFrame
+    elif db_type == 'face':
+        VideoModel = FaceAlertVideo
+        FrameModel = FaceAlertFrame
     else:
-        raise ValueError(f"不支持的告警类型: {alert_type}")
+        raise ValueError(f"不支持的告警类型: {db_type}")
 
     video = VideoModel.query.get(video_id)
     if not video:
@@ -63,7 +64,7 @@ def save_alert_frame(alert_type: str, video_id: int, frame_index: int, image_bas
     # 保存图像
     image.save(save_path)    
 
-    if alert_type == 'road':
+    if db_type == 'road':
         alert_frame = FrameModel(
         video_id=video_id,
         frame_index=frame_index,
@@ -72,11 +73,11 @@ def save_alert_frame(alert_type: str, video_id: int, frame_index: int, image_bas
         image_path=str(save_path),
         created_at=datetime.utcnow()
     )
-    elif alert_type == 'face':
+    elif db_type == 'face':
         alert_frame = FrameModel(
         video_id=video_id,
         frame_index=frame_index,
-        face_id=face_id,
+        alert_type=disease_type or "未知",  
         confidence=confidence,
         image_path=str(save_path),
         created_at=datetime.utcnow()
@@ -87,13 +88,13 @@ def save_alert_frame(alert_type: str, video_id: int, frame_index: int, image_bas
 
     return str(save_path)
 
-def update_alert_video(alert_type: str, video_id: int, alert_frame_count: int):
-    if alert_type == 'road':
+def update_alert_video(db_type: str, video_id: int, alert_frame_count: int):
+    if db_type == 'road':
         VideoModel = AlertVideo
-    # elif alert_type == 'face':
-    #     VideoModel = FaceAlertVideo
+    elif db_type == 'face':
+        VideoModel = FaceAlertVideo
     else:
-        raise ValueError(f"不支持的告警类型: {alert_type}")
+        raise ValueError(f"不支持的告警类型: {db_type}")
 
     video = VideoModel.query.get(video_id)
     if not video:
@@ -103,13 +104,13 @@ def update_alert_video(alert_type: str, video_id: int, alert_frame_count: int):
     db.session.commit()
 
 #更新视频帧数量和病害帧数量
-def update_alert_video_frame_count(alert_type: str, video_id: int, total_frames: int, alert_frame_count: int):
-    if alert_type == 'road':
+def update_alert_video_frame_count(db_type: str, video_id: int, total_frames: int, alert_frame_count: int):
+    if db_type == 'road':
         VideoModel = AlertVideo
-    # elif alert_type == 'face':
-    #     VideoModel = FaceAlertVideo
+    elif db_type == 'face':
+        VideoModel = FaceAlertVideo
     else:
-        raise ValueError(f"不支持的告警类型: {alert_type}")
+        raise ValueError(f"不支持的告警类型: {db_type}")
 
     video = VideoModel.query.get(video_id)
     if not video:

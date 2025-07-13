@@ -115,7 +115,7 @@ def get_pavement_socketio_handlers():
                 # 1️. 自动生成保存路径
                 now = datetime.now()
                 timestamp = now.strftime('%Y%m%d_%H%M%S')
-                save_dir = Path(f'data/alert_videos/video_{timestamp}')
+                save_dir = Path(f'data/alert_videos/pavement/video_{timestamp}')
                 save_dir.mkdir(parents=True, exist_ok=True)
 
                 # 2. 路面病害告警
