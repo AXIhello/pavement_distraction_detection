@@ -11,8 +11,13 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), default='user')  # 用户角色（如 admin, user 等）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关联上传的视频
+    alert_videos = db.relationship('AlertVideo', backref='user', lazy=True)
+    face_alert_videos = db.relationship('FaceAlertVideo', backref='user', lazy=True)
 
     def set_password(self, password):
         self.password = generate_password_hash(password)
@@ -63,7 +68,7 @@ class AlertVideo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     video_name = db.Column(db.String(255), nullable=False)  # 原始视频名称
-    user_id = db.Column(db.Integer, nullable=True)  # 如果需要支持用户关联
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     save_dir = db.Column(db.String(512), nullable=False)  # 病害图像保存目录
     total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
     alert_frame_count = db.Column(db.Integer, nullable=False)  # 病害帧数量
@@ -82,6 +87,34 @@ class AlertFrame(db.Model):
     confidence = db.Column(db.Float, nullable=False)  # 检测置信度（选第一个目标）
     image_path = db.Column(db.String(512), nullable=False)  # 病害图像路径（带标注图）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# 人脸告警视频表
+class FaceAlertVideo(db.Model):
+    __tablename__ = 'face_alert_videos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    video_name = db.Column(db.String(255), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    save_dir = db.Column(db.String(512), nullable=False)
+    total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
+    alert_frame_count = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    face_alert_frames = db.relationship('FaceAlertFrame', backref='video', cascade='all, delete-orphan')
+
+
+# 人脸告警帧表
+class FaceAlertFrame(db.Model):
+    __tablename__ = 'face_alert_frames'
+
+    id = db.Column(db.Integer, primary_key=True)
+    video_id = db.Column(db.Integer, db.ForeignKey('face_alert_videos.id'), nullable=False)
+    frame_index = db.Column(db.Integer, nullable=False)
+    image_path = db.Column(db.String(512), nullable=False)
+    alert_type = db.Column(db.String(128), nullable=False)  # 告警类型（如打电话、低头等）
+    confidence = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 # -------- 用户相关操作 --------
 
