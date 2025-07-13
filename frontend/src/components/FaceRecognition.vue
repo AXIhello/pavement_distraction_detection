@@ -70,6 +70,10 @@ const progress = ref(0) // 进度条百分比
 const progressStatus = ref('识别准备中...') // 状态提示
 const mode = ref('camera') // 当前模式
 
+//处理异步问题
+let requestId = 0
+let latestReqId = 0 // 只接受这一轮的结果
+
 //人脸标识框
 const overlayCanvas = ref(null)
 const videoContainer = ref(null)
@@ -192,7 +196,15 @@ function onVideoUpload(e) {
     videoEl.onseeked = () => {
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
       const base64Image = canvas.toDataURL('image/jpeg')
-      socket.emit('face_recognition', { image: base64Image })
+
+      const currentReqId = requestId++
+latestReqId = currentReqId // 标记为最新
+
+socket.emit('face_recognition', {
+  image: base64Image,
+  req_id: currentReqId
+})
+
       sentFrames++
       progress.value = Math.round((sentFrames / totalFrames) * 100)
       progressStatus.value = `视频识别中... (${sentFrames}/${totalFrames})`
@@ -238,8 +250,13 @@ function connectSocket() {
     progress.value = 0
     progressStatus.value = '识别中...'
   })
-  
-  socket.on('face_bbox', (result) => {
+
+ socket.on('face_bbox', (result) => {
+  if (typeof result.req_id !== 'undefined' && result.req_id < latestReqId) {
+    console.warn(`忽略过期 bbox：req_id=${result.req_id} < ${latestReqId}`)
+    return
+  }
+
   if (result.success && result.bboxes && result.bboxes.length > 0) {
     drawFaceBoxes(result.bboxes)
   } else {
@@ -249,17 +266,23 @@ function connectSocket() {
   }
 })
 
-  socket.on('face_result', (result) => {
-    isWaitingForResult = false
-    progress.value = 100
-    progressStatus.value = '识别完成'
-    if (result.success) {
-      const face = result.faces[0]
-      handleRecognitionResult(face)
-    } else {
-      console.warn('识别失败:', result.message || '未识别到人脸')
-    }
-  })
+socket.on('face_result', (result) => {
+  if (typeof result.req_id !== 'undefined' && result.req_id < latestReqId) {
+    console.warn(`忽略过期识别结果：req_id=${result.req_id} < ${latestReqId}`)
+    return
+  }
+
+  isWaitingForResult = false
+  progress.value = 100
+  progressStatus.value = '识别完成'
+  if (result.success) {
+    const face = result.faces[0]
+    handleRecognitionResult(face)
+  } else {
+    console.warn('识别失败:', result.message || '未识别到人脸')
+  }
+})
+
   socket.on('disconnect', () => {
     stopAll()
   })

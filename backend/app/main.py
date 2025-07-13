@@ -108,6 +108,7 @@ def handle_face_recognition(data):
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
+        req_id = data.get('req_id')  # ✅ 获取前端发送的 req_id
         if not base64_image:
             emit('face_result', {'success': False, 'message': '没有图像数据'})
             return
@@ -115,6 +116,20 @@ def handle_face_recognition(data):
         recognition_results = face_recognition_service.recognize_face(base64_image)
         if not recognition_results or not isinstance(recognition_results,list):
             return
+
+        # 立即向前端发送bbox信息
+        bboxes = [
+            face["bbox"]
+            for face in recognition_results
+            if "bbox" in face
+        ]
+        if bboxes:
+            app_logger.info(f"检测到人脸框，已发送bbox详细信息={bboxes}")
+            emit('face_bbox',{
+                "success": True,
+                "bboxes": bboxes,
+                "req_id": req_id
+            })
         name = recognition_results[0].get('name')
         now = time.time()
         dq = recent_results[sid]
@@ -122,19 +137,28 @@ def handle_face_recognition(data):
         #移除超过1秒的旧帧
         while dq and now-dq[0][0]>2.0:
             dq.popleft()
-        if len(dq)>=3:
+        if len(dq) >= 3:
             last_three = list(dq)[-3:]
-            if all(n==name for t,n in last_three) and name != '未检测到人脸':
-                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")
-            # 检查是否有陌生人
+            if all(n == name for t, n in last_three) and name != '未检测到人脸':
+                # 打印 bbox 信息
+                bbox_info = []
+                for face in recognition_results:
+                    bbox_info.append({
+                        "name": face.get("name"),
+                        "bbox": face.get("bbox"),
+                    })
+                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}, bbox={bbox_info}")
+
                 if name == "陌生人":
                     app_logger.warning("告警：检测到陌生人！")
-            # 判断识别结果，统一返回格式
+
                 emit('face_result', {
                     "success": True,
-                    "faces": recognition_results
+                    "faces": recognition_results,
+                    "req_id": req_id  # ✅ 添加 req_id
                 })
-                dq.clear() #防止重复弹窗
+                dq.clear()
+
         elif (
                 isinstance(recognition_results, list)
                 and recognition_results
