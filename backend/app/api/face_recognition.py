@@ -1,22 +1,18 @@
 from flask_restx import Namespace, Resource, fields
-from flask import request
-import os
-import base64
-import re
-import dlib
-import numpy as np
-import cv2
-import csv
+from flask import request, current_app
 import logging
-from ..services.face_db_service import FaceDatabaseService
 
 # 获取日志器
 logger = logging.getLogger(__name__)
 ns = Namespace('face', description='人脸识别相关接口')
 
-# 人脸录入请求体模型
+# 请求体模型
 face_register_model = ns.model('FaceRegister', {
     'name': fields.String(required=True, description='姓名'),
+    'image': fields.String(required=True, description='Base64图片')
+})
+
+face_recognition_model = ns.model('FaceRecognition', {
     'image': fields.String(required=True, description='Base64图片')
 })
 
@@ -24,63 +20,67 @@ face_register_model = ns.model('FaceRegister', {
 class FaceRegister(Resource):
     @ns.expect(face_register_model)
     def post(self):
-        """人脸图片录入（保存到本地，并立即提取特征追加到 features_all.csv）"""
-        data = ns.payload
-        name = data.get('name')
-        image_base64 = data.get('image')
-        logger.info(f"收到请求: name={name}, image_length={len(image_base64)}")
-        if not name or not image_base64:
-            return {'success': False, 'message': '缺少姓名或图片'}
-        # 只保留中文、英文、数字
-        name = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9]', '', name)
-        # 使用绝对路径，基于当前文件位置计算项目根目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        save_dir = os.path.join(project_root, 'backend', 'data', 'data_faces_from_camera', f'person_{name}')
-        os.makedirs(save_dir, exist_ok=True)
-        # 自动编号
-        existing = [f for f in os.listdir(save_dir) if f.endswith('.jpg')]
-        idx = len(existing) + 1
-        img_path = os.path.join(save_dir, f'img_face_{idx}.jpg')
-        # 去掉base64头
-        if ',' in image_base64:
-            image_base64 = image_base64.split(',')[1]
-        with open(img_path, 'wb') as f:
-            f.write(base64.b64decode(image_base64))
-        # --- 新增：保存后立即提取特征并加密存储到数据库 ---
-        dlib_data_path = os.path.join(project_root, 'backend', 'data', 'data_dlib')
-        predictor_path = os.path.join(dlib_data_path, 'shape_predictor_68_face_landmarks.dat')
-        reco_model_path = os.path.join(dlib_data_path, 'dlib_face_recognition_resnet_model_v1.dat')
-        detector = dlib.get_frontal_face_detector()
-        predictor = dlib.shape_predictor(predictor_path)
-        face_reco_model = dlib.face_recognition_model_v1(reco_model_path)
-        img = cv2.imread(img_path)
-        if img is not None:
-            faces = detector(img, 1)
-            if len(faces) > 0:
-                shape = predictor(img, faces[0])
-                feat = np.array(face_reco_model.compute_face_descriptor(img, shape))
-                
-                # 使用数据库服务保存加密特征
-                success = FaceDatabaseService.save_feature(name, feat)
-                if success:
-                    feature_count = FaceDatabaseService.get_feature_count(name)
-                    
-                    # 重新加载人脸识别服务的数据库
-                    try:
-                        from ..main import face_recognition_service
-                        face_recognition_service.reload_face_database()
-                        logger.info(f"人脸录入成功后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
-                    except Exception as e:
-                        logger.error(f"重新加载人脸数据库失败: {e}")
-                    
-                    return {'success': True, 'message': f'保存成功: {img_path}，已录入 {feature_count} 张照片，特征已更新'}
-                else:
-                    return {'success': False, 'message': '特征保存到数据库失败'}
-            else:
-                return {'success': False, 'message': '图片中未检测到人脸，未写入特征'}
-        else:
-            return {'success': False, 'message': '图片保存失败，无法读取'}
+        """人脸图片录入接口"""
+        try:
+            data = ns.payload
+            name = data.get('name')
+            image_base64 = data.get('image')
+            
+            logger.info(f"收到人脸注册请求: name={name}, image_length={len(image_base64) if image_base64 else 0}")
+            
+            # 调用业务逻辑服务
+            service = current_app.face_recognition_service
+            result = service.register_face(name, image_base64)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"人脸注册接口处理失败: {e}", exc_info=True)
+            return {'success': False, 'message': f'注册失败: {str(e)}'}
+
+@ns.route('/recognize')
+class FaceRecognition(Resource):
+    @ns.expect(face_recognition_model)
+    def post(self):
+        """人脸识别接口（用于单张图片识别）"""
+        try:
+            data = ns.payload
+            image_base64 = data.get('image')
+            
+            logger.info(f"收到人脸识别请求: image_length={len(image_base64) if image_base64 else 0}")
+            
+            if not image_base64:
+                return {'success': False, 'message': '缺少图片数据'}
+            
+            # 调用业务逻辑服务
+            service = current_app.face_recognition_service
+            recognition_results = service.recognize_face(image_base64)
+            
+            if not recognition_results:
+                return {'success': False, 'message': '识别失败，未返回结果'}
+            
+            # 检查是否有错误
+            if recognition_results[0].get("status") == "error":
+                return {
+                    'success': False, 
+                    'message': recognition_results[0].get("message", "识别出错")
+                }
+            
+            # 检查是否检测到人脸
+            if recognition_results[0].get("name") == "未检测到人脸":
+                return {
+                    'success': False, 
+                    'message': '未检测到人脸'
+                }
+            
+            return {
+                'success': True,
+                'faces': recognition_results
+            }
+            
+        except Exception as e:
+            logger.error(f"人脸识别接口处理失败: {e}", exc_info=True)
+            return {'success': False, 'message': f'识别失败: {str(e)}'}
 
 # 人脸特征管理接口
 @ns.route('/features')
@@ -88,13 +88,14 @@ class FaceFeaturesManagement(Resource):
     def get(self):
         """获取所有已注册的人脸特征信息"""
         try:
+            from ..services.face_db_service import FaceDatabaseService
             names = FaceDatabaseService.get_all_names()
             features_info = []
             for name in names:
                 count = FaceDatabaseService.get_feature_count(name)
                 features_info.append({
                     'name': name,
-                    'photo_count': count  # 改为photo_count更准确
+                    'photo_count': count
                 })
             return {
                 'success': True, 
@@ -110,6 +111,7 @@ class FaceFeatureDetail(Resource):
     def get(self, name):
         """获取指定人的特征信息"""
         try:
+            from ..services.face_db_service import FaceDatabaseService
             feature_vector = FaceDatabaseService.get_feature(name)
             if feature_vector is not None:
                 count = FaceDatabaseService.get_feature_count(name)
@@ -117,7 +119,7 @@ class FaceFeatureDetail(Resource):
                     'success': True,
                     'data': {
                         'name': name,
-                        'photo_count': count,  # 改为photo_count
+                        'photo_count': count,
                         'feature_dimension': len(feature_vector)
                     },
                     'message': '获取成功'
@@ -131,13 +133,14 @@ class FaceFeatureDetail(Resource):
     def delete(self, name):
         """删除指定人的人脸特征"""
         try:
+            from ..services.face_db_service import FaceDatabaseService
             success = FaceDatabaseService.delete_feature(name)
             if success:
                 # 重新加载人脸识别服务的数据库
                 try:
-                    from ..main import face_recognition_service
-                    face_recognition_service.reload_face_database()
-                    logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(face_recognition_service.features_known_list)} 个特征")
+                    service = current_app.face_recognition_service
+                    service.reload_face_database()
+                    logger.info(f"删除人脸特征后重新加载数据库，当前数据库包含 {len(service.features_known_list)} 个特征")
                 except Exception as e:
                     logger.error(f"重新加载人脸数据库失败: {e}")
                 
@@ -154,49 +157,9 @@ class FaceFeaturesExtract(Resource):
     def post(self):
         """提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性接口）"""
         try:
-            # 使用绝对路径，基于当前文件位置计算项目根目录
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-            faces_dir = os.path.join(project_root, 'backend', 'data', 'data_faces_from_camera')
-            features_csv = os.path.join(project_root, 'backend', 'data', 'features_all.csv')
-            dlib_data_path = os.path.join(project_root, 'backend', 'data', 'data_dlib')
-            predictor_path = os.path.join(dlib_data_path, 'shape_predictor_68_face_landmarks.dat')
-            reco_model_path = os.path.join(dlib_data_path, 'dlib_face_recognition_resnet_model_v1.dat')
-            detector = dlib.get_frontal_face_detector()
-            predictor = dlib.shape_predictor(predictor_path)
-            face_reco_model = dlib.face_recognition_model_v1(reco_model_path)
-
-            def return_128d_features(img_path):
-                img = cv2.imread(img_path)
-                if img is None:
-                    return None
-                faces = detector(img, 1)
-                if len(faces) == 0:
-                    return None
-                shape = predictor(img, faces[0])
-                return np.array(face_reco_model.compute_face_descriptor(img, shape))
-
-            person_list = [p for p in os.listdir(faces_dir) if os.path.isdir(os.path.join(faces_dir, p))]
-            with open(features_csv, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.writer(csvfile)
-                # 写入注释行
-                writer.writerow(['# 人脸特征数据库 - 姓名,特征1,特征2,...,特征128'])
-                for person in person_list:
-                    person_name = person.split('_', 1)[-1]
-                    img_dir = os.path.join(faces_dir, person)
-                    features = []
-                    for img_file in os.listdir(img_dir):
-                        if img_file.endswith('.jpg'):
-                            feat = return_128d_features(os.path.join(img_dir, img_file))
-                            if feat is not None:
-                                features.append(feat)
-                    if features:
-                        mean_feat = np.mean(features, axis=0)
-                    else:
-                        mean_feat = np.zeros(128)
-                    row = [person_name] + mean_feat.tolist()
-                    writer.writerow(row)
-            return {'success': True, 'message': '特征提取完成'}
+            service = current_app.face_recognition_service
+            result = service.extract_all_features_to_csv()
+            return result
         except Exception as e:
             logger.error(f"特征提取失败: {e}")
             return {'success': False, 'message': f'特征提取失败: {str(e)}'}

@@ -91,32 +91,44 @@ async function startCamera() {
   }
 }
 
+// 图片识别 - 使用API接口
 function onImageUpload(e) {
   stopAll()
   const file = e.target.files[0]
   if (!file) return
-  connectSocket()
+
   const reader = new FileReader()
-  reader.onload = function(evt) {
+  reader.onload = async function(evt) {
     const base64Image = evt.target.result
-    progress.value = 0
+    progress.value = 50
     progressStatus.value = '识别中...'
-    let sent = 0
-    const total = 5
-    const interval = setInterval(() => {
-      socket.emit('face_recognition', { image: base64Image })
-      sent++
-      progress.value = Math.round((sent / total) * 100)
-      if (sent >= total) {
-        clearInterval(interval)
-        progress.value = 100
-        progressStatus.value = '识别完成，等待结果...'
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/face/recognize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image })
+      })
+
+      const result = await response.json()
+      progress.value = 100
+      progressStatus.value = '识别完成'
+
+      if (result.success && result.faces && result.faces.length > 0) {
+        const face = result.faces[0]
+        handleRecognitionResult(face)
+      } else {
+        progressStatus.value = result.message || '识别失败'
       }
-    }, 200)
+    } catch (error) {
+      console.error('API识别失败:', error)
+      progressStatus.value = '识别失败，请重试'
+    }
   }
   reader.readAsDataURL(file)
 }
 
+// 视频识别 - 使用Socket.IO
 function onVideoUpload(e) {
   stopAll()
   const file = e.target.files[0]
@@ -163,6 +175,25 @@ function onVideoUpload(e) {
   }
 }
 
+// 统一处理识别结果
+function handleRecognitionResult(face) {
+  // DeepFake 检测弹窗（优先级最高）
+  if(face.name === 'deepfake') {
+    alert(`⚠️ 警告：检测到DeepFake人脸！`)
+    stopAll()
+    return
+  }
+  if (face.name === '陌生人') {
+    alert('告警：检测到陌生人！')
+    stopAll()
+    router.push('/login')
+    return
+  }
+  recognizedName.value = face.name || ''
+  recognitionFinished.value = true
+  stopAll()
+}
+
 function connectSocket() {
   if (socket) {
     socket.disconnect()
@@ -179,27 +210,7 @@ function connectSocket() {
     progressStatus.value = '识别完成'
     if (result.success) {
       const face = result.faces[0]
-      // DeepFake 检测弹窗（优先级最高）
-        if(face.name === 'deepfake') {
-          alert(`⚠️ 警告：检测到DeepFake人脸！`)
-        stopAll()
-        return
-      }
-      if(face.name==='未知人员'){
-        alert('数据库中没有人脸数据，请先去录入！');
-        stopAll()
-        router.push('/face_register')
-        return;
-      }
-      if (face.name === '陌生人') {
-        alert('告警：检测到陌生人！')
-        stopAll()
-        router.push('/login')
-        return
-      }
-      recognizedName.value = face.name || ''
-      recognitionFinished.value = true
-      stopAll()
+      handleRecognitionResult(face)
     } else {
       console.warn('识别失败:', result.message || '未识别到人脸')
     }
