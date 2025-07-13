@@ -66,6 +66,66 @@ class FaceRecognitionService:
             logger.error(f"加载deepfake检测模型失败: {e}")
             self.deepfake_model = None
 
+    def register_face(self, name, base64_image_data):
+        """
+        注册新的人脸到数据库
+        Args:
+            name: 人名
+            base64_image_data: Base64编码的图像数据
+        Returns:
+            注册结果字典
+        """
+        if not self.detector or not self.predictor or not self.face_reco_model:
+            logger.error("Dlib 模型未加载。无法执行注册。")
+            return {'success': False, 'message': 'Dlib models not loaded.'}
+
+        try:
+            # 解析Base64图像
+            header, encoded_image = base64_image_data.split(',')
+            nparr = np.frombuffer(base64.b64decode(encoded_image), np.uint8)
+            img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            if img_np is None:
+                return {'success': False, 'message': '无法解码图像数据'}
+
+            # 转换为RGB
+            img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
+
+            # 检测人脸
+            faces = self.detector(img_rgb, 0)
+            
+            if len(faces) == 0:
+                return {'success': False, 'message': '未检测到人脸，请确保图像中包含清晰的人脸'}
+
+            if len(faces) > 1:
+                return {'success': False, 'message': '检测到多个人脸，请只包含一个人脸'}
+
+            # 提取人脸特征
+            face = faces[0]
+            shape = self.predictor(img_rgb, face)
+            face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
+            face_descriptor_np = np.array(face_descriptor)
+
+            # 保存到数据库
+            from .face_db_service import FaceDatabaseService
+            success = FaceDatabaseService.save_feature(name, face_descriptor_np)
+            
+            if success:
+                # 重新加载人脸数据库
+                self.reload_face_database()
+                logger.info(f"成功注册人脸: {name}")
+                return {
+                    'success': True, 
+                    'message': f'成功注册 {name} 的人脸特征',
+                    'name': name
+                }
+            else:
+                return {'success': False, 'message': '保存到数据库失败'}
+
+        except Exception as e:
+            logger.error(f"人脸注册失败: {e}", exc_info=True)
+            return {'success': False, 'message': f'注册失败: {str(e)}'}
+
     def _load_face_database(self, path_features_known_csv=None):
         """
         从数据库加载已知人脸特征和名字。
@@ -191,3 +251,36 @@ class FaceRecognitionService:
         except Exception as e:
             logger.error(f"人脸识别服务处理图像失败: {e}", exc_info=True)
             return [{"status": "error", "message": f"Processing error: {e}"}]
+
+    def extract_all_features_to_csv(self):
+        """
+        提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性方法）
+        """
+        try:
+            from .face_db_service import FaceDatabaseService
+            features_data = FaceDatabaseService.get_all_features()
+            
+            if not features_data:
+                return {'success': False, 'message': '数据库中没有特征数据'}
+            
+            # 创建CSV文件
+            csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'features_all.csv')
+            os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+            
+            # 写入CSV
+            with open(csv_path, 'w', newline='') as csvfile:
+                csvfile.write('name,feature\n')
+                for name, feature_vector in features_data:
+                    feature_str = ','.join(map(str, feature_vector))
+                    csvfile.write(f'{name},{feature_str}\n')
+            
+            logger.info(f"成功导出 {len(features_data)} 个特征到 {csv_path}")
+            return {
+                'success': True, 
+                'message': f'成功导出 {len(features_data)} 个特征到CSV文件',
+                'file_path': csv_path
+            }
+            
+        except Exception as e:
+            logger.error(f"特征导出失败: {e}", exc_info=True)
+            return {'success': False, 'message': f'特征导出失败: {str(e)}'}
