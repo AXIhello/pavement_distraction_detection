@@ -2,8 +2,8 @@
   <div>
     <Navigation ref="navRef" />
     <main class="main-content">
-      <RoadLog />
-      <LoginLog />
+      <RoadWarn />
+      <FaceWarn />
     </main>
   </div>
 </template>
@@ -11,8 +11,8 @@
 <script setup>
 import { ref } from 'vue'
 import Navigation from '@/components/Navigation.vue'
-import RoadLog from '@/components/RoadWarn.vue'
-import LoginLog from '@/components/LoginWarn.vue'
+import RoadWarn from '@/components/RoadWarn.vue'
+import FaceWarn from '@/components/FaceWarn.vue'
 
 const navRef = ref(null)
 </script>
