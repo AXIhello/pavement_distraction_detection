@@ -9,6 +9,10 @@ import os
 import numpy as np
 from typing import List, Dict
 from ultralytics import YOLO
+import logging
+
+# 设置ultralytics的日志级别为WARNING，减少不必要的输出
+logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 from ..services.alert_service import save_alert_frame, update_alert_video, create_alert_video
 from datetime import datetime
@@ -37,19 +41,49 @@ label2color = {
 }
 
 model_path = Path('data/weights/road_damage.pt')
-model = None
-if not model_path.exists():
-    print(f"[ERROR] 模型文件不存在: {model_path}")
-    print(f"当前工作目录: {os.getcwd()}")
-else:
+_model = None  # 全局模型变量
+_model_loaded = False  # 标记模型是否已加载
+
+
+def load_model():
+    """加载模型的函数，确保只加载一次"""
+    global _model, _model_loaded
+
+    if _model_loaded:
+        return _model
+
+    if not model_path.exists():
+        print(f"[ERROR] 模型文件不存在: {model_path}")
+        print(f"当前工作目录: {os.getcwd()}")
+        return None
+
     print(f"[INFO] 找到模型文件: {model_path}")
     try:
         print(" [INFO] 正在加载YOLOv11模型...")
-        model = YOLO(str(model_path))
+        # 临时禁用ultralytics的详细输出
+        import sys
+        from io import StringIO
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        _model = YOLO(str(model_path))
+
+        # 恢复stdout
+        sys.stdout = old_stdout
+        _model_loaded = True
         print("[SUCCESS] YOLOv11模型加载成功")
+        return _model
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {str(e)}")
-        model = None
+        return None
+
+
+def get_model():
+    """获取模型实例"""
+    global _model
+    if not _model_loaded:
+        _model = load_model()
+    return _model
 
 
 def draw_detections(image, detections):
@@ -74,6 +108,7 @@ def draw_detections(image, detections):
 
 
 def detect_single_image(base64_image: str) -> Dict:
+    model = get_model()
     if model is None:
         return {'status': 'error', 'message': '模型未加载，无法进行检测', 'detections': [], 'annotated_image': None}
 
@@ -88,8 +123,8 @@ def detect_single_image(base64_image: str) -> Dict:
         image_resized = image.resize((640, 640))
         image_np = np.array(image_resized)
 
-        # 使用YOLOv11进行推理，设置置信度阈值
-        results = model(image_np, conf=0.30)
+        # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
+        results = model(image_np, conf=0.30, verbose=False)
 
         # 获取检测结果
         detections = []
@@ -135,6 +170,7 @@ def detect_single_image(base64_image: str) -> Dict:
 
 def detect_batch_images(base64_images: List[str]) -> List[Dict]:
     results = []
+    model = get_model()
     if model is None:
         return [{'frame_index': i, 'detections': [], 'image_base64': None, 'status': 'error', 'message': '模型未加载'}
                 for i in range(len(base64_images))]
@@ -160,8 +196,8 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             w_scale = orig_w / 640
             h_scale = orig_h / 640
 
-            # 使用YOLOv11进行推理，设置置信度阈值
-            result_batch = model(image_np, conf=0.30)
+            # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
+            result_batch = model(image_np, conf=0.30, verbose=False)
             detections = []
 
             for result in result_batch:
