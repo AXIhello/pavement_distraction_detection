@@ -3,6 +3,9 @@ from flask import request, current_app, g
 import logging
 from ..core.models import FaceFeature, db
 from functools import wraps
+from ..services.alert_service import create_alert_video, save_alert_frame
+from datetime import datetime
+from pathlib import Path
 
 # 获取日志器
 logger = logging.getLogger(__name__)
@@ -104,6 +107,30 @@ class FaceRecognition(Resource):
                     'message': '未检测到人脸'
                 }
             
+            # 检查是否有告警情况
+            if recognition_results[0].get("name") == "deepfake" or recognition_results[0].get("name") == "陌生人":
+                # 1️. 自动生成保存路径
+                now = datetime.now()
+                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
+                save_dir.mkdir(parents=True, exist_ok=True)
+
+                # 2. 人脸告警视频        
+                video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 1, 1, user_id=None) # none为用户 后续关联
+            
+                # 3. 人脸告警帧
+                bbox = [
+                        recognition_results[0]['bbox'].get('left', 0),
+                        recognition_results[0]['bbox'].get('top', 0),
+                        recognition_results[0]['bbox'].get('right', 0),
+                        recognition_results[0]['bbox'].get('bottom', 0)
+                    ]
+                distance = recognition_results[0].get("distance")
+                if distance is None:
+                    distance = 0  # 或者其他合理默认值
+                confidence = 1 - distance
+                save_alert_frame('face', video_id, 1, image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),bboxes=[bbox])
+
             return {
                 'success': True,
                 'faces': recognition_results
