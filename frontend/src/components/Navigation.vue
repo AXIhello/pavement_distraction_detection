@@ -50,6 +50,11 @@
       <button class="button" @click="goToHome">
         <div class="text-wrapper-3">用户中心</div>
       </button>
+
+      <button class="button logout-button" @click="logout">
+  <div class="text-wrapper-3">退出登录</div>
+</button>
+
     </div>
   </div>
 </template>
@@ -69,6 +74,12 @@ onMounted(() => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
   isAdmin.value = userInfo.role === 'admin'  // 根据你的用户结构调整
 })
+
+function logout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
+  router.push('/login')
+}
 
 
 function goToFirstPage() {
@@ -238,4 +249,13 @@ onBeforeUnmount(() => {
   line-height: 18px;
   white-space: nowrap;
 }
+.logout-button {
+  background-color: #d9534f;
+  margin-left: 10px;
+}
+
+.logout-button:hover {
+  background-color: #c9302c;
+}
+
 </style>
