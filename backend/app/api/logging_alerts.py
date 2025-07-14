@@ -120,17 +120,6 @@ class AlertPlayback(Resource):
             ns.abort(404, message=f"告警 {alert_id} 未找到")
         return playback_data
     
-@ns.route('/alert_frames')
-class AlertFrames(Resource):
-    def get(self):
-        try:
-            frames = AlertFrame.query.order_by(AlertFrame.created_at.desc()).all()
-            data = [frame.to_dict() for frame in frames]
-            return data
-        except Exception as e:
-            logger.error(f"获取告警帧失败: {e}")
-            return {'error': '获取失败'}, 500
-
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -183,3 +172,25 @@ class AlertDeleteV2(Resource):
         db.session.delete(alert)
         db.session.commit()
         return {'success': True, 'message': '告警事件及本地缓存已删除'}
+    
+@ns.route('/alert_frames')
+class AlertFrames(Resource):
+    def get(self):
+        try:
+            frames = AlertFrame.query.order_by(AlertFrame.created_at.desc()).all()
+            data = [frame.to_dict() for frame in frames]
+            return data
+        except Exception as e:
+            logger.error(f"获取告警帧失败: {e}")
+            return {'error': '获取失败'}, 500
+        
+@ns.route('/face_alert_frames')
+class FaceAlertFrames(Resource):    
+    def get(self):
+        try:
+            frames = FaceAlertVideo.query.order_by(FaceAlertVideo.created_at.desc()).all()
+            data = [frame.to_dict() for frame in frames]
+            return data
+        except Exception as e:
+            logger.error(f"获取人脸告警帧失败: {e}")
+            return {'error': '获取失败'}, 500 

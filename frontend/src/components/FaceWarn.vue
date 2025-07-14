@@ -86,8 +86,14 @@ const filterDate = ref('')
 // 获取后端数据
 async function fetchData() {
   try {
-    const res = await axios.get('http://localhost:8000/api/alert_frames')
-    logWarnings.value = res.data
+    const res = await axios.get('http://localhost:8000/api/logs_alerts/face_alert_frames')
+    // 这里对后端返回的数据做字段映射，转成前端展示需要的格式
+    logWarnings.value = res.data.map(item => ({
+      id: item.id,
+      type: item.alert_type,
+      date: item.created_at ? item.created_at.split('T')[0] : '未知',
+      status: item.status || 'unprocessed'  // 如果后端没status，默认unprocessed
+    }))
   } catch (e) {
     console.error('获取登录告警失败', e)
     logWarnings.value = []

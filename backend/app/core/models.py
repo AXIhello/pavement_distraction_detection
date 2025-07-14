@@ -125,6 +125,17 @@ class FaceAlertVideo(db.Model):
 
     face_alert_frames = db.relationship('FaceAlertFrame', backref='video', cascade='all, delete-orphan')
 
+    def to_dict(self):
+        return {            
+            'id': self.id,            
+            'video_name': self.video_name,            
+            'user_id': self.user_id,                        
+            'save_dir': self.save_dir,            
+            'total_frames': self.total_frames,                        
+            'alert_frame_count': self.alert_frame_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None      
+        }                        
+
 
 # 人脸告警帧表
 class FaceAlertFrame(db.Model):
@@ -138,6 +149,16 @@ class FaceAlertFrame(db.Model):
     confidence = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def to_dict(self):
+        return {
+                'id': self.id,            
+                'video_id': self.video_id,                        
+                'frame_index': self.frame_index,                                                
+                'image_path': self.image_path,                                                
+                'alert_type': self.alert_type,                                                          
+                'confidence': self.confidence,
+                'created_at': self.created_at.isoformat() if self.created_at else None
+            }                        
 
 # -------- 用户相关操作 --------
 
