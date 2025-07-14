@@ -13,6 +13,14 @@
   <canvas ref="overlayCanvas" class="overlay-canvas"></canvas> <!-- 用于画框 -->
 </div>
 
+    <!-- 活体检测进度条和提示 -->
+    <div v-if="mode==='camera' && !livenessPassed && !recognitionFinished">
+      <div class="progress-bar">
+        <div class="progress-inner" :style="{ width: livenessProgress + '%' }"></div>
+      </div>
+      <p class="progress-status">{{ livenessTip }}</p>
+    </div>
+
 
     <!-- 上传图片 -->
     <div v-if="mode==='image' && !recognitionFinished">
@@ -57,6 +65,10 @@ const recognitionFinished = ref(false)
 const router = useRouter()
 const video = ref(null)
 
+const livenessProgress = ref(0)
+const livenessTip = ref('请眨眼...')
+const livenessPassed = ref(false)
+
 let socket = null
 let stream = null
 let isWaitingForResult = false // 是否正在等待结果
@@ -75,6 +87,8 @@ let latestReqId = 0 // 只接受这一轮的结果
 //人脸标识框
 const overlayCanvas = ref(null)
 const videoContainer = ref(null)
+
+let livenessInterval = null // 活体检测定时器
 
 function drawFaceBoxes(bboxes) {
   const canvas = overlayCanvas.value
@@ -119,7 +133,8 @@ async function startCamera() {
     video.value.srcObject = stream
     connectSocket()
     video.value.onloadedmetadata = () => {
-      startImageStream()
+
+      startLivenessDetection()
     }
   } catch (err) {
     alert('无法访问摄像头：' + err.message)
@@ -223,6 +238,7 @@ function handleRecognitionResult(face) {
     return
   }
   if (face.name === '陌生人') {
+
     alert('告警：检测到陌生人！')
     stopAll()
     router.push('/login')
@@ -306,6 +322,21 @@ socket && socket.on && socket.on('face_result', (result) => {
   }, WAIT_INTERVAL)
 })
 
+  // 关键：liveness_result 监听注册到这里
+  socket.on('liveness_result', (result) => {
+    if (result.success) {
+      livenessProgress.value = result.progress
+      livenessTip.value = result.next_action
+      if (result.progress === 100) {
+        livenessPassed.value = true
+        if (livenessInterval) clearInterval(livenessInterval)
+        startImageStream()
+      }
+    } else {
+      livenessTip.value = result.message
+    }
+  })
+
   socket.on('disconnect', () => {
     stopAll()
   })
@@ -339,11 +370,33 @@ function stopAll() {
     socket.disconnect()
     socket = null
   }
+  if (livenessInterval) clearInterval(livenessInterval)
   isWaitingForResult = false
   lastResults = []
   progress.value = 0
   progressStatus.value = '识别准备中...'
 }
+function startLivenessDetection() {
+  livenessPassed.value = false
+  livenessProgress.value = 0
+  livenessTip.value = '请眨眼...'
+  if (livenessInterval) clearInterval(livenessInterval)
+  livenessInterval = setInterval(() => {
+    sendLivenessFrame()
+  }, 100) // 每100ms发一帧
+}
+
+function sendLivenessFrame() {
+  if (!video.value || video.value.videoWidth === 0 || video.value.videoHeight === 0 || livenessPassed.value) return
+  const canvas = document.createElement('canvas')
+  canvas.width = video.value.videoWidth
+  canvas.height = video.value.videoHeight
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+  const base64Image = canvas.toDataURL('image/jpeg')
+  socket.emit('liveness_detection', { image: base64Image })
+}
+
 </script>
 
 <style scoped>
