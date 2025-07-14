@@ -9,6 +9,7 @@ import json
 
 # 添加上级目录到 Python 路径中，以便导入其他模块
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # 导入配置和日志设置
@@ -39,7 +40,7 @@ else:
 
 app = Flask(__name__)
 app.config.from_object(config_class)
-CORS(app)    # 允许跨域请求
+CORS(app)  # 允许跨域请求
 
 db.init_app(app)
 
@@ -94,6 +95,7 @@ api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()
 
+
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
 def handle_connect():
@@ -109,15 +111,18 @@ def handle_disconnect():
     app_logger.info(f"SocketIO 客户端断开连接: {sid}")
     client_recognition_status.pop(sid, None)  # 断开时清理状态
 
+
 import time
 from collections import defaultdict, deque
+
 recent_results = defaultdict(lambda: deque())
 first_frame_processed = defaultdict(lambda: False)  # 用于标记每个客户端的首帧是否已处理
 video_id_map = {}
 
+
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
-    from flask import  request
+    from flask import request
     from datetime import datetime
     from pathlib import Path
     sid = request.sid
@@ -139,9 +144,8 @@ def handle_face_recognition(data):
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # 2. 人脸告警视频        
-        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None) # none为用户 后续关联
+        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None)  # none为用户 后续关联
         video_id_map[sid] = video_id  # 保存视频ID到映射中
-    
 
     app_logger.info("收到人脸识别请求")
     try:
@@ -152,7 +156,7 @@ def handle_face_recognition(data):
             return
         # 调用人脸识别服务进行处理
         recognition_results = face_recognition_service.recognize_face(base64_image)
-        if not recognition_results or not isinstance(recognition_results,list):
+        if not recognition_results or not isinstance(recognition_results, list):
             return
 
         # 立即向前端发送bbox信息
@@ -163,7 +167,7 @@ def handle_face_recognition(data):
         ]
         if bboxes:
             app_logger.info(f"检测到人脸框，已发送bbox详细信息={bboxes}")
-            emit('face_bbox',{
+            emit('face_bbox', {
                 "success": True,
                 "bboxes": bboxes,
                 "req_id": req_id
@@ -171,9 +175,9 @@ def handle_face_recognition(data):
         name = recognition_results[0].get('name')
         now = time.time()
         dq = recent_results[sid]
-        dq.append((now,name))
-        #移除超过1秒的旧帧
-        while dq and now-dq[0][0]>2.0:
+        dq.append((now, name))
+        # 移除超过1秒的旧帧
+        while dq and now - dq[0][0] > 2.0:
             dq.popleft()
         if len(dq) >= 3:
             last_three = list(dq)[-3:]
@@ -199,8 +203,8 @@ def handle_face_recognition(data):
                     ]
                     # 触发人脸告警模块，写入告警数据库
                     video_id = video_id_map.get(sid)
-                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
-                # 检查是否有 DeepFake    
+                    save_alert_frame('face', video_id, 1, base64_image, 0, disease_type=name, bboxes=[bbox])
+                # 检查是否有 DeepFake
                 if name == "deepfake":
                     app_logger.warning("告警：检测到DeepFake！")
                     bbox = [
@@ -211,8 +215,8 @@ def handle_face_recognition(data):
                     ]
                     # 触发人脸告警模块，写入告警数据库
                     video_id = video_id_map.get(sid)
-                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
-            # 判断识别结果，统一返回格式
+                    save_alert_frame('face', video_id, 1, base64_image, 0, disease_type=name, bboxes=[bbox])
+                # 判断识别结果，统一返回格式
                 emit('face_result', {
                     "success": True,
                     "faces": recognition_results,
@@ -245,6 +249,7 @@ from flask import request
 
 # 维护一个字典，存储每个客户端（sid）是否继续允许识别，True=允许识别，False=停止识别
 client_recognition_status = {}
+
 
 @socketio.on('face_recognition_end')
 def handle_face_recognition_end(data):
@@ -281,6 +286,34 @@ def log_response_info(response):
         app_logger.info(f"响应 {request.method} {request.path} with status {response.status_code}")
     return response
 
+
+@app.before_request
+def load_user_from_token():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+            user = User.query.get(user_id)
+            if user:
+                g.user = {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role
+                }
+            else:
+                g.user = None
+        except jwt.ExpiredSignatureError:
+            app_logger.warning("JWT过期")
+            g.user = None
+        except jwt.InvalidTokenError:
+            app_logger.warning("JWT无效")
+            g.user = None
+    else:
+        g.user = None
+
+
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():
@@ -292,7 +325,7 @@ if __name__ == '__main__':
         except Exception as e:
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
-    #app.run()   # app.run() # host和port可以在config中设置或直接写在这里
+    # app.run()   # app.run() # host和port可以在config中设置或直接写在这里
     app_logger.info("Flask 应用启动中...")
     app_logger.debug(f"当前运行环境: {env}")
 

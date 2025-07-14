@@ -43,6 +43,7 @@ face_feature_model = face_feature_ns.model('FaceFeature', {
     'updated_at': fields.DateTime
 })
 
+
 @ns.route('/register')
 class FaceRegister(Resource):
     @ns.expect(face_register_model)
@@ -54,20 +55,52 @@ class FaceRegister(Resource):
             image_base64 = data.get('image')
             user = getattr(g, 'user', None)
             user_id = user['id'] if user else None
-            logger.info(f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
+
+            logger.info(
+                f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
+
             if not user_id:
                 return {'success': False, 'message': '未获取到用户ID，请登录后操作'}, 401
-            # 先写入FaceFeature表，获取id
-            feature = FaceFeature(name=name, feature_encrypted='待提取', feature_count=1, user_id=user_id)
-            db.session.add(feature)
-            db.session.commit()
-            # 调用业务逻辑服务，提取特征并更新
+
+            # 直接调用业务逻辑服务进行人脸注册
             service = current_app.face_recognition_service
-            result = service.register_face(name, image_base64, feature.id)
+            result = service.register_face(name, image_base64, user_id)
+
             if result.get('success'):
-                feature.feature_encrypted = result.get('feature_encrypted', '待提取')
-                db.session.commit()
-            return {'success': result.get('success', False), 'message': result.get('message', ''), 'face_id': feature.id}
+                # 注册成功后，获取数据库中的记录ID
+                try:
+                    feature_record = FaceFeature.get_by_name(name)
+                    if feature_record:
+                        # 更新user_id字段
+                        feature_record.user_id = user_id
+                        db.session.commit()
+
+                        return {
+                            'success': True,
+                            'message': result.get('message', '注册成功'),
+                            'face_id': feature_record.id
+                        }
+                    else:
+                        logger.warning(f"注册成功但未找到 {name} 的记录")
+                        return {
+                            'success': True,
+                            'message': result.get('message', '注册成功'),
+                            'face_id': None
+                        }
+                except Exception as e:
+                    logger.error(f"更新user_id失败: {e}")
+                    # 即使更新user_id失败，人脸注册本身是成功的
+                    return {
+                        'success': True,
+                        'message': result.get('message', '注册成功'),
+                        'face_id': None
+                    }
+            else:
+                return {
+                    'success': False,
+                    'message': result.get('message', '注册失败')
+                }
+
         except Exception as e:
             logger.error(f"人脸注册接口处理失败: {e}", exc_info=True)
             return {'success': False, 'message': f'注册失败: {str(e)}'}

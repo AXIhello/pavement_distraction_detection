@@ -66,13 +66,13 @@ class FaceRecognitionService:
             logger.error(f"加载deepfake检测模型失败: {e}")
             self.deepfake_model = None
 
-    def register_face(self, name, base64_image_data, face_id=None):
+    def register_face(self, name, base64_image_data, user_id=None):
         """
         注册新的人脸到数据库
         Args:
             name: 人名
             base64_image_data: Base64编码的图像数据
-            face_id: FaceFeature表主键id（可选）
+            user_id: 用户ID（可选）
         Returns:
             注册结果字典
         """
@@ -94,7 +94,7 @@ class FaceRecognitionService:
 
             # 检测人脸
             faces = self.detector(img_rgb, 0)
-            
+
             if len(faces) == 0:
                 return {'success': False, 'message': '未检测到人脸，请确保图像中包含清晰的人脸'}
 
@@ -107,17 +107,22 @@ class FaceRecognitionService:
             face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
             face_descriptor_np = np.array(face_descriptor)
 
-            # 特征向量转字符串（可用json或base64等方式）
-            feature_str = json.dumps(face_descriptor_np.tolist())
+            # 保存到数据库
+            from .face_db_service import FaceDatabaseService
+            success = FaceDatabaseService.save_feature(name, face_descriptor_np, user_id)
 
-            # 返回特征字符串，API层负责写入数据库
-            return {
-                'success': True,
-                'message': f'成功注册 {name} 的人脸特征',
-                'name': name,
-                'feature_encrypted': feature_str,
-                'face_id': face_id
-            }
+            if success:
+                # 重新加载人脸数据库
+                self.reload_face_database()
+                logger.info(f"成功注册人脸: {name}")
+                return {
+                    'success': True,
+                    'message': f'成功注册 {name} 的人脸特征',
+                    'name': name
+                }
+            else:
+                return {'success': False, 'message': '保存到数据库失败'}
+
         except Exception as e:
             logger.error(f"人脸注册失败: {e}", exc_info=True)
             return {'success': False, 'message': f'注册失败: {str(e)}'}
