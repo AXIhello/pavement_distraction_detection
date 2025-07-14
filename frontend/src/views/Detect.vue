@@ -125,54 +125,55 @@
         </div>
       </div>
 
-      <!-- 快速导航 -->
-      <div class="quick-nav">
-        <div class="nav-section">
-          <h4>快速跳转</h4>
-          <div class="nav-controls">
-            <div class="jump-input">
-              <input 
-                type="number" 
-                v-model.number="jumpToFrame" 
-                :min="1" 
-                :max="frameResults.length"
-                placeholder="帧号"
-                @keyup.enter="jumpToSpecificFrame"
-              />
-              <button @click="jumpToSpecificFrame" class="jump-btn">跳转</button>
-            </div>
-              <!-- 有检测帧下拉选择（放底部） -->
-<div v-if="framesWithDetections.length" class="bottom-dropdown">
-  <label for="frameSelect" class="dropdown-label">跳转到有检测结果的帧:</label>
-  <select id="frameSelect" v-model="selectedFrameIndex" @change="jumpToFrameIndex(selectedFrameIndex)">
-    <option v-for="frameIndex in framesWithDetections" :key="frameIndex" :value="frameIndex">
-      第 {{ frameIndex + 1 }} 帧
-    </option>
-  </select>
-</div>
-          </div>
-        </div>
-      </div>
-
       <!-- 图像轮播与检测详情 -->
       <div class="image-slider">
         <div class="image-controls">
-          <button @click="prevImage" :disabled="frameResults.length <= 1" class="nav-btn">
-            <span class="button-icon">◀️</span>
-            上一张
-          </button>
-          <div class="frame-info">
-            <span class="current-frame">第 {{ currentImageIndex + 1 }} 帧</span>
-            <span class="total-frames">/ {{ frameResults.length }}</span>
+          <!-- 左侧导航按钮 -->
+          <div class="nav-controls-left">
+            <button @click="prevImage" :disabled="frameResults.length <= 1" class="nav-btn">
+              <span class="button-icon">◀️</span>
+              上一张
+            </button>
           </div>
-          <button @click="nextImage" :disabled="frameResults.length <= 1" class="nav-btn">
-            下一张
-            <span class="button-icon">▶️</span>
-          </button>
-          <button @click="toggleAutoPlay" class="auto-play-btn" :class="{ active: autoPlay }">
-            <span class="button-icon">{{ autoPlay ? '⏸️' : '▶️' }}</span>
-            {{ autoPlay ? '停止自动播放' : '自动播放' }}
-          </button>
+          
+          <!-- 中间帧信息 -->
+          <div class="frame-info">
+            <span>第</span>
+            <input 
+              type="number" 
+              v-model.number="currentFrameNumber"
+              :min="1" 
+              :max="frameResults.length"
+              @keyup.enter="jumpToSpecificFrame"
+              @blur="jumpToSpecificFrame"
+              @input="handleFrameNumberInput"
+              style="width: 60px; text-align: center; border: 1px solid #ccc; border-radius: 6px;"
+            />
+            <span> / {{ frameResults.length }} 帧</span>
+          </div>
+
+          <!-- 右侧导航和自动播放按钮 -->
+          <div class="nav-controls-right">
+            <button @click="nextImage" :disabled="frameResults.length <= 1" class="nav-btn">
+              下一张
+              <span class="button-icon">▶️</span>
+            </button>
+            <button @click="toggleAutoPlay" class="auto-play-btn" :class="{ active: autoPlay }">
+              <span class="button-icon">{{ autoPlay ? '⏸️' : '▶️' }}</span>
+              {{ autoPlay ? '停止自动播放' : '自动播放' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 有检测帧下拉选择 -->
+        <div v-if="framesWithDetections.length" class="bottom-dropdown">
+          <label for="frameSelect" class="dropdown-label">跳转到有检测结果的帧:</label>
+          <select id="frameSelect" v-model="selectedFrameIndex" @change="jumpToFrameIndex">
+            <option value="">请选择</option>
+            <option v-for="frameIndex in framesWithDetections" :key="frameIndex" :value="frameIndex">
+              第 {{ frameIndex + 1 }} 帧
+            </option>
+          </select>
         </div>
 
         <div class="image-result">
@@ -218,19 +219,17 @@
       </div>
     </div>
   </div>
-
-
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { io } from 'socket.io-client'
 import Header2 from '@/components/Navigation.vue'
 
 const headerRef = ref(null)
 const headerHeight = ref(0)
-const selectedFrameIndex = ref(null)
+const selectedFrameIndex = ref('')
 
 const mode = ref('upload') // 上传 或 录制
 
@@ -251,8 +250,8 @@ const frameResults = ref([]) // [{ image, detections }]
 const allDetections = ref([])
 const uniqueDetectionClasses = ref([])
 
-// 新增：跳转功能
-const jumpToFrame = ref(null)
+// 新增：当前帧号（用于显示和输入）
+const currentFrameNumber = ref(1)
 
 let socket = null
 
@@ -270,6 +269,27 @@ const framesWithDetections = computed(() => {
     .map((frame, index) => ({ index, hasDetections: frame.detections.length > 0 }))
     .filter(item => item.hasDetections)
     .map(item => item.index)
+})
+
+// 监听当前图像索引变化，同步更新帧号和下拉选择
+watch(currentImageIndex, (newIndex) => {
+  currentFrameNumber.value = newIndex + 1
+  
+  // 如果当前帧有检测结果，更新下拉选择
+  if (framesWithDetections.value.includes(newIndex)) {
+    selectedFrameIndex.value = newIndex
+  } else {
+    selectedFrameIndex.value = ''
+  }
+})
+
+// 监听帧结果变化，重置状态
+watch(frameResults, () => {
+  if (frameResults.value.length > 0) {
+    currentImageIndex.value = 0
+    currentFrameNumber.value = 1
+    selectedFrameIndex.value = ''
+  }
 })
 
 // --- UI 相关 ---
@@ -389,6 +409,7 @@ function cancelRecording() {
 function resetState() {
   frameResults.value = []
   currentImageIndex.value = 0
+  currentFrameNumber.value = 1
   totalFrames.value = 0
   processedFrames.value = 0
   extractionComplete.value = false
@@ -396,7 +417,7 @@ function resetState() {
   autoPlay.value = false
   allDetections.value = []
   uniqueDetectionClasses.value = []
-  jumpToFrame.value = null
+  selectedFrameIndex.value = ''
 }
 
 function resetAll() {
@@ -408,21 +429,32 @@ function resetAll() {
   resetState()
 }
 
-// 新增：跳转功能
+// 处理帧号输入
+function handleFrameNumberInput() {
+  // 实时验证输入范围
+  if (currentFrameNumber.value < 1) {
+    currentFrameNumber.value = 1
+  } else if (currentFrameNumber.value > frameResults.value.length) {
+    currentFrameNumber.value = frameResults.value.length
+  }
+}
+
+// 跳转到指定帧号
 function jumpToSpecificFrame() {
-  if (jumpToFrame.value && jumpToFrame.value >= 1 && jumpToFrame.value <= frameResults.value.length) {
-    currentImageIndex.value = jumpToFrame.value - 1
-    jumpToFrame.value = null
+  if (currentFrameNumber.value >= 1 && currentFrameNumber.value <= frameResults.value.length) {
+    currentImageIndex.value = currentFrameNumber.value - 1
+  } else {
+    // 如果输入无效，恢复到当前帧号
+    currentFrameNumber.value = currentImageIndex.value + 1
   }
 }
 
-function jumpToFrameIndex(frameIndex) {
-  if (typeof frameIndex === 'string') frameIndex = parseInt(frameIndex)
-  if (frameIndex >= 0 && frameIndex < frameResults.value.length) {
-    currentImageIndex.value = frameIndex
+// 跳转到指定帧索引（下拉选择使用）
+function jumpToFrameIndex() {
+  if (selectedFrameIndex.value !== '' && selectedFrameIndex.value >= 0 && selectedFrameIndex.value < frameResults.value.length) {
+    currentImageIndex.value = selectedFrameIndex.value
   }
 }
-
 
 // --- 分析功能 ---
 
@@ -434,6 +466,7 @@ function startAnalysis() {
   frameResults.value = []
   processedFrames.value = 0
   currentImageIndex.value = 0
+  currentFrameNumber.value = 1
 
   socket = io('http://127.0.0.1:8000')
 
@@ -592,7 +625,6 @@ onBeforeRouteLeave((to, from, next) => {
     : next()
 })
 </script>
-
 <style scoped>
 .detect-container {
   max-width: 1200px;
@@ -698,9 +730,9 @@ onBeforeRouteLeave((to, from, next) => {
   text-align: center;
 }
 
-.remove-btn {
+remove-btn.remove-btn {
   padding: 10px 20px;
-  background: #dc3545;
+  background: #5d5a5a;
   color: white;
   border: none;
   border-radius: 8px;
@@ -709,10 +741,12 @@ onBeforeRouteLeave((to, from, next) => {
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
+
+  
 }
 
 .remove-btn:hover {
-  background: #c82333;
+  background: #e6bb2e;
   transform: translateY(-1px);
 }
 
@@ -1100,13 +1134,45 @@ onBeforeRouteLeave((to, from, next) => {
   border: 1px solid #f0f0f0;
 }
 
+
+
 .image-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  flex-wrap: wrap;
+  gap: 16px;
+  min-height: 44px; /* 确保有足够的高度 */
+  flex-wrap: nowrap; /* 防止换行 */
+}
+
+/* 左侧按钮组 */
+.nav-controls-left {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  flex-shrink: 0; /* 防止缩小 */
+}
+
+/* 中间帧信息 */
+.frame-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap; /* 防止文字换行 */
+  flex-shrink: 0; /* 防止缩小 */
+  min-width: 120px; /* 确保有足够宽度 */
+  justify-content: center;
+}
+
+/* 右侧按钮组 */
+.nav-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0; /* 防止缩小 */
 }
 
 .nav-btn {
@@ -1121,6 +1187,9 @@ onBeforeRouteLeave((to, from, next) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap; /* 防止文字换行 */
+  min-width: 80px; /* 确保按钮有最小宽度 */
+  justify-content: center;
 }
 
 .nav-btn:hover:not(:disabled) {
@@ -1132,14 +1201,6 @@ onBeforeRouteLeave((to, from, next) => {
   background: #ccc;
   cursor: not-allowed;
   opacity: 0.6;
-}
-
-.frame-info {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 16px;
-  font-weight: 600;
 }
 
 .current-frame {
@@ -1162,6 +1223,9 @@ onBeforeRouteLeave((to, from, next) => {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap; /* 防止文字换行 */
+  min-width: 120px; /* 确保按钮有足够宽度 */
+  justify-content: center;
 }
 
 .auto-play-btn:hover {
@@ -1174,6 +1238,44 @@ onBeforeRouteLeave((to, from, next) => {
 
 .auto-play-btn.active:hover {
   background: #218838;
+}
+
+/* 响应式设计 - 小屏幕时调整 */
+@media (max-width: 768px) {
+  .image-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .nav-controls-left,
+  .nav-controls-right {
+    justify-content: center;
+  }
+  
+  .frame-info {
+    justify-content: center;
+    order: -1; /* 在移动端将帧信息放在最上面 */
+  }
+  
+  .nav-btn,
+  .auto-play-btn {
+    flex: 1;
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-controls-left,
+  .nav-controls-right {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .nav-btn,
+  .auto-play-btn {
+    width: 100%;
+  }
 }
 
 .image-result {

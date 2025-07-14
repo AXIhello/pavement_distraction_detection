@@ -1,14 +1,14 @@
 # 日志与告警接口
 # backend/app/api/logging_alerts.py
 from flask_restx import Namespace, Resource, fields
-from flask import request
+from flask import request, g
 # 导入你的 LoggingService
 from ..services.logging_service import LoggingService
 # 导入你的日志器
 from ..utils.logger import get_logger
-
-# 导入数据库
-from ..core.models import db, AlertFrame,AlertVideo
+from ..core.models import AlertVideo, FaceAlertVideo, db, AlertFrame
+import shutil, os
+from functools import wraps
 from flask import jsonify
 
 logger = get_logger(__name__)
@@ -130,3 +130,56 @@ class AlertFrames(Resource):
         except Exception as e:
             logger.error(f"获取告警帧失败: {e}")
             return {'error': '获取失败'}, 500
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = getattr(g, 'user', None)
+        if not user or user.get('role') != 'admin':
+            return {'success': False, 'message': '无权限，管理员专用'}, 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+@ns.route('/alerts/<int:alert_id>')
+class AlertDelete(Resource):
+    @admin_required
+    def delete(self, alert_id):
+        alert = AlertVideo.query.get(alert_id)
+        if not alert:
+            return {'success': False, 'message': '告警事件不存在'}, 404
+        # 删除本地缓存目录
+        save_dir = alert.save_dir
+        try:
+            if save_dir and os.path.exists(save_dir):
+                shutil.rmtree(save_dir)
+        except Exception as e:
+            return {'success': False, 'message': f'本地缓存删除失败: {str(e)}'}, 500
+        # 删除数据库记录
+        db.session.delete(alert)
+        db.session.commit()
+        return {'success': True, 'message': '告警事件及本地缓存已删除'}
+
+@ns.route('/alerts/<string:alert_type>/<int:alert_id>')
+class AlertDeleteV2(Resource):
+    @admin_required
+    def delete(self, alert_type, alert_id):
+        if alert_type == 'road':
+            alert = AlertVideo.query.get(alert_id)
+        elif alert_type == 'face':
+            alert = FaceAlertVideo.query.get(alert_id)
+        else:
+            return {'success': False, 'message': '未知告警类型'}, 400
+        if not alert:
+            return {'success': False, 'message': '告警事件不存在'}, 404
+        # 删除本地缓存目录
+        save_dir = alert.save_dir
+        import shutil, os
+        try:
+            if save_dir and os.path.exists(save_dir):
+                shutil.rmtree(save_dir)
+        except Exception as e:
+            return {'success': False, 'message': f'本地缓存删除失败: {str(e)}'}, 500
+        # 删除数据库记录
+        db.session.delete(alert)
+        db.session.commit()
+        return {'success': True, 'message': '告警事件及本地缓存已删除'}

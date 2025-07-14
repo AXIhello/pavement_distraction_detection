@@ -1,11 +1,77 @@
 # 认证相关接口
 # backend/app/api/auth.py
 from flask_restx import Namespace, Resource, fields
-from app.core.models import User, find_user_by_username, find_user_by_email, create_user
-from app.core.security import create_jwt_token
-from flask import current_app
-from app.utils.email_service import send_email_code, verify_email_code
+from ..core.models import User, find_user_by_username, find_user_by_email, create_user
+from ..core.security import create_jwt_token
+from flask import current_app, Blueprint, request, jsonify, g
+from ..utils.email_service import send_email_code, verify_email_code
+from functools import wraps
+from ..extensions import db
 
+# 权限校验装饰器
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = getattr(g, 'user', None)
+        if not user or user.get('role') != 'admin':
+            return jsonify({'success': False, 'message': '无权限，管理员专用'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# 用户管理API
+from flask_restx import Namespace, Resource, fields
+user_ns = Namespace('user_admin', description='用户管理（仅管理员）')
+
+user_model = user_ns.model('User', {
+    'id': fields.Integer,
+    'username': fields.String,
+    'email': fields.String,
+    'role': fields.String,
+    'created_at': fields.DateTime,
+    'updated_at': fields.DateTime
+})
+
+@user_ns.route('/')
+class UserList(Resource):
+    @user_ns.marshal_list_with(user_model)
+    @admin_required
+    def get(self):
+        users = User.query.all()
+        return users
+
+@user_ns.route('/<int:user_id>')
+class UserDetail(Resource):
+    @user_ns.marshal_with(user_model)
+    @admin_required
+    def get(self, user_id):
+        """根据用户ID获取用户信息（仅限管理员）"""
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+        return user
+
+    @user_ns.marshal_with(user_model)
+    @admin_required
+    def put(self, user_id):
+        data = request.json
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+        user.username = data.get('username', user.username)
+        user.email = data.get('email', user.email)
+        user.role = data.get('role', user.role)
+        db.session.commit()
+        return user
+
+    @admin_required
+    def delete(self, user_id):
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+        db.session.delete(user)
+        db.session.commit()
+        return {'success': True, 'message': '删除成功'}
 
 # 1. 定义一个命名空间 'ns'
 ns = Namespace('auth', description='认证相关操作')

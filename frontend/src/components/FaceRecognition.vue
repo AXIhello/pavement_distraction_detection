@@ -8,9 +8,11 @@
     </div>
 
     <!-- 摄像头画面 -->
-    <div class="video-container" v-if="mode==='camera' && !recognitionFinished">
-      <video ref="video" autoplay playsinline></video>
-    </div>
+   <div class="video-container" v-if="mode==='camera' && !recognitionFinished" ref="videoContainer">
+  <video ref="video" autoplay playsinline></video>
+  <canvas ref="overlayCanvas" class="overlay-canvas"></canvas> <!-- 用于画框 -->
+</div>
+
 
     <!-- 上传图片 -->
     <div v-if="mode==='image' && !recognitionFinished">
@@ -67,6 +69,42 @@ const WAIT_TIME = 1000 // 等待结果时间1000ms
 const progress = ref(0) // 进度条百分比
 const progressStatus = ref('识别准备中...') // 状态提示
 const mode = ref('camera') // 当前模式
+
+//处理异步问题
+let requestId = 0
+let latestReqId = 0 // 只接受这一轮的结果
+
+//人脸标识框
+const overlayCanvas = ref(null)
+const videoContainer = ref(null)
+
+function drawFaceBoxes(bboxes) {
+  const canvas = overlayCanvas.value
+  const videoEl = video.value
+  if (!canvas || !videoEl || videoEl.videoWidth === 0 || videoEl.videoHeight === 0) return
+
+  // 设置 canvas 大小与视频匹配
+  canvas.width = videoEl.videoWidth
+  canvas.height = videoEl.videoHeight
+
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.lineWidth = 2
+  ctx.strokeStyle = 'red'
+
+  bboxes.forEach(bbox => {
+    const scaleX = canvas.width / videoEl.videoWidth
+    const scaleY = canvas.height / videoEl.videoHeight
+
+    // 如果 bbox 是原始像素坐标（不缩放），直接绘制
+    const x = bbox.left
+    const y = bbox.top
+    const w = bbox.right - bbox.left
+    const h = bbox.bottom - bbox.top
+
+    ctx.strokeRect(x, y, w, h)
+  })
+}
 
 function setMode(m) {
   stopAll()
@@ -158,7 +196,15 @@ function onVideoUpload(e) {
     videoEl.onseeked = () => {
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
       const base64Image = canvas.toDataURL('image/jpeg')
-      socket.emit('face_recognition', { image: base64Image })
+
+      const currentReqId = requestId++
+latestReqId = currentReqId // 标记为最新
+
+socket.emit('face_recognition', {
+  image: base64Image,
+  req_id: currentReqId
+})
+
       sentFrames++
       progress.value = Math.round((sentFrames / totalFrames) * 100)
       progressStatus.value = `视频识别中... (${sentFrames}/${totalFrames})`
@@ -189,9 +235,22 @@ function handleRecognitionResult(face) {
     router.push('/login')
     return
   }
+   if (face.name === '未知人员') {
+    alert('人脸数据库中无数据，请前去录入')
+    stopAll()
+    router.push('/face_register')
+    return
+  }
   recognizedName.value = face.name || ''
   recognitionFinished.value = true
   stopAll()
+}
+
+function sendRecognitionEndSignal() {
+  if(socket && socket.connected) {
+    socket.emit('face_recognition_end', { msg: 'recognition_finished' })
+    console.log('已发送识别结束信号给后端')
+  }
 }
 
 function connectSocket() {
@@ -204,17 +263,41 @@ function connectSocket() {
     progress.value = 0
     progressStatus.value = '识别中...'
   })
-  socket.on('face_result', (result) => {
-    isWaitingForResult = false
-    progress.value = 100
-    progressStatus.value = '识别完成'
-    if (result.success) {
-      const face = result.faces[0]
-      handleRecognitionResult(face)
-    } else {
-      console.warn('识别失败:', result.message || '未识别到人脸')
-    }
-  })
+
+ socket.on('face_bbox', (result) => {
+  if (typeof result.req_id !== 'undefined' && result.req_id < latestReqId) {
+    console.warn(`忽略过期 bbox：req_id=${result.req_id} < ${latestReqId}`)
+    return
+  }
+
+  if (result.success && result.bboxes && result.bboxes.length > 0) {
+    drawFaceBoxes(result.bboxes)
+  } else {
+    // 没检测到人脸，清空框
+    const ctx = overlayCanvas.value?.getContext('2d')
+    if (ctx) ctx.clearRect(0, 0, overlayCanvas.value.width, overlayCanvas.value.height)
+  }
+})
+
+socket.on('face_result', (result) => {
+  if (typeof result.req_id !== 'undefined' && result.req_id < latestReqId) {
+    console.warn(`忽略过期识别结果：req_id=${result.req_id} < ${latestReqId}`)
+    return
+  }
+
+  isWaitingForResult = false
+  progress.value = 100
+  progressStatus.value = '识别完成'
+  if (result.success) {
+    console.log('🎉 识别成功，处理识别结果')
+    const face = result.faces[0]
+    handleRecognitionResult(face)
+    sendRecognitionEndSignal()
+  } else {
+    console.warn('识别失败:', result.message || '未识别到人脸')
+  }
+})
+
   socket.on('disconnect', () => {
     stopAll()
   })
@@ -261,6 +344,7 @@ function stopAll() {
     stream = null
   }
   if (socket) {
+    sendRecognitionEndSignal()  
     socket.disconnect()
     socket = null
   }
@@ -308,6 +392,18 @@ function stopAll() {
   background: #d7c480;
   color: #fff;
 }
+.overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.video-container {
+  position: relative; /* 让 canvas 相对定位 */
+}
+
 .video-container {
   width: 100%;
   aspect-ratio: 4/3;
