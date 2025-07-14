@@ -44,6 +44,15 @@ class UserList(Resource):
 class UserDetail(Resource):
     @user_ns.marshal_with(user_model)
     @admin_required
+    def get(self, user_id):
+        """根据用户ID获取用户信息（仅限管理员）"""
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+        return user
+
+    @user_ns.marshal_with(user_model)
+    @admin_required
     def put(self, user_id):
         data = request.json
         user = User.query.get(user_id)
@@ -52,8 +61,6 @@ class UserDetail(Resource):
         user.username = data.get('username', user.username)
         user.email = data.get('email', user.email)
         user.role = data.get('role', user.role)
-        user.created_at = data.get('created_at', user.created_at)
-        user.updated_at = data.get('updated_at', user.updated_at)
         db.session.commit()
         return user
 
