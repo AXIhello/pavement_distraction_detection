@@ -3,6 +3,9 @@ from flask import request, current_app, g
 import logging
 from ..core.models import FaceFeature, db
 from functools import wraps
+from ..services.alert_service import create_alert_video, save_alert_frame
+from datetime import datetime
+from pathlib import Path
 
 # 获取日志器
 logger = logging.getLogger(__name__)
@@ -40,6 +43,7 @@ face_feature_model = face_feature_ns.model('FaceFeature', {
     'updated_at': fields.DateTime
 })
 
+
 @ns.route('/register')
 class FaceRegister(Resource):
     @ns.expect(face_register_model)
@@ -49,17 +53,54 @@ class FaceRegister(Resource):
             data = ns.payload
             name = data.get('name')
             image_base64 = data.get('image')
-            #user = getattr(g, 'user', None)
-            #user_id = user['id'] if user else None
-            #logger.info(f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
-            #if not user_id:
-            #    return {'success': False, 'message': '未获取到用户ID，请登录后操作'}, 401
-            # 业务逻辑：写入FaceFeature表
-                # 调用业务逻辑服务
+            user = getattr(g, 'user', None)
+            user_id = user['id'] if user else None
+
+            logger.info(
+                f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
+
+            if not user_id:
+                return {'success': False, 'message': '未获取到用户ID，请登录后操作'}, 401
+
+            # 直接调用业务逻辑服务进行人脸注册
             service = current_app.face_recognition_service
-            result = service.register_face(name, image_base64)
-            # 实际业务应在此处提取特征并更新feature_encrypted字段
-            return {'success': True, 'message': '人脸录入成功', 'face_id': 0}#feature.id
+            result = service.register_face(name, image_base64, user_id)
+
+            if result.get('success'):
+                # 注册成功后，获取数据库中的记录ID
+                try:
+                    feature_record = FaceFeature.get_by_name(name)
+                    if feature_record:
+                        # 更新user_id字段
+                        feature_record.user_id = user_id
+                        db.session.commit()
+
+                        return {
+                            'success': True,
+                            'message': result.get('message', '注册成功'),
+                            'face_id': feature_record.id
+                        }
+                    else:
+                        logger.warning(f"注册成功但未找到 {name} 的记录")
+                        return {
+                            'success': True,
+                            'message': result.get('message', '注册成功'),
+                            'face_id': None
+                        }
+                except Exception as e:
+                    logger.error(f"更新user_id失败: {e}")
+                    # 即使更新user_id失败，人脸注册本身是成功的
+                    return {
+                        'success': True,
+                        'message': result.get('message', '注册成功'),
+                        'face_id': None
+                    }
+            else:
+                return {
+                    'success': False,
+                    'message': result.get('message', '注册失败')
+                }
+
         except Exception as e:
             logger.error(f"人脸注册接口处理失败: {e}", exc_info=True)
             return {'success': False, 'message': f'注册失败: {str(e)}'}
@@ -99,6 +140,30 @@ class FaceRecognition(Resource):
                     'message': '未检测到人脸'
                 }
             
+            # 检查是否有告警情况
+            if recognition_results[0].get("name") == "deepfake" or recognition_results[0].get("name") == "陌生人":
+                # 1️. 自动生成保存路径
+                now = datetime.now()
+                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
+                save_dir.mkdir(parents=True, exist_ok=True)
+
+                # 2. 人脸告警视频
+                video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 1, 1, user_id=None) # none为用户 后续关联
+
+                # 3. 人脸告警帧
+                bbox = [
+                        recognition_results[0]['bbox'].get('left', 0),
+                        recognition_results[0]['bbox'].get('top', 0),
+                        recognition_results[0]['bbox'].get('right', 0),
+                        recognition_results[0]['bbox'].get('bottom', 0)
+                    ]
+                distance = recognition_results[0].get("distance")
+                if distance is None:
+                    distance = 0  # 或者其他合理默认值
+                confidence = 1 - distance
+                save_alert_frame('face', video_id, 1, image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),bboxes=[bbox])
+
             return {
                 'success': True,
                 'faces': recognition_results

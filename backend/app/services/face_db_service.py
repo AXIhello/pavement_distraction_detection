@@ -15,13 +15,14 @@ class FaceDatabaseService:
     """人脸特征数据库服务类"""
     
     @staticmethod
-    def save_feature(name: str, feature_vector: np.ndarray) -> bool:
+    def save_feature(name: str, feature_vector: np.ndarray, user_id: int = None) -> bool:
         """
         保存加密后的人脸特征到数据库
         如果该人已存在特征，则计算新旧特征的平均值
         Args:
             name: 人名
             feature_vector: 128维人脸特征向量
+            user_id: 用户ID（可选）
         Returns:
             是否保存成功
         """
@@ -41,6 +42,9 @@ class FaceDatabaseService:
                 existing_record.feature_encrypted = encrypted_feature
                 existing_record.feature_count += 1
                 existing_record.updated_at = db.func.now()
+                # 可选：如果希望更新user_id，也可以加上
+                # if user_id is not None:
+                #     existing_record.user_id = user_id
                 logger.info(f"更新 {name} 的人脸特征（第 {existing_record.feature_count} 张照片），使用平均值")
             else:
                 # 创建新记录
@@ -48,7 +52,8 @@ class FaceDatabaseService:
                 new_record = FaceFeature(
                     name=name,
                     feature_encrypted=encrypted_feature,
-                    feature_count=1
+                    feature_count=1,
+                    user_id=user_id
                 )
                 db.session.add(new_record)
                 logger.info(f"新增 {name} 的人脸特征（第1张照片）")

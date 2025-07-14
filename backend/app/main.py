@@ -39,7 +39,7 @@ else:
 
 app = Flask(__name__)
 app.config.from_object(config_class)
-CORS(app)    # 允许跨域请求
+CORS(app)  # 允许跨域请求
 
 db.init_app(app)
 
@@ -94,6 +94,7 @@ api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()
 
+
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
 def handle_connect():
@@ -109,14 +110,18 @@ def handle_disconnect():
     app_logger.info(f"SocketIO 客户端断开连接: {sid}")
     client_recognition_status.pop(sid, None)  # 断开时清理状态
 
+
 import time
 from collections import defaultdict, deque
+
 recent_results = defaultdict(lambda: deque())
 first_frame_processed = defaultdict(lambda: False)  # 用于标记每个客户端的首帧是否已处理
 video_id_map = {}
 
+
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
+    from flask import request
     # 处理前端通过SocketIO发送过来的人脸识别请求
     from flask import  request
     from datetime import datetime
@@ -140,7 +145,7 @@ def handle_face_recognition(data):
         # 创建人脸告警视频记录
         video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None)
         video_id_map[sid] = video_id  # 保存视频ID到映射中
-    
+
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
@@ -186,6 +191,7 @@ from flask import request
 # 维护一个字典，存储每个客户端（sid）是否继续允许识别，True=允许识别，False=停止识别
 client_recognition_status = {}
 
+
 @socketio.on('face_recognition_end')
 def handle_face_recognition_end(data):
     sid = request.sid
@@ -222,38 +228,38 @@ def log_response_info(response):
     return response
 
 
-# @app.before_request
-# def load_user_from_token():
-#     auth_header = request.headers.get('Authorization')
-#     if auth_header and auth_header.startswith('Bearer '):
-#         token = auth_header.split(' ')[1]
-#         try:
-#             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-#             user_id = payload.get("user_id")
-#             user = User.query.get(user_id)
-#             if user:
-#                 g.user = {
-#                     "id": user.id,
-#                     "username": user.username,
-#                     "role": user.role
-#                 }
-#             else:
-#                 g.user = None
-#         except jwt.ExpiredSignatureError:
-#             app_logger.warning("JWT过期")
-#             g.user = None
-#         except jwt.InvalidTokenError:
-#             app_logger.warning("JWT无效")
-#             g.user = None
-#     else:
-#         g.user = None
+@app.before_request
+def load_user_from_token():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_id = payload.get("user_id")
+            user = User.query.get(user_id)
+            if user:
+                g.user = {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role
+                }
+            else:
+                g.user = None
+        except jwt.ExpiredSignatureError:
+            app_logger.warning("JWT过期")
+            g.user = None
+        except jwt.InvalidTokenError:
+            app_logger.warning("JWT无效")
+            g.user = None
+    else:
+        g.user = None
 
 
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():
         try:
-
+            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
@@ -261,7 +267,6 @@ if __name__ == '__main__':
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
     #app.run()   # app.run() # host和port可以在config中设置或直接写在这里
-
     app_logger.info("Flask 应用启动中...")
     app_logger.debug(f"当前运行环境: {env}")
 
