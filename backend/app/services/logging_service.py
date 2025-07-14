@@ -1,55 +1,54 @@
 # backend/app/services/logging_service.py
 import datetime
 
-# 模拟数据库存储，实际应替换为数据库操作
-mock_logs_db = []
-mock_alerts_db = []
 
-class LoggingService:  # <--- Make sure this class is defined exactly like this
+
+mock_alerts_db = []
+from ..core.models import db, LogEntry
+class LoggingService:
     @staticmethod
     def add_log(level, message, pathname, lineno, module):
         """
-        添加一条新的日志记录。
-        实际项目中会将日志写入数据库。
+        添加一条日志记录到 log_entries 表中。
         """
-        log_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "level": level,
-            "message": message,
-            "pathname": pathname,
-            "lineno": lineno,
-            "module": module
-        }
-        mock_logs_db.append(log_entry)
-        # 实际项目中，这里会将 log_entry 写入数据库
-        return log_entry
+        log_entry = LogEntry(
+            timestamp=datetime.datetime.now(),
+            level=level,
+            message=message,
+            pathname=pathname,
+            lineno=lineno,
+            module=module
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+        return log_entry.to_dict()
 
     @staticmethod
     def get_logs(level=None, start_time=None, end_time=None, page=1, per_page=10):
         """
-        从模拟数据库中获取日志记录，支持过滤和分页。
-        实际项目中会从数据库查询。
+        从数据库查询日志记录，支持过滤和分页。
         """
-        filtered_logs = mock_logs_db[:]
-        if level:
-            filtered_logs = [log for log in filtered_logs if log['level'].lower() == level.lower()]
-        if start_time:
-            filtered_logs = [log for log in filtered_logs if log['timestamp'] >= start_time]
-        if end_time:
-            filtered_logs = [log for log in filtered_logs if log['timestamp'] <= end_time]
+        query = LogEntry.query
 
-        # 简单的分页逻辑
-        start_index = (page - 1) * per_page
-        end_index = start_index + per_page
-        paginated_logs = filtered_logs[start_index:end_index]
+        if level:
+            query = query.filter(LogEntry.level.ilike(level))
+        if start_time:
+            query = query.filter(LogEntry.timestamp >= start_time)
+        if end_time:
+            query = query.filter(LogEntry.timestamp <= end_time)
+
+        total = query.count()
+        logs = query.order_by(LogEntry.timestamp.desc()) \
+                    .offset((page - 1) * per_page) \
+                    .limit(per_page) \
+                    .all()
 
         return {
-            "logs": paginated_logs,
-            "total": len(filtered_logs),
+            "logs": [log.to_dict() for log in logs],
+            "total": total,
             "page": page,
             "per_page": per_page
         }
-
     @staticmethod
     def add_alert(alert_type, description, details=None, media_url=None):
         """
