@@ -93,12 +93,17 @@ pavement_handlers = get_pavement_socketio_handlers()
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
 def handle_connect():
-    app_logger.info("SocketIO 客户端连接")
+    # app_logger.info("SocketIO 客户端连接")
+    sid = request.sid
+    app_logger.info(f"SocketIO 客户端连接: {sid}")
+    client_recognition_status[sid] = True  # 新连接默认允许识别
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    app_logger.info("SocketIO 客户端断开连接")
+    sid = request.sid
+    app_logger.info(f"SocketIO 客户端断开连接: {sid}")
+    client_recognition_status.pop(sid, None)  # 断开时清理状态
 
 import time
 from collections import defaultdict, deque
@@ -112,6 +117,11 @@ def handle_face_recognition(data):
     from datetime import datetime
     from pathlib import Path
     sid = request.sid
+    if not client_recognition_status.get(sid, True):
+        # 已标记停止识别，忽略该客户端请求
+        app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
+        return
+
     # client_type[sid] = 'face'
 
     if not first_frame_processed[sid]:
@@ -132,6 +142,7 @@ def handle_face_recognition(data):
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
+        req_id = data.get('req_id')  # ✅ 获取前端发送的 req_id
         if not base64_image:
             emit('face_result', {'success': False, 'message': '没有图像数据'})
             return
@@ -139,6 +150,20 @@ def handle_face_recognition(data):
         recognition_results = face_recognition_service.recognize_face(base64_image)
         if not recognition_results or not isinstance(recognition_results,list):
             return
+
+        # 立即向前端发送bbox信息
+        bboxes = [
+            face["bbox"]
+            for face in recognition_results
+            if "bbox" in face
+        ]
+        if bboxes:
+            app_logger.info(f"检测到人脸框，已发送bbox详细信息={bboxes}")
+            emit('face_bbox',{
+                "success": True,
+                "bboxes": bboxes,
+                "req_id": req_id
+            })
         name = recognition_results[0].get('name')
         now = time.time()
         dq = recent_results[sid]
@@ -146,11 +171,20 @@ def handle_face_recognition(data):
         #移除超过1秒的旧帧
         while dq and now-dq[0][0]>2.0:
             dq.popleft()
-        if len(dq)>=3:
+        if len(dq) >= 3:
             last_three = list(dq)[-3:]
-            if all(n==name for t,n in last_three) and name != '未检测到人脸':
-                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}")
-                # 检查是否有陌生人
+            if all(n == name for t, n in last_three) and name != '未检测到人脸':
+                if not client_recognition_status.get(sid, True):
+                    app_logger.info(f"识别已结束，跳过 emit 识别结果（sid={sid}）")
+                    return
+                bbox_info = []
+                for face in recognition_results:
+                    bbox_info.append({
+                        "name": face.get("name"),
+                        "bbox": face.get("bbox"),
+                    })
+                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}, bbox={bbox_info}")
+
                 if name == "陌生人":
                     app_logger.warning("告警：检测到陌生人！")
                     bbox = [
@@ -177,9 +211,11 @@ def handle_face_recognition(data):
             # 判断识别结果，统一返回格式
                 emit('face_result', {
                     "success": True,
-                    "faces": recognition_results
+                    "faces": recognition_results,
+                    "req_id": req_id
                 })
-                dq.clear() #防止重复弹窗
+                dq.clear()
+
         elif (
                 isinstance(recognition_results, list)
                 and recognition_results
@@ -198,6 +234,19 @@ def handle_face_recognition(data):
     except Exception as e:
         app_logger.error(f"人脸识别处理错误: {e}", exc_info=True)
         emit('face_result', {"success": False, "message": str(e)})
+
+
+# 处理人脸识别结束信号
+from flask import request
+
+# 维护一个字典，存储每个客户端（sid）是否继续允许识别，True=允许识别，False=停止识别
+client_recognition_status = {}
+
+@socketio.on('face_recognition_end')
+def handle_face_recognition_end(data):
+    sid = request.sid
+    app_logger.info(f"收到客户端 {sid} 的识别结束信号: {data}")
+    client_recognition_status[sid] = False  # 标记该客户端停止识别
 
 
 # --- 路面检测 Socket.IO 事件处理 ---

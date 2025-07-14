@@ -55,12 +55,12 @@
 
             <div v-else-if="loginMethod === 'sms'">
               <div class="form-group">
-                <label for="phone">账号</label>
+                <label for="email">账号</label>
                 <input 
                   type="tel" 
-                  id="phone" 
+                  id="email" 
                   placeholder="账号"
-                  v-model="phone" 
+                  v-model="email" 
                   required />
               </div>
 
@@ -171,7 +171,8 @@ const mainTab = ref('login')
 const loginMethod = ref('password')
 const account = ref('')
 const password = ref('')
-const phone = ref('')
+// const phone = ref('')
+const email = ref('')
 const smsCode = ref('')
 const message = ref('')
 const messageColor = ref('red')
@@ -205,12 +206,12 @@ function isStrongPassword(password) {
 
 
 function sendSmsCode() {
-  if (!phone.value) {
+  if (!email.value) {
     message.value = '请输入邮箱'
     messageColor.value = 'red'
     return
   }
-  if (!isValidEmail(phone.value)) {
+  if (!isValidEmail(email.value)) {
   message.value = '邮箱格式不正确'
   messageColor.value = 'red'
   return
@@ -221,7 +222,7 @@ function sendSmsCode() {
   fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: phone.value })
+    body: JSON.stringify({ email: email.value })
   }).then(res => res.json())
     .then(data => {
       if (data.success) {
@@ -238,39 +239,39 @@ function sendSmsCode() {
     })
 }
 
-function sendRegSmsCode() {
-  if (!regPhone.value) {
-    regMessage.value = '请输入邮箱'
-    regMessageColor.value = 'red'
-    return
-  }
-  if (!isValidEmail(phone.value)) {
-  message.value = '邮箱格式不正确'
-  messageColor.value = 'red'
-  return
-}
+// function sendRegSmsCode() {
+//   if (!regPhone.value) {
+//     regMessage.value = '请输入邮箱'
+//     regMessageColor.value = 'red'
+//     return
+//   }
+//   if (!isValidEmail(phone.value)) {
+//   message.value = '邮箱格式不正确'
+//   messageColor.value = 'red'
+//   return
+// }
 
-  regMessage.value = ''
+//   regMessage.value = ''
 
-  fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: regPhone.value })
-  }).then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        regMessage.value = '验证码已发送'
-        regMessageColor.value = 'green'
-        startRegCountdown()
-      } else {
-        regMessage.value = data.message || '发送验证码失败'
-        regMessageColor.value = 'red'
-      }
-    }).catch(() => {
-      regMessage.value = '请求失败，请检查后端服务'
-      regMessageColor.value = 'red'
-    })
-}
+//   fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ phone: regPhone.value })
+//   }).then(res => res.json())
+//     .then(data => {
+//       if (data.success) {
+//         regMessage.value = '验证码已发送'
+//         regMessageColor.value = 'green'
+//         startRegCountdown()
+//       } else {
+//         regMessage.value = data.message || '发送验证码失败'
+//         regMessageColor.value = 'red'
+//       }
+//     }).catch(() => {
+//       regMessage.value = '请求失败，请检查后端服务'
+//       regMessageColor.value = 'red'
+//     })
+// }
 
 function startCountdown() {
   countdown.value = 60
@@ -321,13 +322,13 @@ async function handleLogin() {
       messageColor.value = 'red'
     }
   } else {
-    if (!phone.value || !smsCode.value) {
+    if (!email.value || !smsCode.value) {
       message.value = '请输入邮箱和验证码'
       messageColor.value = 'red'
       return
     }
     
-    if (!isValidEmail(phone.value)) {
+    if (!isValidEmail(email.value)) {
   message.value = '请输入正确的邮箱格式'
   messageColor.value = 'red'
   return
@@ -338,7 +339,7 @@ async function handleLogin() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: phone.value,
+          email: email.value,
           code: smsCode.value
         })
       })

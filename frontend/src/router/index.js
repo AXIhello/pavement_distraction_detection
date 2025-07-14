@@ -6,6 +6,7 @@ import FaceRegister from '@/views/FaceRegister.vue'
 import Detect from '@/views/Detect.vue'
 import Admin from '@/views/Admin.vue'
 import RoadLog from '@/components/RoadWarn.vue'
+import Warning from '@/views/Warning.vue'
 import Log from '@/views/Log.vue'
 import FirstPage from '@/views/FirstPage.vue'
 
@@ -59,6 +60,12 @@ const routes = [
     path:'/first_page',
     name:'FirstPage',
     component: FirstPage,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/warning',
+    name:'Warning',
+    component: Warning,
     meta: { requiresAuth: true }
   },
   {
