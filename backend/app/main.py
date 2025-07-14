@@ -1,5 +1,5 @@
 # backend/app/main.py
-from flask import Flask, request
+from flask import Flask, request, g
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -25,6 +25,10 @@ from .services.face_service import FaceRecognitionService
 
 # 导入告警模块
 from .services.alert_service import create_alert_video, save_alert_frame, update_alert_video_frame_count
+
+# 导入JWT相关
+import jwt
+from .core.security import get_jwt_secret
 
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
@@ -276,6 +280,33 @@ def log_response_info(response):
     if not request.path.startswith('/ws/'):  # 排除 WebSocket 请求的日志
         app_logger.info(f"响应 {request.method} {request.path} with status {response.status_code}")
     return response
+
+
+@app.before_request
+def load_user_from_token():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, get_jwt_secret(), algorithms=["HS256"])
+            user_id = payload.get("user_id")
+            user = User.query.get(user_id)
+            if user:
+                g.user = {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role
+                }
+            else:
+                g.user = None
+        except jwt.ExpiredSignatureError:
+            app_logger.warning("JWT过期")
+            g.user = None
+        except jwt.InvalidTokenError:
+            app_logger.warning("JWT无效")
+            g.user = None
+    else:
+        g.user = None
 
 
 # --- 运行 Flask 应用 (使用 SocketIO) ---

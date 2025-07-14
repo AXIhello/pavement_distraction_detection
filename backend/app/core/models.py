@@ -38,6 +38,8 @@ class FaceFeature(db.Model):
     feature_count = db.Column(db.Integer, default=1)  # 该人的特征图片数量
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    user = db.relationship('User', backref='face_features')
     
     def __repr__(self):
         return f'<FaceFeature {self.name}>'
@@ -76,6 +78,18 @@ class AlertVideo(db.Model):
 
     alert_frames = db.relationship('AlertFrame', backref='video', cascade='all, delete-orphan')
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'video_name': self.video_name,
+            'user_id': self.user_id,
+            'save_dir': self.save_dir,
+            'disease_type':'未知',
+            'total_frames': self.total_frames,
+            'alert_frame_count': self.alert_frame_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 # 记录一次路害视频中的告警一帧
 class AlertFrame(db.Model):
     __tablename__ = 'alert_frames'
@@ -87,6 +101,17 @@ class AlertFrame(db.Model):
     confidence = db.Column(db.Float, nullable=False)  # 检测置信度（选第一个目标）
     image_path = db.Column(db.String(512), nullable=False)  # 病害图像路径（带标注图）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'video_id': self.video_id,
+            'frame_index': self.frame_index,
+            'disease_type': self.disease_type,
+            'confidence': self.confidence,
+            'image_path': self.image_path,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 # 人脸告警视频表
 class FaceAlertVideo(db.Model):
@@ -102,6 +127,17 @@ class FaceAlertVideo(db.Model):
 
     face_alert_frames = db.relationship('FaceAlertFrame', backref='video', cascade='all, delete-orphan')
 
+    def to_dict(self):
+        return {            
+            'id': self.id,            
+            'video_name': self.video_name,            
+            'user_id': self.user_id,                        
+            'save_dir': self.save_dir,            
+            'total_frames': self.total_frames,                        
+            'alert_frame_count': self.alert_frame_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None      
+        }                        
+
 
 # 人脸告警帧表
 class FaceAlertFrame(db.Model):
@@ -115,6 +151,16 @@ class FaceAlertFrame(db.Model):
     confidence = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def to_dict(self):
+        return {
+                'id': self.id,            
+                'video_id': self.video_id,                        
+                'frame_index': self.frame_index,                                                
+                'image_path': self.image_path,                                                
+                'alert_type': self.alert_type,                                                          
+                'confidence': self.confidence,
+                'created_at': self.created_at.isoformat() if self.created_at else None
+            }                        
 
 # -------- 用户相关操作 --------
 
