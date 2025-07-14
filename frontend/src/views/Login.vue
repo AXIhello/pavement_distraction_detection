@@ -239,39 +239,6 @@ function sendSmsCode() {
     })
 }
 
-// function sendRegSmsCode() {
-//   if (!regPhone.value) {
-//     regMessage.value = '请输入邮箱'
-//     regMessageColor.value = 'red'
-//     return
-//   }
-//   if (!isValidEmail(phone.value)) {
-//   message.value = '邮箱格式不正确'
-//   messageColor.value = 'red'
-//   return
-// }
-
-//   regMessage.value = ''
-
-//   fetch('http://127.0.0.1:8000/api/auth/send_email_code', {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ phone: regPhone.value })
-//   }).then(res => res.json())
-//     .then(data => {
-//       if (data.success) {
-//         regMessage.value = '验证码已发送'
-//         regMessageColor.value = 'green'
-//         startRegCountdown()
-//       } else {
-//         regMessage.value = data.message || '发送验证码失败'
-//         regMessageColor.value = 'red'
-//       }
-//     }).catch(() => {
-//       regMessage.value = '请求失败，请检查后端服务'
-//       regMessageColor.value = 'red'
-//     })
-// }
 
 function startCountdown() {
   countdown.value = 60
@@ -295,26 +262,29 @@ function startRegCountdown() {
   }, 1000)
 }
 
+import http from '@/utils/http'  // 导入配置的 axios 实例
+
 async function handleLogin() {
   message.value = ''
 
   if (loginMethod.value === 'password') {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: account.value,
-          password: password.value
-        })
+      const res = await http.post('/auth/login', {
+        username: account.value,
+        password: password.value
       })
-      const data = await res.json()
-      if (data.success) {
-        message.value = data.message
+
+      if (res.data.success) {
+        message.value = res.data.message
         messageColor.value = 'green'
+
+        // 保存 token 
+        localStorage.setItem('token', res.data.access_token)
+
+        // 跳转页面
         router.push('/first_page')
       } else {
-        message.value = data.message
+        message.value = res.data.message
         messageColor.value = 'red'
       }
     } catch (error) {
@@ -322,34 +292,23 @@ async function handleLogin() {
       messageColor.value = 'red'
     }
   } else {
-    if (!email.value || !smsCode.value) {
-      message.value = '请输入邮箱和验证码'
-      messageColor.value = 'red'
-      return
-    }
-    
-    if (!isValidEmail(email.value)) {
-  message.value = '请输入正确的邮箱格式'
-  messageColor.value = 'red'
-  return
-}
-
+    // 验证码登录
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/login_email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.value,
-          code: smsCode.value
-        })
+      const res = await http.post('/auth/login_email', {
+        email: email.value,
+        code: smsCode.value
       })
-      const data = await res.json()
-      if (data.success) {
-        message.value = data.message
+
+      if (res.data.success) {
+        message.value = res.data.message
         messageColor.value = 'green'
+
+        // 保存 token ✅
+        localStorage.setItem('token', res.data.access_token)
+
         router.push('/first_page')
       } else {
-        message.value = data.message
+        message.value = res.data.message
         messageColor.value = 'red'
       }
     } catch (error) {
@@ -358,6 +317,7 @@ async function handleLogin() {
     }
   }
 }
+
 
 async function handleRegister() {
   regMessage.value = ''

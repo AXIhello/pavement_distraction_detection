@@ -4,9 +4,10 @@ import datetime
 
 SECRET_KEY = "your_secret_key"
 
-def create_jwt_token(user_id):
+def create_jwt_token(user):
     payload = {
-        'user_id': user_id,
+        'user_id': user.id,
+        'role': user.role,            # 加入角色字段
         'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=2)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
