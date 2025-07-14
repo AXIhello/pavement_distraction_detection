@@ -117,7 +117,7 @@ const errorDetail = ref(null)
 // 从后端拉取数据
 async function fetchData() {
   try {
-    const res = await axios.get('http://localhost:8000/api/logs_alerts/alert_frames')
+    const res = await axios.get('http://localhost:8000/api/logs_alerts/alert_videos')
     // 这里对后端返回的数据做字段映射，转成前端展示需要的格式
     warnings.value = res.data.map(item => ({
       id: item.id,

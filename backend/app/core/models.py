@@ -3,6 +3,29 @@
 from datetime import datetime
 from ..extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
+from app.extensions import db
+from datetime import datetime
+
+class LogEntry(db.Model):
+    __tablename__ = 'log_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    level = db.Column(db.String(20))
+    message = db.Column(db.Text)
+    pathname = db.Column(db.String(256))
+    lineno = db.Column(db.Integer)
+    module = db.Column(db.String(128))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "level": self.level,
+            "message": self.message,
+            "pathname": self.pathname,
+            "lineno": self.lineno,
+            "module": self.module
+        }
 
 class User(db.Model):
     __tablename__ = 'users'
