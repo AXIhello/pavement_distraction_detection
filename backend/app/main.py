@@ -281,34 +281,6 @@ def log_response_info(response):
         app_logger.info(f"响应 {request.method} {request.path} with status {response.status_code}")
     return response
 
-
-@app.before_request
-def load_user_from_token():
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get("user_id")
-            user = User.query.get(user_id)
-            if user:
-                g.user = {
-                    "id": user.id,
-                    "username": user.username,
-                    "role": user.role
-                }
-            else:
-                g.user = None
-        except jwt.ExpiredSignatureError:
-            app_logger.warning("JWT过期")
-            g.user = None
-        except jwt.InvalidTokenError:
-            app_logger.warning("JWT无效")
-            g.user = None
-    else:
-        g.user = None
-
-
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():

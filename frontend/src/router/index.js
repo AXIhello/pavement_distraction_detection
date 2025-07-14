@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { jwtDecode } from 'jwt-decode'  // 
+import { jwtDecode } from 'jwt-decode'
 
 import Login from '@/views/Login.vue'
 import FaceRecognition from '@/components/FaceRecognition.vue'
