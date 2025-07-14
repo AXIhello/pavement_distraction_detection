@@ -42,7 +42,7 @@ pagination_parser.add_argument('page', type=int, help='页码', default=1)
 pagination_parser.add_argument('per_page', type=int, help='每页数量', default=10)
 
 
-# --- 日志 API (与我之前给您的内容一致) ---
+# --- 日志 API
 @ns.route('/logs')
 class LogList(Resource):
     @ns.doc('获取系统日志列表', parser=pagination_parser)
@@ -74,7 +74,7 @@ class LogList(Resource):
         return logs_data
 
 
-# --- 告警 API (与我之前给您的内容一致) ---
+# --- 告警 API
 @ns.route('/alerts')
 class AlertList(Resource):
     @ns.doc('获取告警事件列表', parser=pagination_parser)

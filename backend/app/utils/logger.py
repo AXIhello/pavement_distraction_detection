@@ -2,7 +2,10 @@
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
-
+import logging
+from app.core.models import LogEntry
+from app.extensions import db
+from flask import has_app_context
 def setup_logging(app):
     """
     配置 Flask 应用程序的日志系统。
@@ -10,6 +13,7 @@ def setup_logging(app):
     """
     # 获取根日志器
     # 重要：直接配置根日志器，这样所有通过 logging.getLogger() 获取的日志器都会继承此配置
+
     root_logger = logging.getLogger()
 
     # 从 Flask 配置中获取日志级别
@@ -46,7 +50,6 @@ def setup_logging(app):
     console_handler.setFormatter(formatter_console)
     root_logger.addHandler(console_handler) # 添加到根日志器
 
-
     # 文件处理器 - 按时间轮转
     log_file_path_time = os.path.join(log_dir, 'app.log')
     time_file_handler = TimedRotatingFileHandler(
@@ -62,6 +65,11 @@ def setup_logging(app):
 
     app.logger.setLevel(log_level)
 
+    db_handler = SQLAlchemyHandler()
+    db_handler.setLevel(log_level)
+    db_handler.setFormatter(formatter_file)
+    root_logger.addHandler(db_handler)
+
     root_logger.info("日志系统初始化完成")
 
 # 可以定义一个全局函数，方便在其他模块获取日志器
@@ -73,3 +81,21 @@ def get_logger(name=None):
     return logging.getLogger(name if name else 'flask_app_main') # 建议给一个特定的名字，而不是 __name__
                                                                 # 因为 __name__ 会因为模块不同而变化，
                                                                 # 导致你可能得到很多独立的命名日志器
+class SQLAlchemyHandler(logging.Handler):
+    def emit(self, record):
+        if not has_app_context():
+            return  # 避免在无 Flask 上下文时写数据库
+        from datetime import datetime
+        log_entry = LogEntry(
+            timestamp = datetime.utcfromtimestamp(record.created),  # 修正时间戳
+            level = record.levelname,
+            message = record.getMessage(),
+            pathname = record.pathname,
+            lineno = record.lineno,
+            module = record.module
+        )
+        db.session.add(log_entry)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
