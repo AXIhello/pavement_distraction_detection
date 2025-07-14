@@ -9,13 +9,13 @@ from functools import wraps
 from ..extensions import db
 
 # 权限校验装饰器
-
+# 你应该改为 返回字典 + 状态码，而不是 Flask 的 jsonify。Flask-RESTx 会自动处理 JSON 序列化。
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = getattr(g, 'user', None)
         if not user or user.get('role') != 'admin':
-            return jsonify({'success': False, 'message': '无权限，管理员专用'}), 403
+            return {'success': False, 'message': '无权限，管理员专用'}, 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -32,13 +32,23 @@ user_model = user_ns.model('User', {
     'updated_at': fields.DateTime
 })
 
+user_list_response = user_ns.model('UserListResponse', {
+    'success': fields.Boolean,
+    'message': fields.String,
+    'data': fields.List(fields.Nested(user_model))
+})
+
 @user_ns.route('/')
 class UserList(Resource):
-    @user_ns.marshal_list_with(user_model)
-    @admin_required
+    # @admin_required
+    @user_ns.marshal_with(user_list_response)
     def get(self):
         users = User.query.all()
-        return users
+        return {
+            'success': True,
+            'message': '获取用户列表成功',
+            'data': users
+        }
 
 @user_ns.route('/<int:user_id>')
 class UserDetail(Resource):
