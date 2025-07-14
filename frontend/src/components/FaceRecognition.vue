@@ -289,6 +289,7 @@ socket.on('face_result', (result) => {
   progress.value = 100
   progressStatus.value = '识别完成'
   if (result.success) {
+    console.log('🎉 识别成功，处理识别结果')
     const face = result.faces[0]
     handleRecognitionResult(face)
     sendRecognitionEndSignal()
