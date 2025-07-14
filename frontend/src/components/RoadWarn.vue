@@ -2,6 +2,12 @@
   <div class="table-wrapper">
   <div class="title">路障告警</div>
     <!-- 独立的状态切换按钮组 -->
+     <RoadAlertDetail
+  v-if="selectedItem"
+  :detail="detailData"
+  @back="backToList"
+/>
+<div v-else>
     <div class="status-toggle">
       <button
         @click="activeTab = 'unprocessed'"
@@ -20,13 +26,6 @@
     <!-- 综合查询过滤 -->
     <div class="filters">
       <div class="filter-group">
-        <label class="filter-label">
-          <span class="label-text">类型:</span>
-          <select v-model="filterType" class="filter-select">
-            <option value="">全部</option>
-            <option v-for="type in uniqueTypes" :key="type" :value="type">{{ type }}</option>
-          </select>
-        </label>
         
         <label class="filter-label">
           <span class="label-text">日期:</span>
@@ -67,7 +66,7 @@
         <tbody>
           <tr v-for="item in displayedData" :key="item.id" class="data-row">
             <td class="type-cell">
-              <span class="type-tag">{{ item.type }}</span>
+              <span class="type-tag">{{ item.id }}</span>
             </td>
             <td class="date-cell">{{ item.date }}</td>
             <td class="action-cell">
@@ -89,11 +88,14 @@
       </table>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
+import RoadAlertDetail from './RoadAlertDetail.vue'
+
 
 const activeTab = ref('unprocessed')
 const warnings = ref([])
@@ -101,8 +103,16 @@ const warnings = ref([])
 const sortKey = ref('')
 const sortOrder = ref(1)
 
-const filterType = ref('')
+// const filterType = ref('')
 const filterDate = ref('')
+
+
+//显示详情用
+const selectedItem = ref(null)
+const detailData = ref(null)
+const loadingDetail = ref(false)
+const errorDetail = ref(null)
+
 
 // 从后端拉取数据
 async function fetchData() {
@@ -126,23 +136,16 @@ const filteredByTab = computed(() =>
   warnings.value.filter(item => item.status === activeTab.value)
 )
 
-// 类型选项
-const uniqueTypes = computed(() => {
-  const types = new Set()
-  warnings.value.forEach(item => types.add(item.type))
-  return Array.from(types)
-})
 
-// 综合过滤
 const filteredByFilter = computed(() => {
   return filteredByTab.value.filter(item => {
-    const matchType = filterType.value ? item.type === filterType.value : true
     const matchDate = filterDate.value
       ? item.date.startsWith(filterDate.value)
       : true
-    return matchType && matchDate
+    return matchDate
   })
 })
+
 
 // 排序后最终显示
 const displayedData = computed(() => {
@@ -164,8 +167,28 @@ function sortBy(key) {
   }
 }
 
-function viewDetails(item) {
-  alert(`详情\n类型: ${item.type}\n时间: ${item.date}\n状态: ${item.status}`)
+async function viewDetails(item) {
+  selectedItem.value = null
+  detailData.value = null
+  errorDetail.value = null
+  loadingDetail.value = true
+  try {
+    const res = await axios.get(`http://localhost:8000/api/alert_video_detail/${item.id}`) // 用视频ID请求详情
+    detailData.value = res.data
+    selectedItem.value = item
+  } catch (e) {
+    errorDetail.value = '获取详情失败，请稍后重试'
+    console.error('获取详情失败', e)
+    alert('获取详情失败，请稍后重试')
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
+function backToList() {
+  selectedItem.value = null
+  detailData.value = null
+  errorDetail.value = null
 }
 
 function clearFilters() {
