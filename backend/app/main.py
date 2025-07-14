@@ -23,6 +23,9 @@ from flask_socketio import SocketIO, emit
 # 导入人脸识别服务
 from .services.face_service import FaceRecognitionService
 
+# 导入告警模块
+from .services.alert_service import create_alert_video, save_alert_frame, update_alert_video_frame_count
+
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
 if env == 'production':
@@ -105,14 +108,36 @@ def handle_disconnect():
 import time
 from collections import defaultdict, deque
 recent_results = defaultdict(lambda: deque())
+first_frame_processed = defaultdict(lambda: False)  # 用于标记每个客户端的首帧是否已处理
+video_id_map = {}
 
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
+    from flask import  request
+    from datetime import datetime
+    from pathlib import Path
     sid = request.sid
     if not client_recognition_status.get(sid, True):
         # 已标记停止识别，忽略该客户端请求
         app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
         return
+
+    # client_type[sid] = 'face'
+
+    if not first_frame_processed[sid]:
+        app_logger.info(f"首次接收到人脸图像，sid={sid}")
+        first_frame_processed[sid] = True
+        # 这里执行首帧处理逻辑，如初始化告警模块、记录日志、写数据库等
+        # 1️. 自动生成保存路径
+        now = datetime.now()
+        timestamp = now.strftime('%Y%m%d_%H%M%S')
+        save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        # 2. 人脸告警视频        
+        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None) # none为用户 后续关联
+        video_id_map[sid] = video_id  # 保存视频ID到映射中
+    
 
     app_logger.info("收到人脸识别请求")
     try:
@@ -162,7 +187,28 @@ def handle_face_recognition(data):
 
                 if name == "陌生人":
                     app_logger.warning("告警：检测到陌生人！")
-
+                    bbox = [
+                        recognition_results[0]['bbox'].get('left', 0),
+                        recognition_results[0]['bbox'].get('top', 0),
+                        recognition_results[0]['bbox'].get('right', 0),
+                        recognition_results[0]['bbox'].get('bottom', 0)
+                    ]
+                    # 触发人脸告警模块，写入告警数据库
+                    video_id = video_id_map.get(sid)
+                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
+                # 检查是否有 DeepFake    
+                if name == "deepfake":
+                    app_logger.warning("告警：检测到DeepFake！")
+                    bbox = [
+                        recognition_results[0]['bbox'].get('left', 0),
+                        recognition_results[0]['bbox'].get('top', 0),
+                        recognition_results[0]['bbox'].get('right', 0),
+                        recognition_results[0]['bbox'].get('bottom', 0)
+                    ]
+                    # 触发人脸告警模块，写入告警数据库
+                    video_id = video_id_map.get(sid)
+                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
+            # 判断识别结果，统一返回格式
                 emit('face_result', {
                     "success": True,
                     "faces": recognition_results,
@@ -236,6 +282,7 @@ def log_response_info(response):
 if __name__ == '__main__':
     with app.app_context():
         try:
+            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
