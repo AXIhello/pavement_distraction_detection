@@ -40,50 +40,20 @@ label2color = {
     '井盖': (255, 192, 203),
 }
 
-model_path = Path('data/weights/road_damage.pt')
-_model = None  # 全局模型变量
-_model_loaded = False  # 标记模型是否已加载
+# 移除原有的模型加载和全局变量
+# model_path = Path('data/weights/road_damage.pt')
+# _model = None  # 全局模型变量
+# _model_loaded = False  # 标记模型是否已加载
 
+# 新增全局模型管理接口
+_global_model = None
 
-def load_model():
-    """加载模型的函数，确保只加载一次"""
-    global _model, _model_loaded
+def set_global_model(model):
+    global _global_model
+    _global_model = model
 
-    if _model_loaded:
-        return _model
-
-    if not model_path.exists():
-        print(f"[ERROR] 模型文件不存在: {model_path}")
-        print(f"当前工作目录: {os.getcwd()}")
-        return None
-
-    print(f"[INFO] 找到模型文件: {model_path}")
-    try:
-        print(" [INFO] 正在加载YOLOv11模型...")
-        # 临时禁用ultralytics的详细输出
-        import sys
-        from io import StringIO
-        old_stdout = sys.stdout
-        sys.stdout = StringIO()
-
-        _model = YOLO(str(model_path))
-
-        # 恢复stdout
-        sys.stdout = old_stdout
-        _model_loaded = True
-        print("[SUCCESS] YOLOv11模型加载成功")
-        return _model
-    except Exception as e:
-        print(f"[ERROR] 模型加载失败: {str(e)}")
-        return None
-
-
-def get_model():
-    """获取模型实例"""
-    global _model
-    if not _model_loaded:
-        _model = load_model()
-    return _model
+def get_global_model():
+    return _global_model
 
 
 def draw_detections(image, detections):
@@ -108,7 +78,7 @@ def draw_detections(image, detections):
 
 
 def detect_single_image(base64_image: str) -> Dict:
-    model = get_model()
+    model = get_global_model()
     if model is None:
         return {'status': 'error', 'message': '模型未加载，无法进行检测', 'detections': [], 'annotated_image': None}
 
@@ -169,8 +139,7 @@ def detect_single_image(base64_image: str) -> Dict:
 
 
 def detect_batch_images(base64_images: List[str]) -> List[Dict]:
-    results = []
-    model = get_model()
+    model = get_global_model()
     if model is None:
         return [{'frame_index': i, 'detections': [], 'image_base64': None, 'status': 'error', 'message': '模型未加载'}
                 for i in range(len(base64_images))]

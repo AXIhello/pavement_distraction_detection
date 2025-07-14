@@ -151,10 +151,10 @@ def get_pavement_socketio_handlers():
     def handle_video_stream_end(data: dict):
         """
         处理视频流结束信号。
-        通知客户端视频处理已完成。
+        之前会通知客户端视频处理已完成，现在不再发送stream_complete信号，由前端自行判断。
         """
         logger.info('收到视频流结束信号，视频流处理完成。')
-        emit('stream_complete', {'message': '视频处理完成'})
+        # emit('stream_complete', {'message': '视频处理完成'})  # 已删除
 
     return {
         'video_frame': handle_video_frame,

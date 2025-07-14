@@ -31,6 +31,8 @@ import jwt
 from .core.security import SECRET_KEY
 
 from app.services.liveness_service import liveness_check
+from app.services.pavement_service import set_global_model
+from ultralytics import YOLO
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
 if env == 'production':
@@ -55,6 +57,22 @@ app_logger = get_logger(__name__)
 # --- 初始化人脸识别服务 ---
 # 将 app.config 传递给服务，以便服务可以获取路径或其他配置
 face_recognition_service = FaceRecognitionService(app.config)
+
+# 初始化路面病害检测模型（全局只加载一次）
+try:
+    model_path = 'data/weights/road_damage.pt'
+    pavement_model = YOLO(model_path)
+    set_global_model(pavement_model)
+    app_logger.info("路面病害检测模型YOLO已全局加载")
+    # ----------- 模型预热 -------------
+    import numpy as np
+    dummy_img = np.zeros((640, 640, 3), dtype=np.uint8)
+    _ = pavement_model(dummy_img)
+    app_logger.info("YOLO模型预热完成")
+    # ----------------------------------
+except Exception as e:
+    set_global_model(None)
+    app_logger.error(f"路面病害检测模型加载失败: {e}")
 
 # 将服务设置为Flask应用的属性，以便在其他模块中访问
 app.face_recognition_service = face_recognition_service
