@@ -173,7 +173,7 @@ async function viewDetails(item) {
   errorDetail.value = null
   loadingDetail.value = true
   try {
-    const res = await axios.get(`http://localhost:8000/api/alert_video_detail/${item.id}`) // 用视频ID请求详情
+    const res = await axios.get(`http://localhost:8000/api/logs_alerts/alert_video_detail/${item.id}`) // 用视频ID请求详情
     detailData.value = res.data
     selectedItem.value = item
   } catch (e) {

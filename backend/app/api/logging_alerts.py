@@ -177,7 +177,7 @@ class AlertDeleteV2(Resource):
 class AlertFrames(Resource):
     def get(self):
         try:
-            frames = AlertFrame.query.order_by(AlertFrame.created_at.desc()).all()
+            frames = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
             data = [frame.to_dict() for frame in frames]
             return data
         except Exception as e:
@@ -194,3 +194,72 @@ class FaceAlertFrames(Resource):
         except Exception as e:
             logger.error(f"获取人脸告警帧失败: {e}")
             return {'error': '获取失败'}, 500 
+        
+@ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
+class AlertVideoDetail(Resource):               
+    def get(self, video_id):
+        try:
+            # 查询视频信息
+            video = AlertVideo.query.get(video_id)
+            if not video:
+                return {'error': '未找到对应视频'}, 404
+
+            # 查询该视频下的所有帧（如果有）
+            frames = AlertFrame.query.filter_by(video_id=video_id).order_by(AlertFrame.created_at.asc()).all()
+
+            # 构造响应数据
+            data = {
+                'id': frames[0].video_id,  # 用第一条的 video_id
+                'created_at': frames[0].created_at.isoformat() if frames[0].created_at else None,
+                'disease_type': frames[0].disease_type,  # 这里可以按需求改成列表里所有类型或第一个
+                'description': f'共检测到{len(frames)}帧告警',
+                'frames': []
+            }
+
+            for f in frames:
+                data['frames'].append({
+                    'frame_index': f.frame_index,
+                    'disease_type': f.disease_type,
+                    'confidence': f.confidence,
+                    'image_url': f.image_path,
+                    'created_at': f.created_at.isoformat() if f.created_at else None
+                })
+            return data
+        except Exception as e:
+            logger.error(f"获取人脸告警视频详情失败: {e}")
+            return {'error': '获取失败'}, 500    
+        
+@ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
+class AlertVideoDetail(Resource):               
+    def get(self, video_id):
+        try:
+            # 查询视频信息
+            video = FaceAlertVideo.query.get(video_id)
+            if not video:
+                return {'error': '未找到对应视频'}, 404
+
+            # 查询该视频下的所有帧（如果有）
+            frames = FaceAlertFrames.query.filter_by(video_id=video_id).order_by(FaceAlertFrames.created_at.asc()).all()
+
+            # 构造响应数据
+            data = {
+                'id': frames[0].video_id,  # 用第一条的 video_id
+                'created_at': frames[0].created_at.isoformat() if frames[0].created_at else None,
+                'alert_type': frames[0].alert_type,  # 这里可以按需求改成列表里所有类型或第一个
+                'description': f'共检测到{len(frames)}帧告警',
+                'frames': []
+            }
+
+            for f in frames:
+                data['frames'].append({
+                    'frame_index': f.frame_index,
+                    'alert_type': f.alert_type,
+                    'confidence': f.confidence,
+                    'image_url': f.image_path,
+                    'created_at': f.created_at.isoformat() if f.created_at else None
+                })
+            return data
+        except Exception as e:
+            logger.error(f"获取人脸告警视频详情失败: {e}")
+            return {'error': '获取失败'}, 500    
+        

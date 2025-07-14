@@ -145,7 +145,7 @@ function sortBy(key) {
 
 async function viewDetails(item) {
   try {
-    const res = await axios.get(`http://localhost:8000/api/face_alert_detail/${item.id}`)
+    const res = await axios.get(`http://localhost:8000/api/logs_alerts/face_alert_detail/${item.id}`)
     detailData.value = res.data
     selectedItem.value = item     // 加载完再切换视图
   } catch (e) {
