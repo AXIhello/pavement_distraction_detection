@@ -235,9 +235,22 @@ function handleRecognitionResult(face) {
     router.push('/login')
     return
   }
+   if (face.name === '未知人员') {
+    alert('人脸数据库中无数据，请前去录入')
+    stopAll()
+    router.push('/face_register')
+    return
+  }
   recognizedName.value = face.name || ''
   recognitionFinished.value = true
   stopAll()
+}
+
+function sendRecognitionEndSignal() {
+  if(socket && socket.connected) {
+    socket.emit('face_recognition_end', { msg: 'recognition_finished' })
+    console.log('已发送识别结束信号给后端')
+  }
 }
 
 function connectSocket() {
@@ -278,6 +291,7 @@ socket.on('face_result', (result) => {
   if (result.success) {
     const face = result.faces[0]
     handleRecognitionResult(face)
+    sendRecognitionEndSignal()
   } else {
     console.warn('识别失败:', result.message || '未识别到人脸')
   }
@@ -329,6 +343,7 @@ function stopAll() {
     stream = null
   }
   if (socket) {
+    sendRecognitionEndSignal()  
     socket.disconnect()
     socket = null
   }

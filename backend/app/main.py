@@ -90,12 +90,17 @@ pavement_handlers = get_pavement_socketio_handlers()
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
 def handle_connect():
-    app_logger.info("SocketIO 客户端连接")
+    # app_logger.info("SocketIO 客户端连接")
+    sid = request.sid
+    app_logger.info(f"SocketIO 客户端连接: {sid}")
+    client_recognition_status[sid] = True  # 新连接默认允许识别
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    app_logger.info("SocketIO 客户端断开连接")
+    sid = request.sid
+    app_logger.info(f"SocketIO 客户端断开连接: {sid}")
+    client_recognition_status.pop(sid, None)  # 断开时清理状态
 
 import time
 from collections import defaultdict, deque
@@ -103,8 +108,12 @@ recent_results = defaultdict(lambda: deque())
 
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
-    from flask import  request
     sid = request.sid
+    if not client_recognition_status.get(sid, True):
+        # 已标记停止识别，忽略该客户端请求
+        app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
+        return
+
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
@@ -140,7 +149,9 @@ def handle_face_recognition(data):
         if len(dq) >= 3:
             last_three = list(dq)[-3:]
             if all(n == name for t, n in last_three) and name != '未检测到人脸':
-                # 打印 bbox 信息
+                if not client_recognition_status.get(sid, True):
+                    app_logger.info(f"识别已结束，跳过 emit 识别结果（sid={sid}）")
+                    return
                 bbox_info = []
                 for face in recognition_results:
                     bbox_info.append({
@@ -155,7 +166,7 @@ def handle_face_recognition(data):
                 emit('face_result', {
                     "success": True,
                     "faces": recognition_results,
-                    "req_id": req_id  # ✅ 添加 req_id
+                    "req_id": req_id
                 })
                 dq.clear()
 
@@ -177,6 +188,19 @@ def handle_face_recognition(data):
     except Exception as e:
         app_logger.error(f"人脸识别处理错误: {e}", exc_info=True)
         emit('face_result', {"success": False, "message": str(e)})
+
+
+# 处理人脸识别结束信号
+from flask import request
+
+# 维护一个字典，存储每个客户端（sid）是否继续允许识别，True=允许识别，False=停止识别
+client_recognition_status = {}
+
+@socketio.on('face_recognition_end')
+def handle_face_recognition_end(data):
+    sid = request.sid
+    app_logger.info(f"收到客户端 {sid} 的识别结束信号: {data}")
+    client_recognition_status[sid] = False  # 标记该客户端停止识别
 
 
 # --- 路面检测 Socket.IO 事件处理 ---
