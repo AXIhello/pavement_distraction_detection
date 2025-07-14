@@ -1,6 +1,6 @@
 <template>
   <div class="table-wrapper">
-  <div class="title">路障告警</div>
+  <div class="title">路面灾害告警</div>
     <!-- 独立的状态切换按钮组 -->
      <RoadAlertDetail
   v-if="selectedItem"
