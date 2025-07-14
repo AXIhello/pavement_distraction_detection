@@ -1,7 +1,12 @@
 <template>
   <div class="table-wrapper">
-    <div class="title">登录告警</div>
-
+    <div class="title">人脸识别告警</div>
+  <FaceAlertDetail
+      v-if="selectedItem"
+      :detail="detailData"
+      @back="backToList"
+    />
+    <div v-else>
     <!-- 状态切换按钮 -->
     <div class="status-toggle">
       <button
@@ -69,14 +74,20 @@
       </table>
     </div>
   </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
+import FaceAlertDetail from './FaceAlertDetail.vue'
 
-const activeTab = ref('unprocessed')
-const logWarnings = ref([])
+
+const logWarnings = ref([])           // 补充声明
+const activeTab = ref('unprocessed') // 补充声明，默认tab
+
+const selectedItem = ref(null)
+const detailData = ref(null)
 
 const sortKey = ref('')
 const sortOrder = ref(1)
@@ -132,8 +143,32 @@ function sortBy(key) {
   }
 }
 
-function viewDetails(item) {
-  alert(`详情\n时间: ${item.date}\n状态: ${item.status}`)
+async function viewDetails(item) {
+  try {
+    const res = await axios.get(`http://localhost:8000/api/face_alert_detail/${item.id}`)
+    detailData.value = res.data
+    selectedItem.value = item     // 加载完再切换视图
+  } catch (e) {
+    console.error('获取详情失败', e)
+    detailData.value = null
+    alert('获取详情失败，请稍后重试') 
+  }
+}
+
+
+// async function fetchDetail(id) {
+//   try {
+//     const res = await axios.get(`http://localhost:8000/api/face_alert_detail/${id}`)
+//     detailData.value = res.data
+//   } catch (e) {
+//     console.error('获取详情失败', e)
+//     detailData.value = null
+//   }
+// }
+
+function backToList() {
+  selectedItem.value = null
+  detailData.value = null
 }
 
 function clearFilters() {

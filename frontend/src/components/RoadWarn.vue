@@ -47,7 +47,7 @@
           <tr>
             <th @click="sortBy('type')" class="sortable-header">
               <div class="header-content">
-                <span>类型</span>
+                <span>视频ID</span>
                 <span v-if="sortKey === 'type'" class="sort-indicator">
                   {{ sortOrder === 1 ? '▲' : '▼' }}
                 </span>

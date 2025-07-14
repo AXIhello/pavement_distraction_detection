@@ -103,32 +103,44 @@ async function savePhoto() {
   }
   loading.value = true
   message.value = '正在处理中，请稍候...'
+
   try {
-    const token = localStorage.getItem('token')  // 从本地取token
+    const token = localStorage.getItem('token')
+    console.log('savePhoto: token =', token)
+    if (!token) {
+      message.value = '缺少token，请先登录'
+      loading.value = false
+      return
+    }
+
     const res = await fetch('http://127.0.0.1:8000/api/face/register', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`   // 传token
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
         name: name.value,
         image: capturedPhoto.value
       })
     })
-
+    console.log('savePhoto: fetch 响应状态', res.status)
     const data = await res.json()
+    console.log('savePhoto: 返回数据', data)
+
     if (data.success) {
       message.value = '录入成功！'
     } else {
-      message.value = '录入失败！' + data.message
+      message.value = '录入失败！' + (data.message || '')
     }
   } catch (err) {
+    console.error('savePhoto 请求异常:', err)
     message.value = '请求失败，请检查后端服务'
   } finally {
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>
