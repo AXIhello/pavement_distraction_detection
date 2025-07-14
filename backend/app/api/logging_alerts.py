@@ -6,9 +6,10 @@ from flask import request, g
 from ..services.logging_service import LoggingService
 # 导入你的日志器
 from ..utils.logger import get_logger
-from ..core.models import AlertVideo, FaceAlertVideo, db
+from ..core.models import AlertVideo, FaceAlertVideo, db, AlertFrame
 import shutil, os
 from functools import wraps
+from flask import jsonify
 
 logger = get_logger(__name__)
 
@@ -118,6 +119,17 @@ class AlertPlayback(Resource):
         if not playback_data:
             ns.abort(404, message=f"告警 {alert_id} 未找到")
         return playback_data
+    
+@ns.route('/alert_frames')
+class AlertFrames(Resource):
+    def get(self):
+        try:
+            frames = AlertFrame.query.order_by(AlertFrame.created_at.desc()).all()
+            data = [frame.to_dict() for frame in frames]
+            return data
+        except Exception as e:
+            logger.error(f"获取告警帧失败: {e}")
+            return {'error': '获取失败'}, 500
 
 def admin_required(f):
     @wraps(f)

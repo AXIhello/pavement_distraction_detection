@@ -86,7 +86,7 @@ const filterDate = ref('')
 // 获取后端数据
 async function fetchData() {
   try {
-    const res = await axios.get('/api/login_warnings')
+    const res = await axios.get('http://localhost:8000/api/alert_frames')
     logWarnings.value = res.data
   } catch (e) {
     console.error('获取登录告警失败', e)
