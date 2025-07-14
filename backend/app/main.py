@@ -30,6 +30,7 @@ from .services.alert_service import create_alert_video, save_alert_frame, update
 import jwt
 from .core.security import SECRET_KEY
 
+from app.services.liveness_service import liveness_check
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
 if env == 'production':
@@ -253,7 +254,29 @@ def load_user_from_token():
             g.user = None
     else:
         g.user = None
+liveness_status = {}
 
+@socketio.on('liveness_detection')
+def handle_liveness_detection(data):
+    from flask import request
+    sid = request.sid
+    base64_image = data.get('image', '')
+    if not base64_image:
+        emit('liveness_result', {'success': False, 'message': '没有图像数据'})
+        return
+
+    progress, next_action, status_dict = liveness_check(base64_image, liveness_status.get(sid, {}))
+    liveness_status[sid] = status_dict
+
+    emit('liveness_result', {
+        'success': True,
+        'progress': progress,
+        'next_action': next_action,
+        'status': status_dict
+    })
+
+    if progress == 100:
+        liveness_status.pop(sid, None)
 
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
