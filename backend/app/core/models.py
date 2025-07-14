@@ -38,6 +38,8 @@ class FaceFeature(db.Model):
     feature_count = db.Column(db.Integer, default=1)  # 该人的特征图片数量
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    user = db.relationship('User', backref='face_features')
     
     def __repr__(self):
         return f'<FaceFeature {self.name}>'
