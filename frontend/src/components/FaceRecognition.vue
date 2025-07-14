@@ -58,17 +58,15 @@ const router = useRouter()
 const video = ref(null)
 
 let socket = null
-let streamInterval = null
 let stream = null
 let isWaitingForResult = false // 是否正在等待结果
-let frameCount = 0 // 当前批次已发送的帧数
-const FRAMES_PER_BATCH = 5 // 每批次发送5帧
-const BATCH_INTERVAL = 200 // 批次内每帧间隔200ms
-const WAIT_TIME = 1000 // 等待结果时间1000ms
+let lastResults = [] // 存储最近三帧识别结果
+const MAX_RESULT_QUEUE = 3
+const WAIT_INTERVAL = 500 // 每帧间隔ms
 
-const progress = ref(0) // 进度条百分比
 const progressStatus = ref('识别准备中...') // 状态提示
 const mode = ref('camera') // 当前模式
+const progress = ref(0)
 
 //处理异步问题
 let requestId = 0
@@ -109,7 +107,6 @@ function drawFaceBoxes(bboxes) {
 function setMode(m) {
   stopAll()
   mode.value = m
-  progress.value = 0
   progressStatus.value = '识别准备中...'
   recognitionFinished.value = false
   recognizedName.value = ''
@@ -138,7 +135,6 @@ function onImageUpload(e) {
   const reader = new FileReader()
   reader.onload = async function(evt) {
     const base64Image = evt.target.result
-    progress.value = 50
     progressStatus.value = '识别中...'
 
     try {
@@ -149,7 +145,6 @@ function onImageUpload(e) {
       })
 
       const result = await response.json()
-      progress.value = 100
       progressStatus.value = '识别完成'
 
       if (result.success && result.faces && result.faces.length > 0) {
@@ -206,13 +201,11 @@ socket.emit('face_recognition', {
 })
 
       sentFrames++
-      progress.value = Math.round((sentFrames / totalFrames) * 100)
       progressStatus.value = `视频识别中... (${sentFrames}/${totalFrames})`
       currentTime += interval
       if (currentTime < duration) {
         setTimeout(captureFrame, 100)
       } else {
-        progress.value = 100
         progressStatus.value = '视频识别完成，等待结果...'
         URL.revokeObjectURL(url)
       }
@@ -260,7 +253,6 @@ function connectSocket() {
   }
   socket = io('http://127.0.0.1:8000')
   socket.on('connect', () => {
-    progress.value = 0
     progressStatus.value = '识别中...'
   })
 
@@ -279,23 +271,39 @@ function connectSocket() {
   }
 })
 
-socket.on('face_result', (result) => {
-  if (typeof result.req_id !== 'undefined' && result.req_id < latestReqId) {
-    console.warn(`忽略过期识别结果：req_id=${result.req_id} < ${latestReqId}`)
-    return
-  }
-
+socket && socket.on && socket.on('face_result', (result) => {
   isWaitingForResult = false
-  progress.value = 100
-  progressStatus.value = '识别完成'
-  if (result.success) {
-    console.log('🎉 识别成功，处理识别结果')
-    const face = result.faces[0]
-    handleRecognitionResult(face)
-    sendRecognitionEndSignal()
-  } else {
-    console.warn('识别失败:', result.message || '未识别到人脸')
+  const name = result.faces && result.faces[0] ? result.faces[0].name : '未检测到人脸'
+  lastResults.push(name)
+  if (lastResults.length > MAX_RESULT_QUEUE) lastResults.shift()
+
+  if (lastResults.length === 1) {
+    progress.value = 33
+  } else if (lastResults.length === 2) {
+    if (lastResults[0] === lastResults[1] && lastResults[0] !== '未检测到人脸') {
+      progress.value = 66
+    } else {
+      // 两帧不一致，归零
+      progress.value = 0
+      lastResults = [lastResults[1]]
+    }
+  } else if (lastResults.length === 3) {
+    if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
+      progress.value = 100
+      handleRecognitionResult(result.faces[0])
+      recognitionFinished.value = true
+      stopAll()
+      return
+    } else {
+      // 三帧不一致，归零，只保留最新一帧
+      progress.value = 0
+      lastResults = [lastResults[2]]
+    }
   }
+  // 继续采集下一帧
+  setTimeout(() => {
+    if (!recognitionFinished.value) startImageStream()
+  }, WAIT_INTERVAL)
 })
 
   socket.on('disconnect', () => {
@@ -306,52 +314,35 @@ socket.on('face_result', (result) => {
   })
 }
 
+// 新的单帧节流采集逻辑
 function startImageStream() {
-  streamInterval = setInterval(() => {
-    if (!video.value || video.value.videoWidth === 0 || video.value.videoHeight === 0) return
-    if (isWaitingForResult) return
-    const canvas = document.createElement('canvas')
-    canvas.width = video.value.videoWidth
-    canvas.height = video.value.videoHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
-    const base64Image = canvas.toDataURL('image/jpeg')
-    socket.emit('face_recognition', { image: base64Image })
-    frameCount++
-    progress.value = Math.round((frameCount / FRAMES_PER_BATCH) * 100)
-    progressStatus.value = '识别中...'
-    if (frameCount >= FRAMES_PER_BATCH) {
-      isWaitingForResult = true
-      frameCount = 0
-      progress.value = 100
-      progressStatus.value = '识别中，请稍候...'
-      setTimeout(() => {
-        if (isWaitingForResult) {
-          isWaitingForResult = false
-          progress.value = 0
-          progressStatus.value = '识别中...'
-        }
-      }, WAIT_TIME)
-    }
-  }, BATCH_INTERVAL)
+  if (isWaitingForResult || recognitionFinished.value) return
+  if (!video.value || video.value.videoWidth === 0 || video.value.videoHeight === 0) return
+  const canvas = document.createElement('canvas')
+  canvas.width = video.value.videoWidth
+  canvas.height = video.value.videoHeight
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+  const base64Image = canvas.toDataURL('image/jpeg')
+  isWaitingForResult = true
+  progressStatus.value = '识别中...'
+  socket.emit('face_recognition', { image: base64Image })
 }
 
 function stopAll() {
-  clearInterval(streamInterval)
-  streamInterval = null
   if (stream) {
     stream.getTracks().forEach(track => track.stop())
     stream = null
   }
   if (socket) {
-    sendRecognitionEndSignal()  
+    sendRecognitionEndSignal()
     socket.disconnect()
     socket = null
   }
+  isWaitingForResult = false
+  lastResults = []
   progress.value = 0
   progressStatus.value = '识别准备中...'
-  frameCount = 0
-  isWaitingForResult = false
 }
 </script>
 

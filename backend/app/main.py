@@ -117,45 +117,46 @@ video_id_map = {}
 
 @socketio.on('face_recognition')
 def handle_face_recognition(data):
+    # 处理前端通过SocketIO发送过来的人脸识别请求
     from flask import  request
     from datetime import datetime
     from pathlib import Path
     sid = request.sid
+    # 判断该客户端是否允许继续识别
     if not client_recognition_status.get(sid, True):
         # 已标记停止识别，忽略该客户端请求
         app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
         return
 
-    # client_type[sid] = 'face'
-
+    # 首帧处理逻辑（如初始化告警模块、记录日志、写数据库等）
     if not first_frame_processed[sid]:
         app_logger.info(f"首次接收到人脸图像，sid={sid}")
         first_frame_processed[sid] = True
-        # 这里执行首帧处理逻辑，如初始化告警模块、记录日志、写数据库等
-        # 1️. 自动生成保存路径
+        # 自动生成保存路径
         now = datetime.now()
         timestamp = now.strftime('%Y%m%d_%H%M%S')
         save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
         save_dir.mkdir(parents=True, exist_ok=True)
-
-        # 2. 人脸告警视频        
-        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None) # none为用户 后续关联
+        # 创建人脸告警视频记录
+        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None)
         video_id_map[sid] = video_id  # 保存视频ID到映射中
     
-
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
-        req_id = data.get('req_id')  # ✅ 获取前端发送的 req_id
+        req_id = data.get('req_id')  # 获取前端发送的 req_id
         if not base64_image:
-            emit('face_result', {'success': False, 'message': '没有图像数据'})
+            # 没有图像数据，直接返回错误
+            emit('face_result', {'success': False, 'message': '没有图像数据', 'req_id': req_id})
             return
         # 调用人脸识别服务进行处理
         recognition_results = face_recognition_service.recognize_face(base64_image)
         if not recognition_results or not isinstance(recognition_results,list):
+            # 识别结果异常，直接返回
+            emit('face_result', {'success': False, 'message': '识别失败', 'req_id': req_id})
             return
 
-        # 立即向前端发送bbox信息
+        # 立即向前端发送bbox信息（用于画框）
         bboxes = [
             face["bbox"]
             for face in recognition_results
@@ -168,76 +169,15 @@ def handle_face_recognition(data):
                 "bboxes": bboxes,
                 "req_id": req_id
             })
-        name = recognition_results[0].get('name')
-        now = time.time()
-        dq = recent_results[sid]
-        dq.append((now,name))
-        #移除超过1秒的旧帧
-        while dq and now-dq[0][0]>2.0:
-            dq.popleft()
-        if len(dq) >= 3:
-            last_three = list(dq)[-3:]
-            if all(n == name for t, n in last_three) and name != '未检测到人脸':
-                if not client_recognition_status.get(sid, True):
-                    app_logger.info(f"识别已结束，跳过 emit 识别结果（sid={sid}）")
-                    return
-                bbox_info = []
-                for face in recognition_results:
-                    bbox_info.append({
-                        "name": face.get("name"),
-                        "bbox": face.get("bbox"),
-                    })
-                app_logger.info(f"连续三帧一致，emit结果，sid={sid}, name={name}, dq={list(dq)}, bbox={bbox_info}")
-
-                if name == "陌生人":
-                    app_logger.warning("告警：检测到陌生人！")
-                    bbox = [
-                        recognition_results[0]['bbox'].get('left', 0),
-                        recognition_results[0]['bbox'].get('top', 0),
-                        recognition_results[0]['bbox'].get('right', 0),
-                        recognition_results[0]['bbox'].get('bottom', 0)
-                    ]
-                    # 触发人脸告警模块，写入告警数据库
-                    video_id = video_id_map.get(sid)
-                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
-                # 检查是否有 DeepFake    
-                if name == "deepfake":
-                    app_logger.warning("告警：检测到DeepFake！")
-                    bbox = [
-                        recognition_results[0]['bbox'].get('left', 0),
-                        recognition_results[0]['bbox'].get('top', 0),
-                        recognition_results[0]['bbox'].get('right', 0),
-                        recognition_results[0]['bbox'].get('bottom', 0)
-                    ]
-                    # 触发人脸告警模块，写入告警数据库
-                    video_id = video_id_map.get(sid)
-                    save_alert_frame('face', video_id, 1, base64_image, 0,disease_type=name,bboxes=[bbox])
-            # 判断识别结果，统一返回格式
-                emit('face_result', {
-                    "success": True,
-                    "faces": recognition_results,
-                    "req_id": req_id
-                })
-                dq.clear()
-
-        elif (
-                isinstance(recognition_results, list)
-                and recognition_results
-                and recognition_results[0].get("status") == "error"
-        ):
-            emit('face_result', {
-                "success": False,
-                "message": recognition_results[0].get("message", "识别出错")
-            })
-        else:
-            emit('face_result', {
-                "success": False,
-                "message": "未检测到人脸"
-            })
-
+        # 直接返回本帧识别结果给前端（不再做三帧一致判定，交由前端处理）
+        emit('face_result', {
+            "success": True,
+            "faces": recognition_results,
+            "req_id": req_id
+        })
     except Exception as e:
         app_logger.error(f"人脸识别处理错误: {e}", exc_info=True)
-        emit('face_result', {"success": False, "message": str(e)})
+        emit('face_result', {"success": False, "message": str(e), 'req_id': data.get('req_id')})
 
 
 # 处理人脸识别结束信号
@@ -282,38 +222,38 @@ def log_response_info(response):
     return response
 
 
-@app.before_request
-def load_user_from_token():
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-            user_id = payload.get("user_id")
-            user = User.query.get(user_id)
-            if user:
-                g.user = {
-                    "id": user.id,
-                    "username": user.username,
-                    "role": user.role
-                }
-            else:
-                g.user = None
-        except jwt.ExpiredSignatureError:
-            app_logger.warning("JWT过期")
-            g.user = None
-        except jwt.InvalidTokenError:
-            app_logger.warning("JWT无效")
-            g.user = None
-    else:
-        g.user = None
+# @app.before_request
+# def load_user_from_token():
+#     auth_header = request.headers.get('Authorization')
+#     if auth_header and auth_header.startswith('Bearer '):
+#         token = auth_header.split(' ')[1]
+#         try:
+#             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+#             user_id = payload.get("user_id")
+#             user = User.query.get(user_id)
+#             if user:
+#                 g.user = {
+#                     "id": user.id,
+#                     "username": user.username,
+#                     "role": user.role
+#                 }
+#             else:
+#                 g.user = None
+#         except jwt.ExpiredSignatureError:
+#             app_logger.warning("JWT过期")
+#             g.user = None
+#         except jwt.InvalidTokenError:
+#             app_logger.warning("JWT无效")
+#             g.user = None
+#     else:
+#         g.user = None
 
 
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
@@ -321,6 +261,7 @@ if __name__ == '__main__':
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
     #app.run()   # app.run() # host和port可以在config中设置或直接写在这里
+
     app_logger.info("Flask 应用启动中...")
     app_logger.debug(f"当前运行环境: {env}")
 

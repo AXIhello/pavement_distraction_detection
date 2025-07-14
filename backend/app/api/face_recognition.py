@@ -49,11 +49,11 @@ class FaceRegister(Resource):
             data = ns.payload
             name = data.get('name')
             image_base64 = data.get('image')
-            user = getattr(g, 'user', None)
-            user_id = user['id'] if user else None
-            logger.info(f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
-            if not user_id:
-                return {'success': False, 'message': '未获取到用户ID，请登录后操作'}, 401
+            #user = getattr(g, 'user', None)
+            #user_id = user['id'] if user else None
+            #logger.info(f"收到人脸注册请求: name={name}, user_id={user_id}, image_length={len(image_base64) if image_base64 else 0}")
+            #if not user_id:
+            #    return {'success': False, 'message': '未获取到用户ID，请登录后操作'}, 401
             # 业务逻辑：写入FaceFeature表
                 # 调用业务逻辑服务
             service = current_app.face_recognition_service
