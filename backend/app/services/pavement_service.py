@@ -8,6 +8,11 @@ import base64
 import os
 import numpy as np
 from typing import List, Dict
+from ultralytics import YOLO
+import logging
+
+# 设置ultralytics的日志级别为WARNING，减少不必要的输出
+logging.getLogger("ultralytics").setLevel(logging.WARNING)
 
 from ..services.alert_service import save_alert_frame, update_alert_video, create_alert_video
 from datetime import datetime
@@ -36,20 +41,50 @@ label2color = {
 }
 
 model_path = Path('data/weights/road_damage.pt')
-model = None
-if not model_path.exists():
-    print(f"[ERROR] 模型文件不存在: {model_path}")
-    print(f"当前工作目录: {os.getcwd()}")
-else:
+_model = None  # 全局模型变量
+_model_loaded = False  # 标记模型是否已加载
+
+
+def load_model():
+    """加载模型的函数，确保只加载一次"""
+    global _model, _model_loaded
+
+    if _model_loaded:
+        return _model
+
+    if not model_path.exists():
+        print(f"[ERROR] 模型文件不存在: {model_path}")
+        print(f"当前工作目录: {os.getcwd()}")
+        return None
+
     print(f"[INFO] 找到模型文件: {model_path}")
     try:
-        print(" [INFO] 正在加载YOLOv5官方推理接口模型...")
-        model = torch.hub.load('yolov5', 'custom', path=str(model_path), source='local')
-        model.conf = 0.30
-        print("[SUCCESS] YOLOv5模型加载成功（ultralytics官方接口）")
+        print(" [INFO] 正在加载YOLOv11模型...")
+        # 临时禁用ultralytics的详细输出
+        import sys
+        from io import StringIO
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        _model = YOLO(str(model_path))
+
+        # 恢复stdout
+        sys.stdout = old_stdout
+        _model_loaded = True
+        print("[SUCCESS] YOLOv11模型加载成功")
+        return _model
     except Exception as e:
         print(f"[ERROR] 模型加载失败: {str(e)}")
-        model = None
+        return None
+
+
+def get_model():
+    """获取模型实例"""
+    global _model
+    if not _model_loaded:
+        _model = load_model()
+    return _model
+
 
 def draw_detections(image, detections):
     draw = ImageDraw.Draw(image)
@@ -71,7 +106,9 @@ def draw_detections(image, detections):
         draw.text((x, y), text, fill=color, font=font)
     return image
 
+
 def detect_single_image(base64_image: str) -> Dict:
+    model = get_model()
     if model is None:
         return {'status': 'error', 'message': '模型未加载，无法进行检测', 'detections': [], 'annotated_image': None}
 
@@ -86,24 +123,38 @@ def detect_single_image(base64_image: str) -> Dict:
         image_resized = image.resize((640, 640))
         image_np = np.array(image_resized)
 
-        output = model(image_np)
-        df = output.pandas().xyxy[0]
-        w_scale = orig_w / 640
-        h_scale = orig_h / 640
+        # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
+        results = model(image_np, conf=0.30, verbose=False)
 
+        # 获取检测结果
         detections = []
-        for _, row in df.iterrows():
-            label_key = row['name']
-            output.names[row['class']] = id2label.get(label_key, label_key)
-            xmin_r = row['xmin'] * w_scale
-            ymin_r = row['ymin'] * h_scale
-            xmax_r = row['xmax'] * w_scale
-            ymax_r = row['ymax'] * h_scale
-            detections.append({
-                'class': id2label.get(label_key, label_key),
-                'confidence': round(float(row['confidence']), 3),
-                'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
-            })
+        for result in results:
+            boxes = result.boxes
+            if boxes is not None:
+                for box in boxes:
+                    # 获取边界框坐标
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    # 获取置信度并转换为Python原生float类型
+                    conf = float(box.conf[0].cpu().numpy().item())
+                    # 获取类别
+                    cls = int(box.cls[0].cpu().numpy().item())
+
+                    # 从模型的类别名称获取标签
+                    label_key = model.names[cls]
+
+                    # 缩放回原始尺寸
+                    w_scale = orig_w / 640
+                    h_scale = orig_h / 640
+                    xmin_r = float(x1 * w_scale)
+                    ymin_r = float(y1 * h_scale)
+                    xmax_r = float(x2 * w_scale)
+                    ymax_r = float(y2 * h_scale)
+
+                    detections.append({
+                        'class': id2label.get(label_key, label_key),
+                        'confidence': round(conf, 3),
+                        'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
+                    })
 
         annotated = draw_detections(image.copy(), detections)
         buffered = io.BytesIO()
@@ -116,10 +167,13 @@ def detect_single_image(base64_image: str) -> Dict:
         print(f"[ERROR] 检测失败: {str(e)}")
         return {'status': 'error', 'message': f'检测失败: {str(e)}', 'detections': [], 'annotated_image': None}
 
+
 def detect_batch_images(base64_images: List[str]) -> List[Dict]:
     results = []
+    model = get_model()
     if model is None:
-        return [{'frame_index': i, 'detections': [], 'image_base64': None, 'status': 'error', 'message': '模型未加载'} for i in range(len(base64_images))]
+        return [{'frame_index': i, 'detections': [], 'image_base64': None, 'status': 'error', 'message': '模型未加载'}
+                for i in range(len(base64_images))]
 
     now = datetime.now()
     timestamp = now.strftime('%Y%m%d_%H%M%S')
@@ -142,22 +196,35 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             w_scale = orig_w / 640
             h_scale = orig_h / 640
 
-            output = model(image_np)
-            df = output.pandas().xyxy[0]
+            # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
+            result_batch = model(image_np, conf=0.30, verbose=False)
             detections = []
 
-            for _, row in df.iterrows():
-                label_key = row['name']
-                output.names[row['class']] = id2label.get(label_key, label_key)
-                xmin_r = row['xmin'] * w_scale
-                ymin_r = row['ymin'] * h_scale
-                xmax_r = row['xmax'] * w_scale
-                ymax_r = row['ymax'] * h_scale
-                detections.append({
-                    'class': id2label.get(label_key, label_key),
-                    'confidence': round(float(row['confidence']), 3),
-                    'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
-                })
+            for result in result_batch:
+                boxes = result.boxes
+                if boxes is not None:
+                    for box in boxes:
+                        # 获取边界框坐标
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        # 获取置信度并转换为Python原生float类型
+                        conf = float(box.conf[0].cpu().numpy().item())
+                        # 获取类别
+                        cls = int(box.cls[0].cpu().numpy().item())
+
+                        # 从模型的类别名称获取标签
+                        label_key = model.names[cls]
+
+                        # 缩放回原始尺寸
+                        xmin_r = float(x1 * w_scale)
+                        ymin_r = float(y1 * h_scale)
+                        xmax_r = float(x2 * w_scale)
+                        ymax_r = float(y2 * h_scale)
+
+                        detections.append({
+                            'class': id2label.get(label_key, label_key),
+                            'confidence': round(conf, 3),
+                            'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
+                        })
 
             annotated = draw_detections(image.copy(), detections)
             buffered = io.BytesIO()
