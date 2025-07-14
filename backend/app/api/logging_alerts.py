@@ -183,7 +183,21 @@ class AlertFrames(Resource):
         except Exception as e:
             logger.error(f"获取告警帧失败: {e}")
             return {'error': '获取失败'}, 500
-        
+
+
+@ns.route('/alert_videos')
+class AlertVideos(Resource):
+    def get(self):
+        try:
+            videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
+            data = [video.to_dict() for video in videos]
+            return data
+        except Exception as e:
+            logger.error(f"获取路面灾害告警信息失败: {e}")
+            return {'error': '获取失败'}, 500
+
+
+
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
