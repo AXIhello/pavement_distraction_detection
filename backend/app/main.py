@@ -282,7 +282,7 @@ def log_response_info(response):
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
@@ -295,3 +295,28 @@ if __name__ == '__main__':
 
     # 使用 SocketIO 启动服务器
     socketio.run(app, host='127.0.0.1', port=8000, debug=False)
+
+    from flask import request, g, jsonify, current_app
+    import jwt
+
+
+    @app.before_request
+    def load_user_from_token():
+        auth_header = request.headers.get('Authorization', None)
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == 'bearer':
+                token = parts[1]
+                try:
+                    # 用你自己的密钥和算法解码
+                    payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+                    # 假设token里有 user_id 字段
+                    g.user_id = payload.get('user_id')
+                except jwt.ExpiredSignatureError:
+                    return jsonify({'success': False, 'message': 'Token已过期'}), 401
+                except jwt.InvalidTokenError:
+                    return jsonify({'success': False, 'message': '无效的Token'}), 401
+            else:
+                g.user_id = None
+        else:
+            g.user_id = None

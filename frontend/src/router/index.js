@@ -31,36 +31,37 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+//先全部放行
+// router.beforeEach((to, from, next) => {
+//   const token = localStorage.getItem('token')
 
-  // 如果需要登录但没token，跳登录页
-  if (to.meta.requiresAuth && !token) {
-    return next({ name: 'Login' })
-  }
+//   // 如果需要登录但没token，跳登录页
+//   if (to.meta.requiresAuth && !token) {
+//     return next({ name: 'Login' })
+//   }
 
-  let userRole = null
-  if (token) {
-    try {
-      const decoded = jwtDecode(token)  // ✅ 此处修复
-      userRole = decoded.role
-    } catch (err) {
-      localStorage.removeItem('token')
-      return next({ name: 'Login' })
-    }
-  }
+//   let userRole = null
+//   if (token) {
+//     try {
+//       const decoded = jwtDecode(token)  // ✅ 此处修复
+//       userRole = decoded.role
+//     } catch (err) {
+//       localStorage.removeItem('token')
+//       return next({ name: 'Login' })
+//     }
+//   }
 
-  // 管理员专属页面拦截
-  if ((to.path === '/admin' || to.path === '/log') && userRole !== 'admin') {
-    return next({ name: 'Home' }) // 非管理员跳回首页
-  }
+//   // 管理员专属页面拦截
+//   if ((to.path === '/admin' || to.path === '/log') && userRole !== 'admin') {
+//     return next({ name: 'Home' }) // 非管理员跳回首页
+//   }
 
-  // 已登录用户禁止访问登录页
-  if (to.name === 'Login' && token) {
-    return next({ name: 'Home' })
-  }
+//   // 已登录用户禁止访问登录页
+//   if (to.name === 'Login' && token) {
+//     return next({ name: 'Home' })
+//   }
 
-  next()
-})
+//   next()
+// })
 
 export default router
