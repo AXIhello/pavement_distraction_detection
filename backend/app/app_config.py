@@ -3,8 +3,14 @@ import os
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
 
+    # JWT配置
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'your-jwt-secret-key'
+    JWT_TOKEN_LOCATION = ['headers']
+    JWT_HEADER_NAME = 'Authorization'
+    JWT_HEADER_TYPE = 'Bearer'
+
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123@localhost:3306/test_db'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:000000@localhost:3306/test_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # 邮件验证码发送邮箱配置

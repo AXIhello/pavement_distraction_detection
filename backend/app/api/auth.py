@@ -209,7 +209,29 @@ class UserRegister(Resource):
 
         create_user(username,email,password)
         return {'success': True, 'message': '注册成功'}
-        
+    
+
+# 显示当前用户信息
+from app.core.security import token_required  # ✅ 导入装饰器
+@ns.route('/me')
+class UserMe(Resource):
+    @ns.doc('获取当前用户信息')
+    @token_required
+    def get(self):
+        user = g.user
+
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+
+        return {
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role
+            }
+        }
 # 你可能还会有注册、刷新token等其他接口
 # @ns.route('/register')
 # class UserRegister(Resource):
