@@ -108,7 +108,7 @@ class UserLogin(Resource):
         # 已更换为数据库查询
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):  # 这里建议改成密码哈希校验
-            access_token = create_jwt_token(user.id)
+            access_token = create_jwt_token(user)
             return {
                 'success': True,
                 'message': '登录成功',
@@ -168,7 +168,7 @@ class LoginWithEmailCode(Resource):
         if not user:
             return {'success': False, 'message': '用户不存在'}, 404
 
-        token = create_jwt_token(user.id)
+        token = create_jwt_token(user)
         return {
             'success': True,
             'message': '登录成功',
