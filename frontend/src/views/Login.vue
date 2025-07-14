@@ -157,7 +157,7 @@
 <script setup>
 import { ref } from 'vue'
 import map from '@/assets/images/map.png'
-
+import { jwtDecode } from 'jwt-decode'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -278,8 +278,18 @@ async function handleLogin() {
         message.value = res.data.message
         messageColor.value = 'green'
 
-        // 保存 token 
-        localStorage.setItem('token', res.data.access_token)
+ const token = res.data.access_token
+  localStorage.setItem('token', token)
+
+  // 🔥 解码 token，获取角色信息
+  const decoded = jwtDecode(token)
+  const userInfo = {
+    id: decoded.user_id,
+    username: decoded.username,
+    role: decoded.role  // ← 确保你的后端 token 里有这一项
+  }
+
+  localStorage.setItem('userInfo', JSON.stringify(userInfo))
 
         // 跳转页面
         router.push('/first_page')
