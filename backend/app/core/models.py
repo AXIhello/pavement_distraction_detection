@@ -34,13 +34,9 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default='user')  # 用户角色（如 admin, user 等）
+    role = db.Column(db.String(50), default='admin')  # 用户角色（如 admin, user 等）
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # 关联上传的视频
-    alert_videos = db.relationship('AlertVideo', backref='user', lazy=True)
-    face_alert_videos = db.relationship('FaceAlertVideo', backref='user', lazy=True)
 
     def set_password(self, password):
         self.password = generate_password_hash(password)
@@ -102,7 +98,6 @@ class AlertVideo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     video_name = db.Column(db.String(255), nullable=False)  # 原始视频名称
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     save_dir = db.Column(db.String(512), nullable=False)  # 病害图像保存目录
     total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
     alert_frame_count = db.Column(db.Integer, nullable=False)  # 病害帧数量
@@ -114,7 +109,6 @@ class AlertVideo(db.Model):
         return {
             'id': self.id,
             'video_name': self.video_name,
-            'user_id': self.user_id,
             'save_dir': self.save_dir,
             'disease_type':'未知',
             'total_frames': self.total_frames,
@@ -151,7 +145,6 @@ class FaceAlertVideo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     video_name = db.Column(db.String(255), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     save_dir = db.Column(db.String(512), nullable=False)
     total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
     alert_frame_count = db.Column(db.Integer, nullable=False)
@@ -162,8 +155,7 @@ class FaceAlertVideo(db.Model):
     def to_dict(self):
         return {            
             'id': self.id,            
-            'video_name': self.video_name,            
-            'user_id': self.user_id,                        
+            'video_name': self.video_name,                                
             'save_dir': self.save_dir,            
             'total_frames': self.total_frames,                        
             'alert_frame_count': self.alert_frame_count,

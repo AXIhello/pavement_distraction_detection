@@ -19,7 +19,6 @@ def create_alert_video(db_type: str, video_name: str, save_dir: str, total_frame
 
     video = VideoModel(
         video_name=video_name,
-        user_id=user_id,
         save_dir=save_dir,
         total_frames=total_frames,
         alert_frame_count=alert_frame_count,
