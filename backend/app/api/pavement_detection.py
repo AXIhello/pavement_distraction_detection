@@ -140,7 +140,7 @@ def get_pavement_socketio_handlers():
                 if(len(result.get('detections', [])) > 0):
                     alert_count += 1
                     # 保存检测结果到数据库
-                    save_alert_frame('road',video_id, frame_index+1, image_data, result['detections'][0]['confidence'], result['detections'][0]['class'],bboxes=[d['bbox'] for d in result['detections']])
+                    save_alert_frame('road',video_id, frame_index+1, result['annotated_image'], result['detections'][0]['confidence'], result['detections'][0]['class'],bboxes=[d['bbox'] for d in result['detections']])
             else:
                 logger.warning(f"视频帧检测失败: {result.get('message')}")
             

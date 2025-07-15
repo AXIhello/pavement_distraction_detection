@@ -4,3 +4,4 @@ node_modules
 __pycache__/
 venv310/
 backend/data/data_dlib
+backend/data/alert_videos
