@@ -146,24 +146,14 @@ class FaceRecognition(Resource):
                 # 1️. 自动生成保存路径
                 now = datetime.now()
                 timestamp = now.strftime('%Y%m%d_%H%M%S')
-                save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
-                save_dir.mkdir(parents=True, exist_ok=True)
+                save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
 
-                # 2. 人脸告警视频
-                video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 1, 1, user_id=None) # none为用户 后续关联
-
-                # 3. 人脸告警帧
-                bbox = [
-                        recognition_results[0]['bbox'].get('left', 0),
-                        recognition_results[0]['bbox'].get('top', 0),
-                        recognition_results[0]['bbox'].get('right', 0),
-                        recognition_results[0]['bbox'].get('bottom', 0)
-                    ]
+                # 2. 人脸告警帧
                 distance = recognition_results[0].get("distance")
                 if distance is None:
                     distance = 0  # 或者其他合理默认值
                 confidence = 1 - distance
-                save_alert_frame('face', video_id, 1, image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),bboxes=[bbox])
+                save_alert_frame('face', image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),save_dir=str(save_dir))
 
             return {
                 'success': True,

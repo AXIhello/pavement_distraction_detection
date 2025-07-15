@@ -6,7 +6,7 @@ from flask import request, g
 from ..services.logging_service import LoggingService
 # 导入你的日志器
 from ..utils.logger import get_logger
-from ..core.models import AlertVideo, FaceAlertVideo, db, AlertFrame, FaceAlertFrame
+from ..core.models import AlertVideo, db, AlertFrame, FaceAlertFrame
 import shutil, os
 from functools import wraps
 from flask import jsonify
@@ -155,7 +155,7 @@ class AlertDeleteV2(Resource):
         if alert_type == 'road':
             alert = AlertVideo.query.get(alert_id)
         elif alert_type == 'face':
-            alert = FaceAlertVideo.query.get(alert_id)
+            alert = FaceAlertFrame.query.get(alert_id)
         else:
             return {'success': False, 'message': '未知告警类型'}, 400
         if not alert:
@@ -202,7 +202,7 @@ class AlertVideos(Resource):
 class FaceAlertFrames(Resource):    
     def get(self):
         try:
-            frames = FaceAlertVideo.query.order_by(FaceAlertVideo.created_at.desc()).all()
+            frames = FaceAlertFrame.query.order_by(FaceAlertFrame.created_at.desc()).all()
             data = [frame.to_dict() for frame in frames]
             return data
         except Exception as e:
@@ -248,7 +248,7 @@ class AlertVideoDetail(Resource):
     def get(self, video_id):
         try:
             # 查询视频信息
-            video = FaceAlertVideo.query.get(video_id)
+            video = FaceAlertFrame.query.get(video_id)
             if not video:
                 return {'error': '未找到对应视频'}, 404
 
