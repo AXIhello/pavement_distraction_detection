@@ -1,6 +1,6 @@
 # 认证相关接口
 # backend/app/api/auth.py
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource, fields,marshal
 from ..core.models import User, find_user_by_username, find_user_by_email, create_user
 from ..core.security import create_jwt_token
 from flask import current_app, Blueprint, request, jsonify, g
@@ -66,26 +66,21 @@ class UserDetail(Resource):
             return {'success': False, 'message': '用户不存在'}, 404
         return user
 
-    @user_ns.marshal_with(user_model)
     @admin_required
     def put(self, user_id):
         data = request.json
         user = User.query.get(user_id)
         if not user:
             return {'success': False, 'message': '用户不存在'}, 404
+        
         user.username = data.get('name', user.username)
         user.email = data.get('email', user.email)
         user.role = data.get('role', user.role)
         db.session.commit()
-        return {
-            'success': True,
-            'data': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'role': user.role
-            }
-        }, 200
+
+        # 手动序列化 user 数据
+        user_data = marshal(user, user_model)
+        return {'success': True, 'data': user_data}, 200
 
     @admin_required
     def delete(self, user_id):

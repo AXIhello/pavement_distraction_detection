@@ -228,7 +228,7 @@
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token  // ⬅️ 关键：加上这个
+          'Authorization': 'Bearer ' + token  
         },
         body: JSON.stringify({
           name: user.editedName,
