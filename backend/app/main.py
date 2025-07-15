@@ -42,7 +42,10 @@ else:
 
 app = Flask(__name__)
 app.config.from_object(config_class)
-CORS(app)  # 允许跨域请求
+app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'your_secret_key')
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # 必须是 None 才能跨域传 Cookie
+app.config['SESSION_COOKIE_SECURE'] = True      # 必须是 True 才能在 https 下发送 Cookie
+CORS(app, supports_credentials=True, origins=["http://localhost:5173","http://127.0.0.1:5173"])  # 只允许localhost
 
 db.init_app(app)
 
@@ -99,7 +102,6 @@ api = Api(app,
 
 # 导入并注册 API 命名空间
 from .api.auth import ns as auth_ns
-from .api.auth import user_ns
 from .api.face_recognition import ns as face_ns
 from .api.pavement_detection import ns as pavement_ns, get_pavement_socketio_handlers
 from .api.traffic_analysis import ns as traffic_ns
@@ -109,7 +111,6 @@ api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
-api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 
 # 获取路面检测的Socket.IO处理器
@@ -262,8 +263,7 @@ def load_user_from_token():
                 g.user = {
                     "id": user.id,
                     "username": user.username,
-                    "role": user.role,
-                    "email":user.email
+                    "role": user.role
                 }
             else:
                 g.user = None
@@ -303,7 +303,7 @@ def handle_liveness_detection(data):
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
@@ -319,6 +319,7 @@ if __name__ == '__main__':
 
     from flask import request, g, jsonify, current_app
     import jwt
+
 
     @app.before_request
     def load_user_from_token():

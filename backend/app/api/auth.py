@@ -3,10 +3,13 @@
 from flask_restx import Namespace, Resource, fields
 from ..core.models import User, find_user_by_username, find_user_by_email, create_user
 from ..core.security import create_jwt_token
-from flask import current_app, Blueprint, request, jsonify, g
+from flask import current_app, Blueprint, request, jsonify, g, session, send_file, make_response
 from ..utils.email_service import send_email_code, verify_email_code
 from functools import wraps
 from ..extensions import db
+import random, string, io
+from captcha.image import ImageCaptcha
+from datetime import datetime
 
 # 权限校验装饰器
 # 你应该改为 返回字典 + 状态码，而不是 Flask 的 jsonify。Flask-RESTx 会自动处理 JSON 序列化。
@@ -91,7 +94,8 @@ ns = Namespace('auth', description='认证相关操作')
 # 认证模型 (例如，用于登录请求体)
 login_model = ns.model('Login', {
     'username': fields.String(required=True, description='用户名'),
-    'password': fields.String(required=True, description='密码')
+    'password': fields.String(required=True, description='密码'),
+    'captcha': fields.String(required=True, description='验证码')
 })
 
 login_response_model = ns.model('LoginResponse', {
@@ -113,11 +117,21 @@ class UserLogin(Resource):
         data = ns.payload
         username = data.get('username')
         password = data.get('password')
+        captcha = data.get('captcha')
+
+        # 校验验证码
+        code = session.get('captcha_code')
+
+        if not code:
+            return {'success': False, 'message': '验证码已过期，请刷新验证码'}, 400
+        if not captcha or captcha.upper() != code:
+            return {'success': False, 'message': '验证码错误'}, 400
+        # 验证通过后清除验证码，防止重用
+        session.pop('captcha_code', None)
 
         # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
-        # 已更换为数据库查询
         user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):  # 这里建议改成密码哈希校验
+        if user and user.check_password(password):
             access_token = create_jwt_token(user)
             return {
                 'success': True,
@@ -248,3 +262,18 @@ class UserMe(Resource):
 #    ...
 
 # ... 其他认证相关的Resource ...
+
+@ns.route('/captcha')
+class Captcha(Resource):
+    def get(self):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        session['captcha_code'] = code
+        # session.modified = True  # 可选，强制刷新session
+        image = ImageCaptcha(width=120, height=40, font_sizes=[28, 32, 36])
+        data = image.generate(code)
+        buf = io.BytesIO()
+        buf.write(data.read())
+        buf.seek(0)
+        response = make_response(send_file(buf, mimetype='image/png'))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
