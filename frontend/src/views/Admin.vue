@@ -160,6 +160,7 @@
             editedAccount: user.email,
             editedPhone: user.phone || ''
         }))
+        allUsers.value = [...users.value] // 保存所有用户数据以便搜索
       } else {
         console.error('获取用户数据失败:', data.message)
       }
@@ -184,9 +185,11 @@
     users.value = allUsers.value.filter(user => {
       switch (searchType.value) {
         case 'name':
-          return user.username.toLowerCase().includes(query)
+          return user.name.toLowerCase().includes(query)
         case 'account':
-          return user.email.toLowerCase().includes(query)
+          return user.account.toLowerCase().includes(query)
+        case 'phone':
+          return user.role.toLowerCase().includes(query)
         default:
           return true
       }
@@ -257,8 +260,11 @@
   async function deleteUser() {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${userToDelete.value.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${userToDelete.value.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        }
       })
       
       const data = await response.json()
