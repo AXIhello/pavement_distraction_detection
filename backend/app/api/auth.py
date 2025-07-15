@@ -14,7 +14,12 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = getattr(g, 'user', None)
-        if not user or user.get('role') != 'admin':
+        if not user:
+            print("未登录或未获取到用户信息")
+            return {'success': False, 'message': '未登录'}, 401
+        role = user.get('role')
+        if role != 'admin':
+            print("权限不足，当前角色：", role)
             return {'success': False, 'message': '无权限，管理员专用'}, 403
         return f(*args, **kwargs)
     return decorated_function
@@ -40,7 +45,7 @@ user_list_response = user_ns.model('UserListResponse', {
 
 @user_ns.route('/')
 class UserList(Resource):
-    # @admin_required
+    @admin_required
     @user_ns.marshal_with(user_list_response)
     def get(self):
         users = User.query.all()
@@ -68,11 +73,19 @@ class UserDetail(Resource):
         user = User.query.get(user_id)
         if not user:
             return {'success': False, 'message': '用户不存在'}, 404
-        user.username = data.get('username', user.username)
+        user.username = data.get('name', user.username)
         user.email = data.get('email', user.email)
         user.role = data.get('role', user.role)
         db.session.commit()
-        return user
+        return {
+            'success': True,
+            'data': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role
+            }
+        }, 200
 
     @admin_required
     def delete(self, user_id):

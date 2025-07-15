@@ -220,22 +220,25 @@
   
   async function saveEdit(user) {
     try {
-      // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${user.id}`, {
+      const token = localStorage.getItem('token')  // 从 localStorage 读取 JWT Token
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token  // ⬅️ 关键：加上这个
+        },
         body: JSON.stringify({
           name: user.editedName,
-          account: user.editedAccount,
-          phone: user.editedPhone
+          email: user.editedAccount,
+          role: user.editedPhone
         })
       })
       
       const data = await response.json()
       if (data.success) {
-        user.name = user.editedName
-        user.account = user.editedAccount
-        user.phone = user.editedPhone
+        user.name = data.data.username
+        user.account = data.data.email
+        user.role = data.data.role
         user.isEditing = false
       } else {
         console.error('更新用户信息失败:', data.message)
