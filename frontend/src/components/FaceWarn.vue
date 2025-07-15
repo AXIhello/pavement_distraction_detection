@@ -172,6 +172,8 @@ function viewDetails(item) {
 function backToList() {
   selectedItem.value = null
   detailData.value = null
+  // 重新拉取数据刷新列表
+  fetchData()
 }
 
 function clearFilters() {

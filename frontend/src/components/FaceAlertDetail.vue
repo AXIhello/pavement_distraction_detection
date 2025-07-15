@@ -64,14 +64,17 @@ async function confirmDelete() {
   const confirmed = window.confirm('确定要删除该告警帧吗？此操作不可撤销。')
   if (!confirmed) return
 
-  try {
-    await axios.delete(`http://localhost:8000/api/face_alert_frames/${props.detail.id}`)
-    alert('删除成功')
-    emit('back')
-  } catch (e) {
-    console.error('删除失败', e)
-    alert('删除失败，请稍后重试')
-  }
+try {
+  const token = localStorage.getItem('token');
+  await axios.delete(`http://localhost:8000/api/logs_alerts/face_alert_frames/${props.detail.id}`,
+     { headers: { Authorization: `Bearer ${token}` } }
+  )
+  alert('删除成功')
+  emit('back')
+} catch (e) {
+  console.error('删除失败', e)
+  alert('删除失败，请稍后重试')
+}
 }
 
 watch(() => props.detail?.image_url, (newVal) => {

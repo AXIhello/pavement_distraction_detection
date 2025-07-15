@@ -266,5 +266,26 @@ class AlertVideoDetail(Resource):
             return data
         except Exception as e:
             logger.error(f"获取人脸告警视频详情失败: {e}")
-            return {'error': '获取失败'}, 500    
+            return {'error': '获取失败'}, 500
+
+# 删除告警帧
+@ns.route('/face_alert_frames/<int:frame_id>')
+class FaceAlertFrameDelete(Resource):
+    @admin_required
+    def delete(self, frame_id):
+        frame = FaceAlertFrame.query.get(frame_id)
+        if not frame:
+            return {'success': False, 'message': '告警帧不存在'}, 404
+
+        try:
+            # 如果有对应的本地缓存文件需要删除，也可在这里做
+            if frame.image_path and os.path.exists(frame.image_path):
+                os.remove(frame.image_path)
+        except Exception as e:
+            return {'success': False, 'message': f'删除文件失败: {str(e)}'}, 500
+
+        db.session.delete(frame)
+        db.session.commit()
+        return {'success': True, 'message': '告警帧已删除'}
+
         
