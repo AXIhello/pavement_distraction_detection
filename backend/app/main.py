@@ -46,7 +46,16 @@ app.config.from_object(config_class)
 app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'your_secret_key')
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # 必须是 None 才能跨域传 Cookie
 app.config['SESSION_COOKIE_SECURE'] = True      # 必须是 True 才能在 https 下发送 Cookie
-CORS(app, supports_credentials=True, origins=["http://localhost:5173","http://127.0.0.1:5173"],expose_headers='Authorization', allow_headers=['Content-Type', 'Authorization'])
+
+import re
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[re.compile(r"^http://localhost:\d+$"), re.compile(r"^http://127\.0\.0\.1:\d+$")],
+    expose_headers='Authorization',
+    allow_headers=['Content-Type', 'Authorization']
+)
 
 db.init_app(app)
 
@@ -112,7 +121,6 @@ api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
-api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 
 # 获取路面检测的Socket.IO处理器
