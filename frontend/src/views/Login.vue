@@ -51,6 +51,12 @@
                   v-model="password" 
                   required />
               </div>
+
+              <div class="form-group code-group">
+                <label for="captcha">验证码</label>
+                <input type="text" id="captcha" v-model="captcha" maxlength="4" required autocomplete="off" />
+                <img :src="captchaImgUrl" @click="refreshCaptcha" alt="验证码" style="cursor:pointer;height:40px;border-radius:4px;border:1px solid #ccc;" title="点击刷新验证码" />
+              </div>
             </div>
 
             <div v-else-if="loginMethod === 'sms'">
@@ -188,7 +194,11 @@ const regConfirmPassword = ref('')
 const regMessage = ref('')
 const regMessageColor = ref('red')
 
-
+const captcha = ref('')
+const captchaImgUrl = ref('http://127.0.0.1:8000/api/auth/captcha?'+Date.now())
+function refreshCaptcha() {
+  captchaImgUrl.value = 'http://127.0.0.1:8000/api/auth/captcha?' + Date.now()
+}
 
 
 //验证邮箱格式
@@ -271,7 +281,8 @@ async function handleLogin() {
     try {
       const res = await http.post('/auth/login', {
         username: account.value,
-        password: password.value
+        password: password.value,
+        captcha: captcha.value
       })
 
       if (res.data.success) {

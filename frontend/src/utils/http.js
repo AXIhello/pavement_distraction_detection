@@ -5,6 +5,7 @@ const http = axios.create({
   baseURL: 'http://127.0.0.1:8000/api', 
 
   timeout: 5000,
+  withCredentials: true // 关键，所有请求都带cookie
 })
 
 // 请求拦截器：自动加 token

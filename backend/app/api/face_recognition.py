@@ -283,17 +283,18 @@ class MyFaces(Resource):
             return {'success': False, 'message': '未登录'}, 401
         # 查询该用户所有人脸图片
         features = FaceFeature.query.filter_by(user_id=user['id']).all()
-        # 返回图片路径列表
-        image_urls = []
+        # 返回图片对象列表（包含id和url）
+        image_objs = []
         for f in features:
             if f.image_path:
-                # 转为静态资源URL（假设你用 Flask 静态服务）
-                # 只取 image_path 相对路径部分
                 rel_path = f.image_path.replace("\\", "/")
                 if rel_path.startswith("data/"):
                     rel_path = rel_path[5:]
-                image_urls.append(f"/static/{rel_path}")
+                image_objs.append({
+                    'id': f.id,
+                    'url': f"/static/{rel_path}"
+                })
         return {
             'success': True,
-            'images': image_urls
+            'images': image_objs
         }

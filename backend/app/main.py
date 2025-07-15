@@ -43,7 +43,19 @@ else:
 
 app = Flask(__name__,static_folder=None)
 app.config.from_object(config_class)
-CORS(app, supports_credentials=True, expose_headers='Authorization', allow_headers=['Content-Type', 'Authorization'])
+app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'your_secret_key')
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # 必须是 None 才能跨域传 Cookie
+app.config['SESSION_COOKIE_SECURE'] = True      # 必须是 True 才能在 https 下发送 Cookie
+
+import re
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[re.compile(r"^http://localhost:\d+$"), re.compile(r"^http://127\.0\.0\.1:\d+$")],
+    expose_headers='Authorization',
+    allow_headers=['Content-Type', 'Authorization']
+)
 
 db.init_app(app)
 
@@ -100,7 +112,6 @@ api = Api(app,
 
 # 导入并注册 API 命名空间
 from .api.auth import ns as auth_ns
-from .api.auth import user_ns
 from .api.face_recognition import ns as face_ns
 from .api.pavement_detection import ns as pavement_ns, get_pavement_socketio_handlers
 from .api.traffic_analysis import ns as traffic_ns
@@ -110,7 +121,6 @@ api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
-api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 
 # 获取路面检测的Socket.IO处理器
@@ -364,7 +374,7 @@ if __name__ == '__main__':
                             "username": user.username,   # 假设 User 表有 username 字段
                             "role": user.role,           # 假设 User 表有 role 字段
                             "email": user.email          # 假设 User 表有 email 字段
-                        }   
+                        }
                 except jwt.ExpiredSignatureError:
                     return jsonify({'success': False, 'message': 'Token已过期'}), 401
                 except jwt.InvalidTokenError:
