@@ -12,8 +12,11 @@
       <div class="info-item">
         <strong>已录入人脸照片</strong><br />
         <div v-if="faceImages.length">
-            <div v-for="(img, idx) in faceImages" :key="img.id" style="display:inline-block; margin-right:10px;">
+            <div v-for="(img, idx) in faceImages" :key="img.id" style="display:inline-block; margin-right:10px; text-align: center;">
             <img :src="img.url" alt="人脸照片" class="face-image" />
+            <br/>
+            <span>{{ img.name }}</span>
+            <br/>
             <button @click="deleteFace(img.id)">删除</button>
             </div>
         </div>
@@ -61,7 +64,8 @@ async function fetchFaceImages() {
   if (faceData.success) {
     faceImages.value = faceData.images.map(img => ({
       id: img.id,
-      url: 'http://127.0.0.1:8000' + img.url
+      url: 'http://127.0.0.1:8000' + img.url,
+      name: img.name
     }))
   }
 }
