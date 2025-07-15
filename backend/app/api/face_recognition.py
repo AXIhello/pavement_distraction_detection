@@ -3,7 +3,7 @@ from flask import request, current_app, g
 import logging
 from ..core.models import FaceFeature, db
 from functools import wraps
-from ..services.alert_service import create_alert_video, save_alert_frame
+from ..services.alert_service import save_alert_frame
 from datetime import datetime
 from pathlib import Path
 

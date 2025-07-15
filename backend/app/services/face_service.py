@@ -12,7 +12,10 @@ import tensorflow as tf
 from .face_db_service import FaceDatabaseService
 # 获取日志器
 logger = logging.getLogger(__name__)
-
+# 告警
+from .alert_service import save_alert_frame
+from datetime import datetime
+from pathlib import Path
 
 class FaceRecognitionService:
     def __init__(self, app_config_data):
@@ -246,6 +249,18 @@ class FaceRecognitionService:
                         # 如果是DeepFake，直接返回deepfake身份
                         recognized_name = "deepfake"
                         logger.warning(f"!!! DeepFake警告: 概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
+                        # 写入告警模块
+                        # 自动生成保存路径
+                        now = datetime.now()
+                        timestamp = now.strftime('%Y%m%d_%H%M%S')
+                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+
+                        face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
+                        _, buffer = cv2.imencode('.jpg', face_img_bgr)
+                        image_bytes = base64.b64encode(buffer).decode('utf-8')
+                        # 人脸告警帧
+                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=fake_prob,disease_type="deepfake",save_dir=str(save_dir))
+
                     else:
                         # 如果不是DeepFake，进行正常的人脸识别
                         # 遍历已知人脸库进行比对
@@ -258,11 +273,23 @@ class FaceRecognitionService:
                                         recognized_name = self.face_name_known_list[j]
                                     else:
                                         recognized_name = "陌生人"
+                                        # 写入告警模块
+                                        # 自动生成保存路径
+                                        now = datetime.now()
+                                        timestamp = now.strftime('%Y%m%d_%H%M%S')
+                                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+                                        face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
+                                        _, buffer = cv2.imencode('.jpg', face_img_resized)
+                                        image_bytes = base64.b64encode(buffer).decode('utf-8')
+                                        # 人脸告警帧
+                                        distance = round(min_dist, 3) if min_dist != float('inf') else None
+                                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=distance,disease_type="陌生人",save_dir=str(save_dir))
+
 
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
-                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,
+                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,  
                         "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()}
                     })
                     logger.info(
