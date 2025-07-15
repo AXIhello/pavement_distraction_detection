@@ -299,3 +299,15 @@ class MyFaces(Resource):
             'success': True,
             'images': image_objs
         }
+
+@ns.route('/user_faces/<int:user_id>')
+class UserFaces(Resource):
+    def get(self, user_id):
+        """根据user_id查询该用户所有人脸信息（face_id和name）"""
+        from ..core.models import FaceFeature
+        features = FaceFeature.query.filter_by(user_id=user_id).all()
+        result = [
+            {'face_id': f.id, 'name': f.name}
+            for f in features
+        ]
+        return {'success': True, 'faces': result}
