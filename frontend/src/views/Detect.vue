@@ -235,6 +235,11 @@ const mode = ref('upload') // 上传 或 录制
 
 const readyToShowResults = ref(false)
 
+ //容错处理（后端未返回全部数据）
+let fallbackTimer = null
+let fallbackTriggered = false
+
+
 
 const videoFile = ref(null)
 const videoURL = ref('')
@@ -470,6 +475,16 @@ function startAnalysis() {
   return alert('视频尚未加载完成，请稍等片刻')
 }
 
+// 当收到的帧与发送过去的不符时
+function forceShowResults() {
+  processing.value = false
+  readyToShowResults.value = true
+  showCompleteNotice.value = true
+  setTimeout(() => {
+    showCompleteNotice.value = false
+  }, 3000)
+}
+
 
 
   processing.value = true
@@ -490,11 +505,30 @@ function startAnalysis() {
 
   socket.on('connect', () => {
     extractFramesOffline()
+
+    socket.on('connect', () => {
+  extractFramesOffline()
+
+  // fallback 定时器：3 秒后如果没有任何帧，强制展示结果
+  fallbackTimer = setTimeout(() => {
+    if (!fallbackTriggered && frameResults.value.length === 0) {
+      console.warn('3秒未收到帧，执行容错逻辑')
+      fallbackTriggered = true
+      forceShowResults()
+    }
+  }, 3000)
+})
+
   })
 
  const analysisCompleted = ref(false)
 
 socket.on('frame_result', (result) => {
+  //收到便清除
+  if (fallbackTimer) {
+    clearTimeout(fallbackTimer)
+    fallbackTimer = null
+  }
   const { frame_index, annotated_image, detections } = result
 
   // 累加 detection 信息
