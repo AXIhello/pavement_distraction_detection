@@ -41,6 +41,15 @@ else:
     config_class = DevelopmentConfig
 
 app = Flask(__name__)
+
+from flask import send_from_directory
+
+# 静态资源访问配置：映射 /data/** 到 backend/data 目录
+@app.route('/data/<path:filename>')
+def serve_data(filename):
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+    return send_from_directory(root_dir, filename)
+
 app.config.from_object(config_class)
 CORS(app, supports_credentials=True, expose_headers='Authorization', allow_headers=['Content-Type', 'Authorization'])
 
@@ -114,7 +123,6 @@ api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()
-
 
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')

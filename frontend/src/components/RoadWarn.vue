@@ -2,11 +2,16 @@
   <div class="table-wrapper">
   <div class="title">路面灾害告警</div>
     <!-- 独立的状态切换按钮组 -->
-     <RoadAlertDetail
-  v-if="selectedItem"
-  :detail="detailData"
-  @back="backToList"
-/>
+<!-- 弹窗形式展示细节-->
+<div v-if="selectedItem" class="modal-overlay" @click.self="backToList">
+  <div class="modal-content">
+    <RoadAlertDetail
+      :detail="detailData"
+      @back="backToList"
+    />
+  </div>
+</div>
+
 <div v-else>
     <div class="status-toggle">
       <button
@@ -175,8 +180,18 @@ async function viewDetails(item) {
   try {
     const res = await axios.get(`http://localhost:8000/api/logs_alerts/alert_video_detail/${item.id}`) // 用视频ID请求详情
     detailData.value = res.data
+    
+    //打印图片链接以调试
+     if (res.data.frames && res.data.frames.length) {
+      res.data.frames.forEach((frame, idx) => {
+        console.log(`第${idx + 1}帧图片链接:`, frame.image_url)
+      })
+    } else {
+      console.log('没有帧图片链接数据')
+    }
+    
     selectedItem.value = item
-  } catch (e) {
+  } catch (e) {viewD
     errorDetail.value = '获取详情失败，请稍后重试'
     console.error('获取详情失败', e)
     alert('获取详情失败，请稍后重试')
@@ -202,6 +217,44 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 弹窗遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5); /* 半透明背景 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* 弹窗内容容器 */
+.modal-content {
+  background-color: transparent;
+  border-radius: 0;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  box-shadow: none;
+}
+
+
+/* 弹窗动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .table-wrapper {
   position: relative;
   margin-top: 20px;
