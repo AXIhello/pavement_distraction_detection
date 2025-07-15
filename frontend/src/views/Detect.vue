@@ -475,17 +475,30 @@ function startAnalysis() {
   })
 
   socket.on('frame_result', (result) => {
-    if (result?.annotated_image) {
-      frameResults.value.push({
-        image: `data:image/jpeg;base64,${result.annotated_image}`,
-        detections: result.detections || []
-      })
+  const { frame_index, annotated_image, detections } = result
+
+  if (typeof frame_index === 'number' && annotated_image) {
+    const frameData = {
+      frame_index,
+      image: `data:image/jpeg;base64,${annotated_image}`,
+      detections: detections || []
     }
 
-    if (result?.detections) {
-      allDetections.value.push(...result.detections)
+    // 检查是否已存在该帧，防止重复
+    const exists = frameResults.value.some(f => f.frame_index === frame_index)
+    if (!exists) {
+      frameResults.value.push(frameData)
+
+      // 排序：确保按 frame_index 从小到大排列
+      frameResults.value.sort((a, b) => a.frame_index - b.frame_index)
     }
-  })
+  }
+
+  if (detections) {
+    allDetections.value.push(...detections)
+  }
+})
+
 
   socket.on('stream_complete', () => {
     processing.value = false
@@ -548,7 +561,9 @@ function extractFramesOffline() {
             () => {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
               const base64 = canvas.toDataURL('image/jpeg', 1.0)
-              socket.emit('video_frame', { image: base64 })
+              socket.emit('video_frame', { 
+                frame_index: processedFrames.value,
+                image: base64 })
 
               processedFrames.value++
               currentTime += frameInterval

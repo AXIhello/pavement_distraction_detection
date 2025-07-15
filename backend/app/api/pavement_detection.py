@@ -103,6 +103,7 @@ def get_pavement_socketio_handlers():
         logger.info("开始处理视频帧...")
 
         image_data = data.get('image')
+        frame_index = data.get('frame_index')
         if not image_data:
             logger.error("视频帧图像数据为空。")
             emit('frame_result', {'status': 'error', 'message': '图像数据为空', 'detections': [], 'annotated_image': None})
@@ -126,6 +127,8 @@ def get_pavement_socketio_handlers():
             frame_count += 1     # 帧计数
             # 调用服务层进行单帧图像检测
             result = detect_single_image(image_data)
+            if frame_index is not None:
+                result['frame_index'] = frame_index
 
             # 根据detect_single_image的返回结果发送给客户端
             emit('frame_result', result)
@@ -148,10 +151,10 @@ def get_pavement_socketio_handlers():
     def handle_video_stream_end(data: dict):
         """
         处理视频流结束信号。
-        通知客户端视频处理已完成。
+        之前会通知客户端视频处理已完成，现在不再发送stream_complete信号，由前端自行判断。
         """
         logger.info('收到视频流结束信号，视频流处理完成。')
-        emit('stream_complete', {'message': '视频处理完成'})
+        # emit('stream_complete', {'message': '视频处理完成'})  # 已删除
 
     return {
         'video_frame': handle_video_frame,
