@@ -255,9 +255,55 @@ class UserMe(Resource):
                 'role': user.role
             }
         }
-# 你可能还会有注册、刷新token等其他接口
-# @ns.route('/register')
-# class UserRegister(Resource):
-#    ...
+# 修改用户名（唯一）
+@ns.route('/change_username')
+class ChangeUsername(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        new_username = data.get('new_username')
+        if not new_username:
+            return {'success': False, 'message': '新用户名不能为空'}, 400
+        from ..core.models import User
+        if User.query.filter_by(username=new_username).first():
+            return {'success': False, 'message': '用户名已存在'}, 400
+        user.username = new_username
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '用户名修改成功'}
 
-# ... 其他认证相关的Resource ...
+# 修改密码（邮箱验证码）
+@ns.route('/change_password')
+class ChangePassword(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        code = data.get('code')
+        new_password = data.get('new_password')
+        if not code or not new_password:
+            return {'success': False, 'message': '验证码和新密码不能为空'}, 400
+        from ..utils.email_service import verify_email_code
+        if not verify_email_code(user.email, code):
+            return {'success': False, 'message': '验证码无效或已过期'}, 400
+        user.set_password(new_password)
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '密码修改成功'}
+
+# 删除自己的人脸信息（放在 face_recognition.py 里更合适，但这里先实现）
+@ns.route('/delete_face/<int:face_id>')
+class DeleteFace(Resource):
+    @token_required
+    def delete(self, face_id):
+        user = g.user
+        from ..core.models import FaceFeature
+        from ..extensions import db
+        feature = FaceFeature.query.get(face_id)
+        if not feature or feature.user_id != user.id:
+            return {'success': False, 'message': '无权限或人脸不存在'}, 403
+        db.session.delete(feature)
+        db.session.commit()
+        return {'success': True, 'message': '人脸信息已删除'}
+# ... existing code ...
