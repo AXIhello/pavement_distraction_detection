@@ -19,11 +19,11 @@
       <div class="auth-container">
         <!-- 主标签页 -->
         <div class="main-tabs">
-          <button 
-            :class="{ active: mainTab === 'login' }" 
+          <button
+            :class="{ active: mainTab === 'login' }"
             @click="mainTab = 'login'">登录</button>
-          <button 
-            :class="{ active: mainTab === 'register' }" 
+          <button
+            :class="{ active: mainTab === 'register' }"
             @click="mainTab = 'register'">注册</button>
         </div>
 
@@ -35,20 +35,20 @@
             <div v-if="loginMethod === 'password'">
               <div class="form-group">
                 <label for="account">账号</label>
-                <input 
-                  type="text" 
-                  id="account" 
+                <input
+                  type="text"
+                  id="account"
                   placeholder="账号"
-                  v-model="account" 
+                  v-model="account"
                   required />
               </div>
 
               <div class="form-group">
                 <label for="password">密码</label>
-                <input 
-                  type="password" 
-                  id="password" 
-                  v-model="password" 
+                <input
+                  type="password"
+                  id="password"
+                  v-model="password"
                   required />
               </div>
 
@@ -62,11 +62,11 @@
             <div v-else-if="loginMethod === 'sms'">
               <div class="form-group">
                 <label for="email">账号</label>
-                <input 
-                  type="tel" 
-                  id="email" 
+                <input
+                  type="tel"
+                  id="email"
                   placeholder="账号"
-                  v-model="email" 
+                  v-model="email"
                   required />
               </div>
 
@@ -87,11 +87,11 @@
           <div class="other-login-methods">
             <span>其他登录方式</span>
             <div class="login-method-buttons">
-              <button 
-                :class="{ active: loginMethod === 'password' }" 
+              <button
+                :class="{ active: loginMethod === 'password' }"
                 @click="loginMethod = 'password'">账号密码登录</button>
-              <button 
-                :class="{ active: loginMethod === 'sms' }" 
+              <button
+                :class="{ active: loginMethod === 'sms' }"
                 @click="loginMethod = 'sms'">邮箱验证码登录</button>
             </div>
             <div class="register-hint">
@@ -108,39 +108,39 @@
   <form @submit.prevent="handleRegister">
     <div class="form-group">
       <label for="reg-account">账号</label>
-      <input 
-        type="text" 
-        id="reg-account" 
+      <input
+        type="text"
+        id="reg-account"
         placeholder="账号"
-        v-model="regAccount" 
+        v-model="regAccount"
         required />
     </div>
 
     <div class="form-group">
       <label for="reg-email">邮箱</label>
-      <input 
-        type="email" 
-        id="reg-email" 
+      <input
+        type="email"
+        id="reg-email"
         placeholder="邮箱"
-        v-model="regEmail" 
+        v-model="regEmail"
         required />
     </div>
 
     <div class="form-group">
       <label for="reg-password">密码</label>
-      <input 
-        type="password" 
-        id="reg-password" 
-        v-model="regPassword" 
+      <input
+        type="password"
+        id="reg-password"
+        v-model="regPassword"
         required />
     </div>
 
     <div class="form-group">
       <label for="reg-confirm-password">确认密码</label>
-      <input 
-        type="password" 
-        id="reg-confirm-password" 
-        v-model="regConfirmPassword" 
+      <input
+        type="password"
+        id="reg-confirm-password"
+        v-model="regConfirmPassword"
         required />
     </div>
 
@@ -274,6 +274,70 @@ function startRegCountdown() {
 
 import http from '@/utils/http'  // 导入配置的 axios 实例
 
+// async function handleLogin() {
+//   message.value = ''
+//
+//   if (loginMethod.value === 'password') {
+//     try {
+//       const res = await http.post('/auth/login', {
+//         username: account.value,
+//         password: password.value,
+//         captcha: captcha.value
+//       })
+//
+//       if (res.data.success) {
+//         message.value = res.data.message
+//         messageColor.value = 'green'
+//
+//  const token = res.data.access_token
+//   localStorage.setItem('token', token)
+//
+//   // 🔥 解码 token，获取角色信息
+//   const decoded = jwtDecode(token)
+//   const userInfo = {
+//     id: decoded.user_id,
+//     username: decoded.username,
+//     role: decoded.role  // ← 确保你的后端 token 里有这一项
+//   }
+//
+//   localStorage.setItem('userInfo', JSON.stringify(userInfo))
+//
+//         // 跳转页面
+//         router.push('/first_page')
+//       } else {
+//         message.value = res.data.message
+//         messageColor.value = 'red'
+//       }
+//     } catch (error) {
+//       message.value = '请求失败，请检查后端服务是否启动'
+//       messageColor.value = 'red'
+//     }
+//   } else {
+//     // 验证码登录
+//     try {
+//       const res = await http.post('/auth/login_email', {
+//         email: email.value,
+//         code: smsCode.value
+//       })
+//
+//       if (res.data.success) {
+//         message.value = res.data.message
+//         messageColor.value = 'green'
+//
+//         // 保存 token ✅
+//         localStorage.setItem('token', res.data.access_token)
+//
+//         router.push('/first_page')
+//       } else {
+//         message.value = res.data.message
+//         messageColor.value = 'red'
+//       }
+//     } catch (error) {
+//       message.value = '请求失败，请检查后端服务是否启动'
+//       messageColor.value = 'red'
+//     }
+//   }
+// }
 async function handleLogin() {
   message.value = ''
 
@@ -284,33 +348,33 @@ async function handleLogin() {
         password: password.value,
         captcha: captcha.value
       })
-
-      if (res.data.success) {
+      if (res.data && typeof res.data.message === 'string') {
         message.value = res.data.message
-        messageColor.value = 'green'
-
- const token = res.data.access_token
-  localStorage.setItem('token', token)
-
-  // 🔥 解码 token，获取角色信息
-  const decoded = jwtDecode(token)
-  const userInfo = {
-    id: decoded.user_id,
-    username: decoded.username,
-    role: decoded.role  // ← 确保你的后端 token 里有这一项
-  }
-
-  localStorage.setItem('userInfo', JSON.stringify(userInfo))
-
-        // 跳转页面
-        router.push('/first_page')
+        messageColor.value = res.data.success ? 'green' : 'red'
       } else {
-        message.value = res.data.message
+        message.value = '登录失败'
         messageColor.value = 'red'
       }
+      if (res.data.success) {
+        const token = res.data.access_token
+        localStorage.setItem('token', token)
+        const decoded = jwtDecode(token)
+        const userInfo = {
+          id: decoded.user_id,
+          username: decoded.username,
+          role: decoded.role
+        }
+        localStorage.setItem('userInfo', JSON.stringify(userInfo))
+        router.push('/first_page')
+      }
     } catch (error) {
-      message.value = '请求失败，请检查后端服务是否启动'
-      messageColor.value = 'red'
+      if (error.response && error.response.data && error.response.data.message) {
+        message.value = error.response.data.message
+        messageColor.value = 'red'
+      } else {
+        message.value = '请求失败，请检查后端服务是否启动'
+        messageColor.value = 'red'
+      }
     }
   } else {
     // 验证码登录
@@ -319,26 +383,28 @@ async function handleLogin() {
         email: email.value,
         code: smsCode.value
       })
-
-      if (res.data.success) {
+      if (res.data && typeof res.data.message === 'string') {
         message.value = res.data.message
-        messageColor.value = 'green'
-
-        // 保存 token ✅
-        localStorage.setItem('token', res.data.access_token)
-
-        router.push('/first_page')
+        messageColor.value = res.data.success ? 'green' : 'red'
       } else {
-        message.value = res.data.message
+        message.value = '登录失败'
         messageColor.value = 'red'
       }
+      if (res.data.success) {
+        localStorage.setItem('token', res.data.access_token)
+        router.push('/first_page')
+      }
     } catch (error) {
-      message.value = '请求失败，请检查后端服务是否启动'
-      messageColor.value = 'red'
+      if (error.response && error.response.data && error.response.data.message) {
+        message.value = error.response.data.message
+        messageColor.value = 'red'
+      } else {
+        message.value = '请求失败，请检查后端服务是否启动'
+        messageColor.value = 'red'
+      }
     }
   }
 }
-
 
 async function handleRegister() {
   regMessage.value = ''

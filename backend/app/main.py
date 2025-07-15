@@ -122,6 +122,7 @@ api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
+#api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
 api.add_namespace(user_ns)  # 注册用户管理命名空间
 
