@@ -77,7 +77,7 @@
     </div>
 
     <!-- 状态提示 -->
-    <div class="status" v-if="processing || extractionComplete">
+    <div class="status" v-if="processing">
       <div class="status-content">
         <div class="status-text">
           <p v-if="processing">正在处理中... 
@@ -85,7 +85,7 @@
               ({{ processedFrames }}/{{ totalFrames }})
             </span>
           </p>
-          <p v-if="extractionComplete">帧提取完成，等待服务器处理结果...</p>
+    
         </div>
       </div>
     </div>
@@ -103,8 +103,8 @@
       分析完毕！
     </div>
 
-    <!-- 分析结果 -->
-    <div v-if="frameResults.length" class="results-section">
+    <!-- 分析结果：等待所有帧接收完再展示 -->
+<div v-if="readyToShowResults" class="results-section">
       <div class="result-header">
         <h3 class="result-title">
           分析结果
@@ -232,6 +232,9 @@ const headerHeight = ref(0)
 const selectedFrameIndex = ref('')
 
 const mode = ref('upload') // 上传 或 录制
+
+const readyToShowResults = ref(false)
+
 
 const videoFile = ref(null)
 const videoURL = ref('')
@@ -412,12 +415,13 @@ function resetState() {
   currentFrameNumber.value = 1
   totalFrames.value = 0
   processedFrames.value = 0
-  extractionComplete.value = false
+  // extractionComplete.value = false
   processing.value = false
   autoPlay.value = false
   allDetections.value = []
   uniqueDetectionClasses.value = []
   selectedFrameIndex.value = ''
+  readyToShowResults.value = false
 }
 
 function resetAll() {
@@ -460,22 +464,43 @@ function jumpToFrameIndex() {
 
 function startAnalysis() {
   if (!videoURL.value) return alert('请先上传或录制视频')
+  if (processing.value) return alert('正在分析中...')
+  // if (readyToShowResults.value) return alert('请先卸载视频再重新分析')
+  if (videoEl.value?.readyState < 3) {
+  return alert('视频尚未加载完成，请稍等片刻')
+}
+
+
 
   processing.value = true
-  extractionComplete.value = false
+  // extractionComplete.value = false
   frameResults.value = []
   processedFrames.value = 0
   currentImageIndex.value = 0
   currentFrameNumber.value = 1
-
+  // 如果已有 socket，先断开连接
+  if (socket) {
+    socket.off('frame_result')
+    socket.off('disconnect')
+    socket.off('connect_error')
+    socket.disconnect()
+  }
+  
   socket = io('http://127.0.0.1:8000')
 
   socket.on('connect', () => {
     extractFramesOffline()
   })
 
-  socket.on('frame_result', (result) => {
+ const analysisCompleted = ref(false)
+
+socket.on('frame_result', (result) => {
   const { frame_index, annotated_image, detections } = result
+
+  // 累加 detection 信息
+  if (detections) {
+    allDetections.value.push(...detections)
+  }
 
   if (typeof frame_index === 'number' && annotated_image) {
     const frameData = {
@@ -484,42 +509,42 @@ function startAnalysis() {
       detections: detections || []
     }
 
-    // 检查是否已存在该帧，防止重复
     const exists = frameResults.value.some(f => f.frame_index === frame_index)
     if (!exists) {
       frameResults.value.push(frameData)
 
-      // 排序：确保按 frame_index 从小到大排列
+      // 排序
       frameResults.value.sort((a, b) => a.frame_index - b.frame_index)
+
+      // ✅ 判断是否全部接收完毕，且只触发一次
+      if (!analysisCompleted.value && frameResults.value.length >= totalFrames.value) {
+        analysisCompleted.value = true
+        processing.value = false
+        // extractionComplete.value = true
+        readyToShowResults.value = true
+
+
+        // 统计唯一检测类别
+        const seen = new Set()
+        uniqueDetectionClasses.value = allDetections.value
+          .map(d => d.class)
+          .filter(cls => {
+            if (!seen.has(cls)) {
+              seen.add(cls)
+              return true
+            }
+            return false
+          })
+
+        // 弹窗提示
+        showCompleteNotice.value = true
+        setTimeout(() => {
+          showCompleteNotice.value = false
+        }, 3000)
+      }
     }
   }
-
-  if (detections) {
-    allDetections.value.push(...detections)
-  }
 })
-
-
-  socket.on('stream_complete', () => {
-    processing.value = false
-    extractionComplete.value = false
-
-    const seen = new Set()
-    uniqueDetectionClasses.value = allDetections.value
-      .map(d => d.class)
-      .filter(cls => {
-        if (!seen.has(cls)) {
-          seen.add(cls)
-          return true
-        }
-        return false
-      })
-
-    showCompleteNotice.value = true
-    setTimeout(() => {
-      showCompleteNotice.value = false
-    }, 2000)
-  })
 
   socket.on('disconnect', stopAnalysis)
   socket.on('connect_error', stopAnalysis)
@@ -540,13 +565,13 @@ function extractFramesOffline() {
 
     const frameInterval = 0.2
     const duration = video.duration
-    totalFrames.value = Math.floor(duration / frameInterval)
+    totalFrames.value = Math.ceil(duration / frameInterval)
 
     let currentTime = 0
 
     const extractFrame = () => {
       if (currentTime >= duration) {
-        extractionComplete.value = true
+        // extractionComplete.value = true
         socket.emit('video_stream_end', { message: '视频帧发送完成' })
         document.body.removeChild(video)
         return
@@ -588,7 +613,7 @@ function extractFramesOffline() {
 
 function stopAnalysis() {
   processing.value = false
-  extractionComplete.value = false
+  // extractionComplete.value = false
   autoPlayTimer.value && clearInterval(autoPlayTimer.value)
   autoPlayTimer.value = null
   socket?.disconnect()
