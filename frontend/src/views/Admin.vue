@@ -152,8 +152,8 @@
       if (data.success) {
         users.value = data.data.map(user => ({
             id: user.id,
-            name: user.username, // 👈 匹配模板中用到的 user.name
-            account: user.email, // 👈 匹配模板中用到的 user.account
+            name: user.username, 
+            account: user.email, 
             role: user.role,
             isEditing: false,
             editedName: user.username,
@@ -228,7 +228,7 @@
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token  // ⬅️ 关键：加上这个
+          'Authorization': 'Bearer ' + token  
         },
         body: JSON.stringify({
           name: user.editedName,

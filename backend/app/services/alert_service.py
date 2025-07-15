@@ -48,21 +48,29 @@ def save_alert_frame(db_type: str, video_id: int, frame_index: int, image_base64
     filename = f"frame_{frame_index:05d}.jpg"
     save_path = save_dir / filename
 
-    # 解码图像
-    image_data = base64.b64decode(image_base64.split(',')[1])
-    image = Image.open(io.BytesIO(image_data)).convert("RGB")
-
-    # 画检测框
-    if bboxes:
-        draw = ImageDraw.Draw(image)
-        for bbox in bboxes:
-            x1, y1, x2, y2 = bbox
-            draw.rectangle([x1, y1, x2, y2], outline='red', width=3)
-            label_text = f"{disease_type or '未知'} {confidence:.2f}"
-            draw.text((x1, y1 - 10), label_text, fill='red')
+    # # 画检测框
+    # if bboxes:
+    #     draw = ImageDraw.Draw(image)
+    #     for bbox in bboxes:
+    #         x1, y1, x2, y2 = bbox
+    #         draw.rectangle([x1, y1, x2, y2], outline='red', width=3)
+    #         label_text = f"{disease_type or '未知'} {confidence:.2f}"
+    #         draw.text((x1, y1 - 10), label_text, fill='red')
 
     # 保存图像
-    image.save(save_path)    
+    # 去掉 data:image/jpeg;base64, 这样的前缀（如果有的话）
+    if image_base64.startswith('data:image'):
+        image_base64 = image_base64.split(',', 1)[1]
+
+    # 解码 base64 字符串为字节数据
+    image_data = base64.b64decode(image_base64)
+
+    # 使用 Pillow 打开图像
+    image = Image.open(io.BytesIO(image_data))
+
+    # 保存到本地
+    image.save(save_path)
+    print(f"图像已保存到：{save_path}")
 
     if db_type == 'road':
         alert_frame = FrameModel(

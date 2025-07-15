@@ -292,7 +292,8 @@ class MyFaces(Resource):
                     rel_path = rel_path[5:]
                 image_objs.append({
                     'id': f.id,
-                    'url': f"/static/{rel_path}"
+                    'url': f"/static/{rel_path}",
+                    'name': f.name
                 })
         return {
             'success': True,

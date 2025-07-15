@@ -116,12 +116,15 @@ from .api.face_recognition import ns as face_ns
 from .api.pavement_detection import ns as pavement_ns, get_pavement_socketio_handlers
 from .api.traffic_analysis import ns as traffic_ns
 from .api.logging_alerts import ns as logging_alerts_ns  # 导入日志告警命名空间
+from .api.auth import user_ns  # 导入用户管理命名空间
 
 api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
+#api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
+api.add_namespace(user_ns)  # 注册用户管理命名空间
 
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()

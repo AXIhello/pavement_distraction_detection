@@ -122,6 +122,9 @@ def get_pavement_socketio_handlers():
                 # 2. 路面病害告警
                 video_id = create_alert_video('road',f'video_{timestamp}', str(save_dir), 0, 0, None)   # none为用户 后续关联
 
+                frame_count = 0  # 重置帧计数
+                alert_count = 0  # 重置告警计数
+
                 first_frame_handled = True
 
             frame_count += 1     # 帧计数
@@ -137,7 +140,7 @@ def get_pavement_socketio_handlers():
                 if(len(result.get('detections', [])) > 0):
                     alert_count += 1
                     # 保存检测结果到数据库
-                    save_alert_frame('road',video_id, frame_count, image_data, result['detections'][0]['confidence'], result['detections'][0]['class'],bboxes=[d['bbox'] for d in result['detections']])
+                    save_alert_frame('road',video_id, frame_index+1, result['annotated_image'], result['detections'][0]['confidence'], result['detections'][0]['class'],bboxes=[d['bbox'] for d in result['detections']])
             else:
                 logger.warning(f"视频帧检测失败: {result.get('message')}")
             
@@ -154,6 +157,8 @@ def get_pavement_socketio_handlers():
         之前会通知客户端视频处理已完成，现在不再发送stream_complete信号，由前端自行判断。
         """
         logger.info('收到视频流结束信号，视频流处理完成。')
+        nonlocal first_frame_handled  # 允许修改外部变量
+        first_frame_handled = False  # 重置闭包变量
         # emit('stream_complete', {'message': '视频处理完成'})  # 已删除
 
     return {

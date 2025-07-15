@@ -107,6 +107,24 @@ class FaceRecognitionService:
             shape = self.predictor(img_rgb, face)
             face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
             face_descriptor_np = np.array(face_descriptor)
+            #查重
+            from .face_db_service import FaceDatabaseService
+            all_features = FaceDatabaseService.get_all_features()
+            duplicate_name = None
+            for exist_name, exist_feature in all_features:
+                dist = np.linalg.norm(face_descriptor_np - exist_feature)
+                if dist < 0.5:  # 阈值可调整
+                    duplicate_name = exist_name
+                    break
+            if duplicate_name:
+                if duplicate_name == name:
+                    # 允许注册，后续会走平均特征逻辑
+                    pass
+                else:
+                    return {
+                        'success': False,
+                        'message': f'该人脸已被注册为 {duplicate_name}，请勿用其他名字重复录入'
+                    }
             #保存图片
             save_dir = f"data/data_faces_from_camera/person_{name}"
             os.makedirs(save_dir, exist_ok=True)
