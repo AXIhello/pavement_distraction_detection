@@ -43,7 +43,7 @@ else:
 
 app = Flask(__name__,static_folder=None)
 app.config.from_object(config_class)
-CORS(app)  # 允许跨域请求
+CORS(app, supports_credentials=True, expose_headers='Authorization', allow_headers=['Content-Type', 'Authorization'])
 
 db.init_app(app)
 
@@ -252,9 +252,11 @@ def log_response_info(response):
 
 @app.before_request
 def load_user_from_token():
+    print("请求头 Authorization:", request.headers.get('Authorization'))
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split(' ')[1]
+        print("解析到的token:", token)
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_id = payload.get("user_id")
@@ -354,6 +356,15 @@ if __name__ == '__main__':
                     payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
                     # 假设token里有 user_id 字段
                     g.user_id = payload.get('user_id')
+                    # 假设数据库里有 User 表，根据 user_id 查询用户信息
+                    user = User.query.get(g.user_id)
+                    if user:
+                        g.user = {
+                            "id": user.id,
+                            "username": user.username,   # 假设 User 表有 username 字段
+                            "role": user.role,           # 假设 User 表有 role 字段
+                            "email": user.email          # 假设 User 表有 email 字段
+                        }   
                 except jwt.ExpiredSignatureError:
                     return jsonify({'success': False, 'message': 'Token已过期'}), 401
                 except jwt.InvalidTokenError:
