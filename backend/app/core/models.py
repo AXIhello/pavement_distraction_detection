@@ -71,6 +71,7 @@ class FaceFeature(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     user = db.relationship('User', backref='face_features')
+    image_path = db.Column(db.String(512))
     
     def __repr__(self):
         return f'<FaceFeature {self.name}>'

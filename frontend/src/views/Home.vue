@@ -10,8 +10,10 @@
       <div class="info-item"><strong>角色：</strong>{{ user.role }}</div>
       <div class="info-item"><strong>邮箱：</strong>{{ user.email }}</div>
       <div class="info-item">
-        <strong>人脸识别照片：</strong><br />
-        <img v-if="user.face_image_url" :src="user.face_image_url" alt="人脸照片" class="face-image" />
+        <strong>已录入人脸照片</strong><br />
+        <div v-if="faceImages.length">
+            <img v-for="(img, idx) in faceImages" :key="idx" :src="img" alt="人脸照片" class="face-image" />
+        </div>
         <span v-else>暂无照片</span>
       </div>
     </div>
@@ -25,22 +27,34 @@ import Header from '@/components/Navigation.vue'
 const user = ref({})
 const loading = ref(true)
 const error = ref('')
+const faceImages = ref([])
 
-// 后端接口路径（请根据实际修改）
 const token = localStorage.getItem('token')
 const API_URL = 'http://127.0.0.1:8000/api/auth/me'
+const FACE_API = 'http://127.0.0.1:8000/api/face/my_faces'
 
 onMounted(async () => {
   try {
+    // 获取用户信息
     const res = await fetch(API_URL, {
       headers: {
-        'Authorization': `Bearer ${token}`, // 关键点
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     })
     const data = await res.json()
     if (data.success) {
       user.value = data.user
+      // 获取人脸图片
+      const faceRes = await fetch(FACE_API, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      })
+      const faceData = await faceRes.json()
+      if (faceData.success) {
+        faceImages.value = faceData.images.map(url => 'http://127.0.0.1:8000' + url)
+      }
     } else {
       error.value = data.message || '获取用户信息失败'
     }

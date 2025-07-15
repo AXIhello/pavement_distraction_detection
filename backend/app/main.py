@@ -1,11 +1,11 @@
 # backend/app/main.py
-from flask import Flask, request, g
+from flask import Flask, request, g,send_from_directory
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 import os
-import json
+
 
 # 添加上级目录到 Python 路径中，以便导入其他模块
 import sys
@@ -33,6 +33,7 @@ from .core.security import SECRET_KEY
 from app.services.liveness_service import liveness_check
 from app.services.pavement_service import set_global_model
 from ultralytics import YOLO
+from app.core.models import User
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
 if env == 'production':
@@ -40,7 +41,7 @@ if env == 'production':
 else:
     config_class = DevelopmentConfig
 
-app = Flask(__name__)
+app = Flask(__name__,static_folder=None)
 app.config.from_object(config_class)
 CORS(app)  # 允许跨域请求
 
@@ -299,14 +300,35 @@ def handle_liveness_detection(data):
     if progress == 100:
         liveness_status.pop(sid, None)
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    print("已进入static方法！")
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+    return send_from_directory(data_dir, filename)
+
+def create_admin_if_not_exists():
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='23301143@bjtu.edu.cn',
+            role='admin'
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print("已自动创建管理员账号：admin / admin123")
+    else:
+        print("管理员账号已存在，无需重复创建。")
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
+            create_admin_if_not_exists()
         except Exception as e:
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
