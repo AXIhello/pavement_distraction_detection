@@ -48,7 +48,7 @@ user_list_response = user_ns.model('UserListResponse', {
 
 @user_ns.route('/')
 class UserList(Resource):
-    # @admin_required
+    @admin_required
     @user_ns.marshal_with(user_list_response)
     def get(self):
         users = User.query.all()
@@ -319,3 +319,20 @@ class Captcha(Resource):
         response = make_response(send_file(buf, mimetype='image/png'))
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
+    
+# 修改用户名
+@ns.route('/change_username')
+class ChangeUsername(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        new_username = data.get('new_username')
+        if not new_username:
+            return {'success': False, 'message': '新用户名不能为空'}, 400
+        if find_user_by_username(new_username):
+            return {'success': False, 'message': '用户名已存在'}, 400        
+        user.username = new_username
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '用户名修改成功'}
