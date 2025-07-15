@@ -142,7 +142,7 @@ class UserLogin(Resource):
             return {
                 'success': False,
                 'message': '无效的用户名或密码'
-            }, 401
+            }
 
 # 邮箱验证码发送请求模型
 send_email_code_model = ns.model('SendEmailCode', {
