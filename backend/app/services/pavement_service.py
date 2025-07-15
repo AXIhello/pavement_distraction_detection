@@ -150,6 +150,7 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
     save_dir.mkdir(parents=True, exist_ok=True)
     video_id = create_alert_video('road', f'video_{timestamp}', str(save_dir), len(base64_images), 0, None)
     alert_count = 0
+    results = []
 
     for i, base64_str in enumerate(base64_images):
         try:
