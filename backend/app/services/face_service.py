@@ -9,7 +9,7 @@ import base64
 import json  # 用于处理 base64 解码和编码
 import logging
 import tensorflow as tf
-
+from .face_db_service import FaceDatabaseService
 # 获取日志器
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,7 @@ class FaceRecognitionService:
         Returns:
             注册结果字典
         """
+
         if not self.detector or not self.predictor or not self.face_reco_model:
             logger.error("Dlib 模型未加载。无法执行注册。")
             return {'success': False, 'message': 'Dlib models not loaded.'}
@@ -106,10 +107,17 @@ class FaceRecognitionService:
             shape = self.predictor(img_rgb, face)
             face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
             face_descriptor_np = np.array(face_descriptor)
-
-            # 保存到数据库
+            #保存图片
+            save_dir = f"data/data_faces_from_camera/person_{name}"
+            os.makedirs(save_dir, exist_ok=True)
             from .face_db_service import FaceDatabaseService
-            success = FaceDatabaseService.save_feature(name, face_descriptor_np, user_id)
+            feature_count = FaceDatabaseService.get_feature_count(name)
+            img_path = os.path.join(save_dir, f"img_face_{feature_count + 1}.jpg")
+            cv2.imwrite(img_path, img_np)
+
+            # 保存到数据库，传递 image_path
+            success = FaceDatabaseService.save_feature(name, face_descriptor_np, user_id, image_path=img_path)
+            #success = FaceDatabaseService.save_feature(name, face_descriptor_np, user_id)
 
             if success:
                 # 重新加载人脸数据库
