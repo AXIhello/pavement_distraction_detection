@@ -160,6 +160,7 @@
             editedAccount: user.email,
             editedPhone: user.phone || ''
         }))
+        allUsers.value = [...users.value] // 保存所有用户数据以便搜索
       } else {
         console.error('获取用户数据失败:', data.message)
       }
@@ -184,9 +185,11 @@
     users.value = allUsers.value.filter(user => {
       switch (searchType.value) {
         case 'name':
-          return user.username.toLowerCase().includes(query)
+          return user.name.toLowerCase().includes(query)
         case 'account':
-          return user.email.toLowerCase().includes(query)
+          return user.account.toLowerCase().includes(query)
+        case 'phone':
+          return user.role.toLowerCase().includes(query)
         default:
           return true
       }
@@ -220,22 +223,25 @@
   
   async function saveEdit(user) {
     try {
-      // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${user.id}`, {
+      const token = localStorage.getItem('token')  // 从 localStorage 读取 JWT Token
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token  // ⬅️ 关键：加上这个
+        },
         body: JSON.stringify({
           name: user.editedName,
-          account: user.editedAccount,
-          phone: user.editedPhone
+          email: user.editedAccount,
+          role: user.editedPhone
         })
       })
       
       const data = await response.json()
       if (data.success) {
-        user.name = user.editedName
-        user.account = user.editedAccount
-        user.phone = user.editedPhone
+        user.name = data.data.username
+        user.account = data.data.email
+        user.role = data.data.role
         user.isEditing = false
       } else {
         console.error('更新用户信息失败:', data.message)
@@ -254,8 +260,11 @@
   async function deleteUser() {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${userToDelete.value.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${userToDelete.value.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        }
       })
       
       const data = await response.json()

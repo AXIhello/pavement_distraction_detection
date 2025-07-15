@@ -7,6 +7,7 @@ from ..services.alert_service import create_alert_video, save_alert_frame
 from datetime import datetime
 from pathlib import Path
 
+
 # 获取日志器
 logger = logging.getLogger(__name__)
 ns = Namespace('face', description='人脸识别相关接口')
@@ -273,3 +274,27 @@ class FaceFeatureDelete(Resource):
         db.session.delete(feature)
         db.session.commit()
         return {'success': True, 'message': '人脸信息已删除'}
+
+@ns.route('/my_faces')
+class MyFaces(Resource):
+    def get(self):
+        user = getattr(g, 'user', None)
+        if not user:
+            return {'success': False, 'message': '未登录'}, 401
+        # 查询该用户所有人脸图片
+        features = FaceFeature.query.filter_by(user_id=user['id']).all()
+        # 返回图片对象列表（包含id和url）
+        image_objs = []
+        for f in features:
+            if f.image_path:
+                rel_path = f.image_path.replace("\\", "/")
+                if rel_path.startswith("data/"):
+                    rel_path = rel_path[5:]
+                image_objs.append({
+                    'id': f.id,
+                    'url': f"/static/{rel_path}"
+                })
+        return {
+            'success': True,
+            'images': image_objs
+        }

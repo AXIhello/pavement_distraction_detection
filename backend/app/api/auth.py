@@ -17,7 +17,12 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         user = getattr(g, 'user', None)
-        if not user or user.get('role') != 'admin':
+        if not user:
+            print("未登录或未获取到用户信息")
+            return {'success': False, 'message': '未登录'}, 401
+        role = user.get('role')
+        if role != 'admin':
+            print("权限不足，当前角色：", role)
             return {'success': False, 'message': '无权限，管理员专用'}, 403
         return f(*args, **kwargs)
     return decorated_function
@@ -261,6 +266,40 @@ class UserMe(Resource):
 # class UserRegister(Resource):
 #    ...
 
+# 修改密码（邮箱验证码）
+@ns.route('/change_password')
+class ChangePassword(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        code = data.get('code')
+        new_password = data.get('new_password')
+        if not code or not new_password:
+            return {'success': False, 'message': '验证码和新密码不能为空'}, 400
+        from ..utils.email_service import verify_email_code
+        if not verify_email_code(user.email, code):
+            return {'success': False, 'message': '验证码无效或已过期'}, 400
+        user.set_password(new_password)
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '密码修改成功'}
+
+# 删除自己的人脸信息（放在 face_recognition.py 里更合适，但这里先实现）
+@ns.route('/delete_face/<int:face_id>')
+class DeleteFace(Resource):
+    @token_required
+    def delete(self, face_id):
+        user = g.user
+        from ..core.models import FaceFeature
+        from ..extensions import db
+        feature = FaceFeature.query.get(face_id)
+        if not feature or feature.user_id != user.id:
+            return {'success': False, 'message': '无权限或人脸不存在'}, 403
+        db.session.delete(feature)
+        db.session.commit()
+        return {'success': True, 'message': '人脸信息已删除'}
+# ... existing code ...
 # ... 其他认证相关的Resource ...
 
 @ns.route('/captcha')

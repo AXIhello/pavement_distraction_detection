@@ -1,54 +1,61 @@
 <template>
-  <div class="face-register">
-    <!-- 左侧：摄像头或图片预览 -->
-    <div class="left-panel">
-      <div class="video-container" v-if="!photoCaptured">
-        <video ref="video" autoplay playsinline></video>
-      </div>
-      <div class="photo-preview" v-else>
-        <img :src="capturedPhoto" alt="拍摄照片预览" />
-      </div>
-    </div>
+  <div class="face-register-container">
+    <h2>人脸信息录入</h2>
 
-    <!-- 右侧：提示与操作 -->
-    <div class="right-panel">
-      <h2>人脸信息录入</h2>
-      <p class="tip">操作步骤：</p>
-      <ol class="steps">
-        <li>点击「打开摄像头」</li>
-        <li>点击「拍照」获取图像</li>
-        <li>输入姓名（支持中文）</li>
-        <li>点击「保存」完成录入</li>
-      </ol>
-
-      <input v-model="name" placeholder="请输入姓名（支持中文）" />
-
-      <div class="buttons">
-        <button @click="startCamera" v-if="!streaming && !photoCaptured">打开摄像头</button>
-        <button @click="capturePhoto" v-if="streaming && !photoCaptured">拍照</button>
-        <button @click="clearPhoto" v-if="photoCaptured">重拍</button>
-        <button @click="savePhoto" :disabled="!capturedPhoto || !name || loading">{{ loading ? '处理中...' : '保存' }}</button>
+    <div class="content">
+      <!-- 左边摄像头/图片 -->
+      <div class="video-section">
+        <div v-if="!photoCaptured">
+          <video ref="video" autoplay playsinline></video>
+        </div>
+        <div v-else>
+          <img :src="capturedPhoto" alt="拍摄照片预览" />
+        </div>
       </div>
 
-      <p class="message">{{ message }}</p>
+      <!-- 右边操作区 -->
+      <div class="control-section">
+        <p class="tip">操作步骤：</p>
+        <ol class="steps">
+          <li>点击「打开摄像头」</li>
+          <li>点击「拍照」获取图像</li>
+          <li>输入姓名（支持中文）</li>
+          <li>点击「保存」完成录入</li>
+        </ol>
+
+        <input v-model="name" placeholder="请输入姓名（支持中文）" />
+
+        <div class="button-group">
+          <button @click="startCamera" v-if="!streaming && !photoCaptured">打开摄像头</button>
+          <button @click="capturePhoto" v-if="streaming && !photoCaptured">拍照</button>
+          <button @click="clearPhoto" v-if="photoCaptured">重拍</button>
+          <button @click="savePhoto" :disabled="!capturedPhoto || !name || loading">
+            {{ loading ? '处理中...' : '保存' }}
+          </button>
+          <button @click="() => router.push('/first_page')">返回首页</button>
+        </div>
+
+        <p class="message">{{ message }}</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const video = ref(null)
 const name = ref('')
 const capturedPhoto = ref('')
 const message = ref('')
 const streaming = ref(false)
 const photoCaptured = ref(false)
+const loading = ref(false)
 let stream = null
 
-// 打开摄像头
 async function startCamera() {
-
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true })
     video.value.srcObject = stream
@@ -59,7 +66,6 @@ async function startCamera() {
   }
 }
 
-// 关闭摄像头
 function stopCamera() {
   if (stream) {
     stream.getTracks().forEach(track => track.stop())
@@ -68,7 +74,6 @@ function stopCamera() {
   }
 }
 
-// 拍照
 function capturePhoto() {
   const canvas = document.createElement('canvas')
   canvas.width = video.value.videoWidth
@@ -82,20 +87,13 @@ function capturePhoto() {
   stopCamera()
 }
 
-
-
-// 重拍
 function clearPhoto() {
   capturedPhoto.value = ''
   photoCaptured.value = false
   message.value = '照片已清除，请重新拍摄'
-
-  // 重新开启摄像头
   startCamera()
 }
 
-const loading = ref(false)
-// 保存人脸数据
 async function savePhoto() {
   if (!capturedPhoto.value || !name.value) {
     message.value = '请先拍照并输入姓名'
@@ -106,7 +104,6 @@ async function savePhoto() {
 
   try {
     const token = localStorage.getItem('token')
-    console.log('savePhoto: token =', token)
     if (!token) {
       message.value = '缺少token，请先登录'
       loading.value = false
@@ -115,7 +112,7 @@ async function savePhoto() {
 
     const res = await fetch('http://127.0.0.1:8000/api/face/register', {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
@@ -124,9 +121,8 @@ async function savePhoto() {
         image: capturedPhoto.value
       })
     })
-    console.log('savePhoto: fetch 响应状态', res.status)
+
     const data = await res.json()
-    console.log('savePhoto: 返回数据', data)
 
     if (data.success) {
       message.value = '录入成功！'
@@ -134,63 +130,65 @@ async function savePhoto() {
       message.value = '录入失败！' + (data.message || '')
     }
   } catch (err) {
-    console.error('savePhoto 请求异常:', err)
     message.value = '请求失败，请检查后端服务'
   } finally {
     loading.value = false
   }
 }
-
 </script>
 
 <style scoped>
-.face-register {
+.face-register-container {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 40px;
-  padding: 40px;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 40px;
+  background-color: #f9f9f9;
+  border-radius: 16px;
+  max-width: 1000px;
+  margin: 60px auto;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   font-family: "Arial", sans-serif;
-  color: #222;
 }
 
-.left-panel {
-  width: 50%;
-  max-width: 500px;
-  background-color: #000;
+.face-register-container h2 {
+  font-size: 28px;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.content {
+  display: flex;
+  gap: 30px;
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.video-section {
+  flex: 6;
+  background: #000;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-.video-container,
-.photo-preview {
-  width: 100%;
-  aspect-ratio: 4/3;
-}
-
-video,
-img {
+.video-section video,
+.video-section img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.right-panel {
-  width: 40%;
+.control-section {
+  flex: 4;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #000;
+  justify-content: center;
 }
 
 .tip {
   font-weight: bold;
+  margin-bottom: 8px;
 }
 
 .steps {
@@ -198,6 +196,7 @@ h2 {
   font-size: 14px;
   line-height: 1.6;
   color: #444;
+  margin-bottom: 12px;
 }
 
 input {
@@ -206,28 +205,28 @@ input {
   border: 1px solid #aaa;
   border-radius: 6px;
   background-color: #fff;
+  margin-bottom: 12px;
 }
 
-.buttons {
+.button-group {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 10px;
 }
 
 button {
-  padding: 10px 16px;
+  padding: 10px 20px;
   font-size: 14px;
-  background-color: #333;
+  background-color: #d7c480;
   border: none;
-  color: #f5f5dc;
-  border-radius: 6px;
+  color: #fff;
+  border-radius: 8px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 button:hover {
-  background-color: #000;
+  background-color: #b5a25a;
 }
 
 button:disabled {
@@ -240,5 +239,4 @@ button:disabled {
   color: #800000;
   margin-top: 10px;
 }
-
 </style>

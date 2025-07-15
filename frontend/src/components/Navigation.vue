@@ -38,14 +38,19 @@
         :class="{ active: isActive('/warning') }"
       >告警</router-link>
 
-<router-link
-  v-if="isAdmin"
-  to="/log"
-  class="nav-item"
-  :class="{ active: isActive('/log') }"
->
-  日志
-</router-link>
+      <router-link
+      v-if="isAdmin"
+      to="/log"
+      class="nav-item"
+      :class="{ active: isActive('/log') }"
+      >日志</router-link>
+
+      <router-link
+      v-if="isAdmin"
+      to="/admin"
+      class="nav-item"
+      :class="{ active: isActive('/admin') }"
+      >用户管理</router-link>
 
       <button class="button" @click="goToHome">
         <div class="text-wrapper-3">用户中心</div>
