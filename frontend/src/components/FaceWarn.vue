@@ -99,12 +99,19 @@ async function fetchData() {
   try {
     const res = await axios.get('http://localhost:8000/api/logs_alerts/face_alert_frames')
     // 这里对后端返回的数据做字段映射，转成前端展示需要的格式
-    logWarnings.value = res.data.map(item => ({
-      id: item.id,
-      type: item.alert_type,
-      date: item.created_at ? item.created_at.split('T')[0] : '未知',
-      status: item.status || 'unprocessed'  // 如果后端没status，默认unprocessed
-    }))
+   logWarnings.value = res.data.map(item => ({
+  id: item.id,
+  video_id: item.video_id,
+  frame_index: item.frame_index,
+  created_at: item.created_at,
+  alert_type: item.alert_type,
+  confidence: item.confidence,
+  image_url: item.image_url,
+  date: item.created_at ? item.created_at.split('T')[0] : '未知',
+  type: item.alert_type,
+  // 如果后端没返回status，可以先默认未处理
+  status: 'unprocessed'
+}))
   } catch (e) {
     console.error('获取登录告警失败', e)
     logWarnings.value = []
@@ -143,17 +150,13 @@ function sortBy(key) {
   }
 }
 
-async function viewDetails(item) {
-  try {
-    const res = await axios.get(`http://localhost:8000/api/logs_alerts/face_alert_detail/${item.id}`)
-    detailData.value = res.data
-    selectedItem.value = item     // 加载完再切换视图
-  } catch (e) {
-    console.error('获取详情失败', e)
-    detailData.value = null
-    alert('获取详情失败，请稍后重试') 
-  }
+function viewDetails(item) {
+  detailData.value = item
+  selectedItem.value = item
 }
+
+
+
 
 
 // async function fetchDetail(id) {

@@ -187,7 +187,7 @@ class FaceAlertFrame(db.Model):
                 'id': self.id,            
                 'video_id': self.video_id,                        
                 'frame_index': self.frame_index,                                                
-                'image_path': self.image_path,                                                
+                'image_url': self.image_path,
                 'alert_type': self.alert_type,                                                          
                 'confidence': self.confidence,
                 'created_at': self.created_at.isoformat() if self.created_at else None
