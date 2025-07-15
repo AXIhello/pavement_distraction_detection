@@ -57,7 +57,7 @@
           <div v-else class="empty-state">
             <i class="icon-empty">📷</i>
             <p>暂无已录入的人脸照片</p>
-            <button class="btn secondary-btn" @click="showUploadDialog">上传照片</button>
+            <router-link to="/face_register" class="btn secondary-btn">录入人脸</router-link>
           </div>
         </div>
       </div>
@@ -679,6 +679,7 @@ h1::after {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  text-decoration: none;
 }
 
 .primary-btn {

@@ -400,7 +400,6 @@ watch(currentPage, () => {
 <style>
 #admin {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #fefdf9;
   min-height: 100vh;
 }
 
