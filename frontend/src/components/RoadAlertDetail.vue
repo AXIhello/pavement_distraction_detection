@@ -4,17 +4,23 @@
     <button @click="$emit('back')" class="detail-back-btn">×</button>
 
     <!-- 顶部信息 -->
-    <div class="detail-header">
-      <div class="detail-info">
-        <p><strong>视频ID：</strong>{{ detail.id }}</p>
-        <p><strong>告警帧数：</strong>{{ alertFrameCount }}</p>
-        <p><strong>类别统计：</strong> 
-          <span v-for="(count, type) in diseaseTypeCount" :key="type" class="disease-type-tag">
-            {{ type }} ({{ count }})
-          </span>
-        </p>
-      </div>
+ <div class="detail-header">
+  <div class="detail-info-wrapper">
+    <div class="detail-info">
+      <p><strong>视频ID：</strong>{{ detail.id }}</p>
+      <p><strong>告警帧数：</strong>{{ alertFrameCount }}</p>
+      <p>
+        <strong>类别统计：</strong> 
+        <span v-for="(count, type) in diseaseTypeCount" :key="type" class="disease-type-tag">
+          {{ type }} ({{ count }})
+        </span>
+      </p>
     </div>
+    <div v-if="isAdmin" class="delete-wrapper">
+      <button @click="confirmDeleteVideo" class="delete-btn">删除该视频及所有告警帧</button>
+    </div>
+  </div>
+</div>
 
     <!-- 帧图像轮播区域 -->
     <div v-if="detail.frames && detail.frames.length" class="carousel-wrapper">
@@ -54,6 +60,28 @@
 
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+
+const isAdmin = ref(false)
+onMounted(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  isAdmin.value = userInfo.role === 'admin'
+})
+
+async function confirmDeleteVideo() {
+  if (!props.detail?.id) return
+
+  const confirmed = window.confirm('确定要删除该视频及所有告警帧吗？此操作不可撤销。')
+  if (!confirmed) return
+
+  try {
+    await axios.delete(`http://localhost:8000/api/face_alert_videos/${props.detail.id}`)
+    alert('删除成功')
+    emit('back')  // 触发返回到列表或上一页
+  } catch (err) {
+    console.error('删除失败:', err)
+    alert('删除失败，请稍后重试')
+  }
+}
 
 function getFrameImageUrl(frame) {
   if (!frame || !frame.image_url) return ''
@@ -207,16 +235,24 @@ onUnmounted(() => {
   margin-top: 20px;
 }
 
-.detail-info {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  user-select: none;
+.detail-info-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.detail-info p {
-  margin: 6px 0;
+.detail-info {
+  flex: 1 1 auto;
+  min-width: 200px; /* 根据需要调整 */
 }
+
+.delete-wrapper {
+  flex: 0 0 auto;
+  margin-top: 4px; /* 让按钮和文字顶部对齐 */
+}
+
 
 .disease-type-tag {
   display: inline-block;

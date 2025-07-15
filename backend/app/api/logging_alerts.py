@@ -202,12 +202,13 @@ class AlertVideos(Resource):
 class FaceAlertFrames(Resource):    
     def get(self):
         try:
-            frames = FaceAlertVideo.query.order_by(FaceAlertVideo.created_at.desc()).all()
+            frames = FaceAlertFrame.query.order_by(FaceAlertFrame.created_at.desc()).all()
             data = [frame.to_dict() for frame in frames]
             return data
         except Exception as e:
             logger.error(f"获取人脸告警帧失败: {e}")
-            return {'error': '获取失败'}, 500 
+            return {'error': '获取失败'}, 500
+
         
 @ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
 class AlertVideoDetail(Resource):               

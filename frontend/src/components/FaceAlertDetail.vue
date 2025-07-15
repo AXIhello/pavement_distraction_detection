@@ -4,15 +4,20 @@
     <button @click="$emit('back')" class="detail-back-btn">×</button>
 
     <!-- 顶部信息 -->
-    <div class="detail-header" v-if="detail">
-      <div class="detail-info">
-        <p><strong>告警帧 ID：</strong>{{ detail.id }}</p>
-        <p><strong>帧索引：</strong>{{ detail.frame_index }}</p>
-        <p><strong>时间：</strong>{{ detail.created_at }}</p>
-        <p><strong>告警类型：</strong>{{ detail.alert_type }}</p>
-        <p><strong>置信度：</strong>{{ (detail.confidence * 100).toFixed(1) }}%</p>
-      </div>
+   <div class="detail-header" v-if="detail">
+  <div class="detail-info-wrapper">
+    <div class="detail-info">
+      <p><strong>告警帧 ID：</strong>{{ detail.id }}</p>
+      <p><strong>帧索引：</strong>{{ detail.frame_index }}</p>
+      <p><strong>时间：</strong>{{ detail.created_at }}</p>
+      <p><strong>告警类型：</strong>{{ detail.alert_type }}</p>
+      <p><strong>置信度：</strong>{{ (detail.confidence * 100).toFixed(1) }}%</p>
     </div>
+    <button v-if="isAdmin" @click="confirmDelete" class="inline-delete-btn">删除</button>
+  </div>
+</div>
+
+
 
     <!-- 图片展示 -->
     <div v-if="detail?.image_url" class="image-wrapper">
@@ -28,10 +33,12 @@
       <p style="color: #888; margin-top: 20px;">暂无图片显示</p>
     </div>
   </div>
+
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
+import axios from 'axios'
 
 const props = defineProps({
   detail: Object
@@ -39,12 +46,34 @@ const props = defineProps({
 
 const emit = defineEmits(['back'])
 
+// 是否管理员，从 localStorage 中判断
+const isAdmin = ref(false)
+onMounted(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  isAdmin.value = userInfo.role === 'admin'  // 根据你的用户结构调整
+})
+
 function getFrameImageUrl(imagePath) {
   if (!imagePath) return ''
   return `http://localhost:8000/${imagePath.replace(/\\/g, '/')}`
 }
 
-// 监听图片路径变化，方便调试
+async function confirmDelete() {
+  if (!props.detail?.id) return
+
+  const confirmed = window.confirm('确定要删除该告警帧吗？此操作不可撤销。')
+  if (!confirmed) return
+
+  try {
+    await axios.delete(`http://localhost:8000/api/face_alert_frames/${props.detail.id}`)
+    alert('删除成功')
+    emit('back')
+  } catch (e) {
+    console.error('删除失败', e)
+    alert('删除失败，请稍后重试')
+  }
+}
+
 watch(() => props.detail?.image_url, (newVal) => {
   if (newVal) {
     console.log('图片完整URL:', getFrameImageUrl(newVal))
@@ -100,12 +129,23 @@ watch(() => props.detail?.image_url, (newVal) => {
   margin-bottom: 24px;
   margin-top: 20px;
 }
+
+.detail-info-wrapper {
+  display: flex;
+  align-items: center;            /* 垂直居中 */
+  justify-content: space-between; /* 文字左，按钮右 */
+  gap: 16px;
+}
+
 .detail-info {
+  flex: 1 1 auto;                 /* 占满左边剩余空间 */
+  max-width: calc(100% - 100px);  /* 给按钮留出宽度空间 */
   font-size: 14px;
   font-weight: 600;
   color: #374151;
   user-select: none;
 }
+
 .detail-info p {
   margin: 6px 0;
 }
@@ -123,4 +163,28 @@ watch(() => props.detail?.image_url, (newVal) => {
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   user-select: none;
 }
+
+.inline-delete-btn {
+  width: 80px;                   /* 固定宽度 */
+  height: 32px;                  /* 固定高度 */
+  padding: 6px 0;                /* 左右内边距适中 */
+  background: linear-gradient(45deg, #ef4444, #dc2626);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  text-align: center;
+  line-height: 20px;
+}
+
+.inline-delete-btn:hover {
+  background: linear-gradient(45deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(239, 68, 68, 0.25);
+}
 </style>
+
