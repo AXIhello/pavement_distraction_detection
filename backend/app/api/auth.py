@@ -1,12 +1,15 @@
 # 认证相关接口
 # backend/app/api/auth.py
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource, fields,marshal
 from ..core.models import User, find_user_by_username, find_user_by_email, create_user
 from ..core.security import create_jwt_token
-from flask import current_app, Blueprint, request, jsonify, g
+from flask import current_app, Blueprint, request, jsonify, g, session, send_file, make_response
 from ..utils.email_service import send_email_code, verify_email_code
 from functools import wraps
 from ..extensions import db
+import random, string, io
+from captcha.image import ImageCaptcha
+from datetime import datetime
 
 # 权限校验装饰器
 # 你应该改为 返回字典 + 状态码，而不是 Flask 的 jsonify。Flask-RESTx 会自动处理 JSON 序列化。
@@ -45,7 +48,7 @@ user_list_response = user_ns.model('UserListResponse', {
 
 @user_ns.route('/')
 class UserList(Resource):
-    @admin_required
+    # @admin_required
     @user_ns.marshal_with(user_list_response)
     def get(self):
         users = User.query.all()
@@ -66,26 +69,21 @@ class UserDetail(Resource):
             return {'success': False, 'message': '用户不存在'}, 404
         return user
 
-    @user_ns.marshal_with(user_model)
     @admin_required
     def put(self, user_id):
         data = request.json
         user = User.query.get(user_id)
         if not user:
             return {'success': False, 'message': '用户不存在'}, 404
+        
         user.username = data.get('name', user.username)
         user.email = data.get('email', user.email)
         user.role = data.get('role', user.role)
         db.session.commit()
-        return {
-            'success': True,
-            'data': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'role': user.role
-            }
-        }, 200
+
+        # 手动序列化 user 数据
+        user_data = marshal(user, user_model)
+        return {'success': True, 'data': user_data}, 200
 
     @admin_required
     def delete(self, user_id):
@@ -104,7 +102,8 @@ ns = Namespace('auth', description='认证相关操作')
 # 认证模型 (例如，用于登录请求体)
 login_model = ns.model('Login', {
     'username': fields.String(required=True, description='用户名'),
-    'password': fields.String(required=True, description='密码')
+    'password': fields.String(required=True, description='密码'),
+    'captcha': fields.String(required=True, description='验证码')
 })
 
 login_response_model = ns.model('LoginResponse', {
@@ -126,11 +125,21 @@ class UserLogin(Resource):
         data = ns.payload
         username = data.get('username')
         password = data.get('password')
+        captcha = data.get('captcha')
+
+        # 校验验证码
+        code = session.get('captcha_code')
+
+        if not code:
+            return {'success': False, 'message': '验证码已过期，请刷新验证码'}, 400
+        if not captcha or captcha.upper() != code:
+            return {'success': False, 'message': '验证码错误'}, 400
+        # 验证通过后清除验证码，防止重用
+        session.pop('captcha_code', None)
 
         # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
-        # 已更换为数据库查询
         user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):  # 这里建议改成密码哈希校验
+        if user and user.check_password(password):
             access_token = create_jwt_token(user)
             return {
                 'success': True,
@@ -260,4 +269,53 @@ class UserMe(Resource):
 # class UserRegister(Resource):
 #    ...
 
+# 修改密码（邮箱验证码）
+@ns.route('/change_password')
+class ChangePassword(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        code = data.get('code')
+        new_password = data.get('new_password')
+        if not code or not new_password:
+            return {'success': False, 'message': '验证码和新密码不能为空'}, 400
+        from ..utils.email_service import verify_email_code
+        if not verify_email_code(user.email, code):
+            return {'success': False, 'message': '验证码无效或已过期'}, 400
+        user.set_password(new_password)
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '密码修改成功'}
+
+# 删除自己的人脸信息（放在 face_recognition.py 里更合适，但这里先实现）
+@ns.route('/delete_face/<int:face_id>')
+class DeleteFace(Resource):
+    @token_required
+    def delete(self, face_id):
+        user = g.user
+        from ..core.models import FaceFeature
+        from ..extensions import db
+        feature = FaceFeature.query.get(face_id)
+        if not feature or feature.user_id != user.id:
+            return {'success': False, 'message': '无权限或人脸不存在'}, 403
+        db.session.delete(feature)
+        db.session.commit()
+        return {'success': True, 'message': '人脸信息已删除'}
+# ... existing code ...
 # ... 其他认证相关的Resource ...
+
+@ns.route('/captcha')
+class Captcha(Resource):
+    def get(self):
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        session['captcha_code'] = code
+        # session.modified = True  # 可选，强制刷新session
+        image = ImageCaptcha(width=120, height=40, font_sizes=[28, 32, 36])
+        data = image.generate(code)
+        buf = io.BytesIO()
+        buf.write(data.read())
+        buf.seek(0)
+        response = make_response(send_file(buf, mimetype='image/png'))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response

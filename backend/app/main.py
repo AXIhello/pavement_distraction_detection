@@ -1,11 +1,11 @@
 # backend/app/main.py
-from flask import Flask, request, g
+from flask import Flask, request, g,send_from_directory
 from flask_restx import Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 import os
-import json
+
 
 # 添加上级目录到 Python 路径中，以便导入其他模块
 import sys
@@ -33,6 +33,7 @@ from .core.security import SECRET_KEY
 from app.services.liveness_service import liveness_check
 from app.services.pavement_service import set_global_model
 from ultralytics import YOLO
+from app.core.models import User
 # 根据环境变量选择配置
 env = os.environ.get('FLASK_ENV', 'development')
 if env == 'production':
@@ -40,7 +41,7 @@ if env == 'production':
 else:
     config_class = DevelopmentConfig
 
-app = Flask(__name__)
+app = Flask(__name__,static_folder=None)
 
 from flask import send_from_directory
 
@@ -51,7 +52,19 @@ def serve_data(filename):
     return send_from_directory(root_dir, filename)
 
 app.config.from_object(config_class)
-CORS(app, supports_credentials=True, expose_headers='Authorization', allow_headers=['Content-Type', 'Authorization'])
+app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'your_secret_key')
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # 必须是 None 才能跨域传 Cookie
+app.config['SESSION_COOKIE_SECURE'] = True      # 必须是 True 才能在 https 下发送 Cookie
+
+import re
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[re.compile(r"^http://localhost:\d+$"), re.compile(r"^http://127\.0\.0\.1:\d+$")],
+    expose_headers='Authorization',
+    allow_headers=['Content-Type', 'Authorization']
+)
 
 db.init_app(app)
 
@@ -108,18 +121,19 @@ api = Api(app,
 
 # 导入并注册 API 命名空间
 from .api.auth import ns as auth_ns
-from .api.auth import user_ns
 from .api.face_recognition import ns as face_ns
 from .api.pavement_detection import ns as pavement_ns, get_pavement_socketio_handlers
 from .api.traffic_analysis import ns as traffic_ns
 from .api.logging_alerts import ns as logging_alerts_ns  # 导入日志告警命名空间
+from .api.auth import user_ns  # 导入用户管理命名空间
 
 api.add_namespace(auth_ns)
 api.add_namespace(face_ns)
 api.add_namespace(pavement_ns)
 api.add_namespace(traffic_ns)
-api.add_namespace(user_ns)
+#api.add_namespace(user_ns)
 api.add_namespace(logging_alerts_ns)  # 注册日志告警命名空间
+api.add_namespace(user_ns)  # 注册用户管理命名空间
 
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()
@@ -309,14 +323,35 @@ def handle_liveness_detection(data):
     if progress == 100:
         liveness_status.pop(sid, None)
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    print("已进入static方法！")
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+    return send_from_directory(data_dir, filename)
+
+def create_admin_if_not_exists():
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(
+            username='admin',
+            email='23301143@bjtu.edu.cn',
+            role='admin'
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print("已自动创建管理员账号：admin / admin123")
+    else:
+        print("管理员账号已存在，无需重复创建。")
 # --- 运行 Flask 应用 (使用 SocketIO) ---
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
+            create_admin_if_not_exists()
         except Exception as e:
             app_logger.error(f"数据库连接失败：{str(e)}", exc_info=True)
             raise
@@ -350,7 +385,7 @@ if __name__ == '__main__':
                             "username": user.username,   # 假设 User 表有 username 字段
                             "role": user.role,           # 假设 User 表有 role 字段
                             "email": user.email          # 假设 User 表有 email 字段
-                        }   
+                        }
                 except jwt.ExpiredSignatureError:
                     return jsonify({'success': False, 'message': 'Token已过期'}), 401
                 except jwt.InvalidTokenError:

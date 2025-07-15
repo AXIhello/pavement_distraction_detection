@@ -152,14 +152,15 @@
       if (data.success) {
         users.value = data.data.map(user => ({
             id: user.id,
-            name: user.username, // 👈 匹配模板中用到的 user.name
-            account: user.email, // 👈 匹配模板中用到的 user.account
+            name: user.username, 
+            account: user.email, 
             role: user.role,
             isEditing: false,
             editedName: user.username,
             editedAccount: user.email,
             editedPhone: user.phone || ''
         }))
+        allUsers.value = [...users.value] // 保存所有用户数据以便搜索
       } else {
         console.error('获取用户数据失败:', data.message)
       }
@@ -184,9 +185,11 @@
     users.value = allUsers.value.filter(user => {
       switch (searchType.value) {
         case 'name':
-          return user.username.toLowerCase().includes(query)
+          return user.name.toLowerCase().includes(query)
         case 'account':
-          return user.email.toLowerCase().includes(query)
+          return user.account.toLowerCase().includes(query)
+        case 'phone':
+          return user.role.toLowerCase().includes(query)
         default:
           return true
       }
@@ -225,7 +228,7 @@
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token  // ⬅️ 关键：加上这个
+          'Authorization': 'Bearer ' + token  
         },
         body: JSON.stringify({
           name: user.editedName,
@@ -257,8 +260,11 @@
   async function deleteUser() {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${userToDelete.value.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${userToDelete.value.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        }
       })
       
       const data = await response.json()
