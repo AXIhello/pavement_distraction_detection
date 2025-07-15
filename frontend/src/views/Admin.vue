@@ -257,8 +257,11 @@
   async function deleteUser() {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:8000/api/users/${userToDelete.value.id}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${userToDelete.value.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        }
       })
       
       const data = await response.json()
