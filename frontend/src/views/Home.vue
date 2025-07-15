@@ -7,7 +7,7 @@
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else class="user-info">
       <div class="info-item"><strong>账号：</strong>{{ user.username }}</div>
-      <div class="info-item"><strong>电话：</strong>{{ user.phone }}</div>
+      <div class="info-item"><strong>角色：</strong>{{ user.role }}</div>
       <div class="info-item"><strong>邮箱：</strong>{{ user.email }}</div>
       <div class="info-item">
         <strong>人脸识别照片：</strong><br />
@@ -27,11 +27,17 @@ const loading = ref(true)
 const error = ref('')
 
 // 后端接口路径（请根据实际修改）
-const API_URL = 'http://127.0.0.1:5000/api/user_info'
+const token = localStorage.getItem('token')
+const API_URL = 'http://127.0.0.1:8000/api/auth/me'
 
 onMounted(async () => {
   try {
-    const res = await fetch(API_URL)
+    const res = await fetch(API_URL, {
+      headers: {
+        'Authorization': `Bearer ${token}`, // 关键点
+        'Content-Type': 'application/json',
+      },
+    })
     const data = await res.json()
     if (data.success) {
       user.value = data.user

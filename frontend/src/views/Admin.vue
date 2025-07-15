@@ -12,8 +12,8 @@
             <div class="search-group">
               <select v-model="searchType" class="search-type">
                 <option value="name">姓名</option>
-                <option value="account">账号</option>
-                <option value="phone">电话</option>
+                <option value="account">邮箱</option>
+                <option value="phone">角色</option>
               </select>
               <input 
                 type="text" 
@@ -34,8 +34,8 @@
                 <tr>
                   <th>序号</th>
                   <th>姓名</th>
-                  <th>账号</th>
-                  <th>电话</th>
+                  <th>邮箱</th>
+                  <th>角色</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -51,8 +51,8 @@
                     <input v-else v-model="user.editedAccount" type="text" />
                   </td>
                   <td>
-                    <span v-if="!user.isEditing">{{ user.phone }}</span>
-                    <input v-else v-model="user.editedPhone" type="tel" />
+                    <span v-if="!user.isEditing">{{ user.role }}</span>
+                    <input v-else v-model="user.role" type="tel" />
                   </td>
                   <td>
                     <template v-if="!user.isEditing">
@@ -103,6 +103,7 @@
   import { ref, onMounted, computed } from 'vue'
   import { useRouter } from 'vue-router'
   import Header from '@/components/Navigation.vue'
+  import { all } from 'axios'
   
   const router = useRouter()
   
@@ -111,11 +112,13 @@
   const searchQuery = ref('')
   
   // 用户数据（模拟数据，实际应从后端API获取）
-  const users = ref([
-    { id: 1, name: '张三', account: 'zhangsan', phone: '13800138001', isEditing: false },
-    { id: 2, name: '李四', account: 'lisi', phone: '13800138002', isEditing: false },
-    { id: 3, name: '王五', account: 'wangwu', phone: '13800138003', isEditing: false }
-  ])
+  // const users = ref([
+  //   { id: 1, name: '张三', account: 'zhangsan', phone: '13800138001', isEditing: false },
+  //   { id: 2, name: '李四', account: 'lisi', phone: '13800138002', isEditing: false },
+  //   { id: 3, name: '王五', account: 'wangwu', phone: '13800138003', isEditing: false }
+  // ])
+
+  const users = ref([])
   
   // 分页相关
   const currentPage = ref(1)
@@ -135,20 +138,27 @@
   onMounted(() => {
     fetchUsers()
   })
-  
+
   // 从后端获取用户数据
   async function fetchUsers() {
     try {
-      // TODO: 替换为实际的后端API端点
-      const response = await fetch('http://127.0.0.1:5000/api/users')
+      const response = await fetch('http://127.0.0.1:8000/api/user_admin/', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        }
+  })
       const data = await response.json()
       if (data.success) {
-        users.value = data.users.map(user => ({
-          ...user,
-          isEditing: false,
-          editedName: user.name,
-          editedAccount: user.account,
-          editedPhone: user.phone
+        users.value = data.data.map(user => ({
+            id: user.id,
+            name: user.username, // 👈 匹配模板中用到的 user.name
+            account: user.email, // 👈 匹配模板中用到的 user.account
+            role: user.role,
+            isEditing: false,
+            editedName: user.username,
+            editedAccount: user.email,
+            editedPhone: user.phone || ''
         }))
       } else {
         console.error('获取用户数据失败:', data.message)
@@ -158,25 +168,25 @@
     }
   }
   
+  const allUsers = ref([]) // 用于存储所有用户数据，便于搜索
+
   // 搜索处理
   function handleSearch() {
     currentPage.value = 1 // 搜索后重置到第一页
     // 实际应用中可能需要调用API进行搜索
     if (!searchQuery.value) {
-      fetchUsers() // 如果搜索内容为空，重新获取所有用户
+      users.value = allUsers.value
       return
     }
     
     // 本地筛选逻辑
     const query = searchQuery.value.toLowerCase()
-    users.value = users.value.filter(user => {
+    users.value = allUsers.value.filter(user => {
       switch (searchType.value) {
         case 'name':
-          return user.name.toLowerCase().includes(query)
+          return user.username.toLowerCase().includes(query)
         case 'account':
-          return user.account.toLowerCase().includes(query)
-        case 'phone':
-          return user.phone.includes(query)
+          return user.email.toLowerCase().includes(query)
         default:
           return true
       }
@@ -211,7 +221,7 @@
   async function saveEdit(user) {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:5000/api/users/${user.id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -244,7 +254,7 @@
   async function deleteUser() {
     try {
       // TODO: 替换为实际的后端API端点
-      const response = await fetch(`http://127.0.0.1:5000/api/users/${userToDelete.value.id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/users/${userToDelete.value.id}`, {
         method: 'DELETE'
       })
       

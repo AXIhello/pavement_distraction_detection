@@ -46,7 +46,15 @@ class User(db.Model):
         self.password = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password, password)       
+        return check_password_hash(self.password, password)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'role': self.role,
+            'email': self.email
+        }       
 
 class FaceFeature(db.Model):
     """
