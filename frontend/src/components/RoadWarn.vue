@@ -5,10 +5,11 @@
 <!-- 弹窗形式展示细节-->
 <div v-if="selectedItem" class="modal-overlay" @click.self="backToList">
   <div class="modal-content">
-    <RoadAlertDetail
-      :detail="detailData"
-      @back="backToList"
-    />
+   <RoadAlertDetail
+  v-if="selectedItem && detailData"
+  :detail="detailData"
+  @back="backToList"
+/>
   </div>
 </div>
 
@@ -123,18 +124,26 @@ const errorDetail = ref(null)
 async function fetchData() {
   try {
     const res = await axios.get('http://localhost:8000/api/logs_alerts/alert_videos')
-    // 这里对后端返回的数据做字段映射，转成前端展示需要的格式
-    warnings.value = res.data.map(item => ({
-      id: item.id,
-      type: item.disease_type,
-      date: item.created_at ? item.created_at.split('T')[0] : '未知',
-      status: item.status || 'unprocessed'  // 如果后端没status，默认unprocessed
-    }))
+    
+    if (res.data && Array.isArray(res.data)) {
+      warnings.value = res.data.map(item => ({
+        id: item.id,
+        type: item.disease_type,
+        date: item.created_at ? item.created_at.split('T')[0] : '未知',
+        status: item.status || 'unprocessed'
+      }))
+    } else {
+      console.warn('后端返回的数据格式不正确')
+      warnings.value = []
+    }
   } catch (e) {
     console.error('获取数据失败', e)
     warnings.value = []
+    // 可以添加用户友好的错误提示
+    // alert('获取数据失败，请刷新页面重试')
   }
 }
+
 
 // 当前标签页数据
 const filteredByTab = computed(() =>
@@ -173,25 +182,34 @@ function sortBy(key) {
 }
 
 async function viewDetails(item) {
+  // 先清理之前的状态
   selectedItem.value = null
   detailData.value = null
   errorDetail.value = null
   loadingDetail.value = true
+  
   try {
-    const res = await axios.get(`http://localhost:8000/api/logs_alerts/alert_video_detail/${item.id}`) // 用视频ID请求详情
-    detailData.value = res.data
+    const res = await axios.get(`http://localhost:8000/api/logs_alerts/alert_video_detail/${item.id}`)
     
-    //打印图片链接以调试
-     if (res.data.frames && res.data.frames.length) {
-      res.data.frames.forEach((frame, idx) => {
-        console.log(`第${idx + 1}帧图片链接:`, frame.image_url)
-      })
+    // 检查返回的数据是否有效
+    if (res.data) {
+      detailData.value = res.data
+      
+      // 调试信息
+      if (res.data.frames && res.data.frames.length) {
+        res.data.frames.forEach((frame, idx) => {
+          console.log(`第${idx + 1}帧图片链接:`, frame.image_url)
+        })
+      } else {
+        console.log('没有帧图片链接数据')
+      }
+      
+      // 只有数据获取成功才设置selectedItem
+      selectedItem.value = item
     } else {
-      console.log('没有帧图片链接数据')
+      throw new Error('返回数据为空')
     }
-    
-    selectedItem.value = item
-  } catch (e) {viewD
+  } catch (e) {
     errorDetail.value = '获取详情失败，请稍后重试'
     console.error('获取详情失败', e)
     alert('获取详情失败，请稍后重试')
@@ -199,15 +217,24 @@ async function viewDetails(item) {
     loadingDetail.value = false
   }
 }
+import { nextTick } from 'vue'
 
-function backToList() {
+async function backToList() {
+  // 立即清理所有相关状态
   selectedItem.value = null
   detailData.value = null
   errorDetail.value = null
+  loadingDetail.value = false
+  
+  // 等待DOM更新完成，确保子组件完全卸载
+  await nextTick()
+  
+  // 重新获取最新数据
+  await fetchData()
 }
 
 function clearFilters() {
-  filterType.value = ''
+
   filterDate.value = ''
 }
 

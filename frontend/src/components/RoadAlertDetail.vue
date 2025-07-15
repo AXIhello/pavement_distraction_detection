@@ -17,7 +17,14 @@
       </p>
     </div>
     <div v-if="isAdmin" class="delete-wrapper">
-      <button @click="confirmDeleteVideo" class="delete-btn">删除该视频及所有告警帧</button>
+      <button
+  @click="confirmDeleteVideo"
+  class="delete-btn"
+  :disabled="isDeleting"
+>
+  {{ isDeleting ? '正在删除...' : '删除该视频及所有告警帧' }}
+</button>
+
     </div>
   </div>
 </div>
@@ -60,6 +67,10 @@
 
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
+const emit = defineEmits(['back'])
+
+const isDeleting = ref(false)
 
 const isAdmin = ref(false)
 onMounted(() => {
@@ -67,21 +78,48 @@ onMounted(() => {
   isAdmin.value = userInfo.role === 'admin'
 })
 
+
+let deleteLock = false
+let callTimes = 0
 async function confirmDeleteVideo() {
-  if (!props.detail?.id) return
+  callTimes++
+  console.log(`🧩 confirmDeleteVideo 调用第 ${callTimes} 次`)
+  if (!props.detail?.id || deleteLock) return
 
   const confirmed = window.confirm('确定要删除该视频及所有告警帧吗？此操作不可撤销。')
   if (!confirmed) return
 
+  deleteLock = true
+  const token = localStorage.getItem('token')
+
   try {
-    await axios.delete(`http://localhost:8000/api/face_alert_videos/${props.detail.id}`)
-    alert('删除成功')
-    emit('back')  // 触发返回到列表或上一页
+    const res = await axios.delete(
+      `http://localhost:8000/api/logs_alerts/alerts/road/${props.detail.id}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+
+    if (res.status === 200 || res.status === 204 || res.data?.success) {
+      alert('删除成功')
+      stopAutoPlay()
+      emit('back')  // ✅仍保留
+    } else {
+      alert('删除失败：' + (res.data?.message || '状态异常'))
+    }
   } catch (err) {
     console.error('删除失败:', err)
     alert('删除失败，请稍后重试')
+  } finally {
+    deleteLock = false
   }
 }
+
+function stopAutoPlay() {
+  if (autoPlayTimer) {
+    clearInterval(autoPlayTimer)
+    autoPlayTimer = null
+  }
+}
+
 
 function getFrameImageUrl(frame) {
   if (!frame || !frame.image_url) return ''
@@ -91,13 +129,13 @@ function getFrameImageUrl(frame) {
 const props = defineProps({
   detail: Object
 })
-defineEmits(['back'])
+// defineEmits(['back'])
 
 const isAutoPlaying = ref(true)
 
 function toggleAutoPlay() {
   if (isAutoPlaying.value) {
-    clearInterval(autoPlayTimer)
+    stopAutoPlay()
     autoPlayTimer = null
   } else {
     startAutoPlay()
@@ -115,7 +153,7 @@ function startAutoPlay() {
 
 function resetAutoPlay() {
   if (autoPlayTimer) {
-    clearInterval(autoPlayTimer)
+    stopAutoPlay()
     autoPlayTimer = null
   }
   if (isAutoPlaying.value) startAutoPlay()
@@ -141,9 +179,11 @@ const diseaseTypeCount = computed(() => {
 })
 
 watch(() => props.detail?.frames, () => {
+  if (isDeleting.value) return // ❗跳过删除中带来的 watch 变化
   currentFrameIndex.value = 0
   resetAutoPlay()
 })
+
 
 function prevFrame() {
   const frames = props.detail?.frames || []
@@ -180,10 +220,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (autoPlayTimer) {
-    clearInterval(autoPlayTimer)
-    autoPlayTimer = null
-  }
+  stopAutoPlay()
 })
 </script>
 
