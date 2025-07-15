@@ -1,1 +1,6 @@
 backend/app/app_config.py
+node_modules
+*.pyc
+__pycache__/
+venv310/
+backend/data/data_dlib
