@@ -63,7 +63,9 @@ def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id:
 
     # 使用 Pillow 打开图像
     image = Image.open(io.BytesIO(image_data))
-
+    # 如果是RGBA，先转为RGB
+    if image.mode == 'RGBA':
+        image = image.convert('RGB')
     # 保存到本地
     image.save(save_path)
     print(f"图像已保存到：{save_path}")

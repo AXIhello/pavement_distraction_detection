@@ -11,9 +11,11 @@ import RoadLog from '@/components/RoadWarn.vue'
 import Warning from '@/views/Warning.vue'
 import Log from '@/views/Log.vue'
 import FirstPage from '@/views/FirstPage.vue'
+import Traffic from '@/views/Traffic.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
+  { path:'/traffic',name:'traffic',component:Traffic,meta: { requiresAuth: true }},
   { path: '/login', name: 'Login', component: Login },
   { path: '/face', name: 'FaceRecognition', component: FaceRecognition, meta: { requiresAuth: true } },
   { path: '/home', name: 'Home', component: Home, meta: { requiresAuth: true } },
