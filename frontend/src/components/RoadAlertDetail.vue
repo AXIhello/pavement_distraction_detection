@@ -22,7 +22,7 @@
   class="delete-btn"
   :disabled="isDeleting"
 >
-  {{ isDeleting ? '正在删除...' : '删除该视频及所有告警帧' }}
+  {{ isDeleting ? '正在删除...' : '删除' }}
 </button>
 
     </div>
@@ -288,6 +288,32 @@ onUnmounted(() => {
 .delete-wrapper {
   flex: 0 0 auto;
   margin-top: 4px; /* 让按钮和文字顶部对齐 */
+}
+
+.delete-btn {
+  width: 80px;
+  height: 32px;
+  padding: 6px 0;
+  background: linear-gradient(45deg, #ef4444, #dc2626);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  text-align: center;
+  line-height: 20px;
+}
+
+.delete-btn:hover {
+  background: linear-gradient(45deg, #f87171, #dc2626);
+}
+
+.delete-btn:disabled {
+  background: #aaa;
+  cursor: not-allowed;
 }
 
 
