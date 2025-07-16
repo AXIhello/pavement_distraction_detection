@@ -212,6 +212,7 @@ class ExportLogsByTime(Resource):
                 yield f'{log.id},{log.timestamp},{log.level},{log.message},{log.pathname},{log.lineno},{log.module}\n'
         return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=logs.csv"})
 
+# 获取所有人脸识别告警信息（之前）
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
@@ -221,8 +222,10 @@ class FaceAlertFrames(Resource):
             return data
         except Exception as e:
             logger.error(f"获取人脸告警帧失败: {e}")
-            return {'error': '获取失败'}, 500 
-        
+            return {'error': '获取失败'}, 500
+
+
+# （可用）根据视频ID获取路面灾害告警详情
 @ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
 class AlertVideoDetail(Resource):               
     def get(self, video_id):
@@ -257,31 +260,53 @@ class AlertVideoDetail(Resource):
             logger.error(f"获取人脸告警视频详情失败: {e}")
             return {'error': '获取失败'}, 500    
         
-@ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
-class AlertVideoDetail(Resource):               
-    def get(self, video_id):
+# @ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
+# class AlertVideoDetail(Resource):
+#     def get(self, video_id):
+#         try:
+#             # 查询视频信息
+#             # video = FaceAlertFrame.query.get(video_id)
+#             # if not video:
+#             #     return {'error': '未找到对应视频'}, 404
+#
+#             # 查询该视频下的所有帧（如果有）
+#             frame = FaceAlertFrame.query.filter_by(id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
+#
+#             # 构造响应数据
+#             data = {
+#                 'id': frame.id,
+#                 'created_at': frame.created_at.isoformat() if frame.created_at else None,
+#                 'alert_type': frame.alert_type,
+#                 'image_url': frame.image_path,
+#             }
+#             return data
+#         except Exception as e:
+#             logger.error(f"获取人脸告警视频详情失败: {e}")
+#             return {'error': '获取失败'}, 500
+
+# 删除人脸识别告警帧
+import os
+@ns.route('/face_alert_frames/<int:frame_id>')
+class FaceAlertFrameDelete(Resource):
+    @admin_required
+    def delete(self, frame_id):
+        frame = FaceAlertFrame.query.get(frame_id)
+        if not frame:
+            return {'success': False, 'message': '告警帧不存在'}, 404
+
         try:
-            # 查询视频信息
-            # video = FaceAlertFrame.query.get(video_id)
-            # if not video:
-            #     return {'error': '未找到对应视频'}, 404
-
-            # 查询该视频下的所有帧（如果有）
-            frame = FaceAlertFrame.query.filter_by(id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
-
-            # 构造响应数据
-            data = {
-                'id': frame.id,
-                'created_at': frame.created_at.isoformat() if frame.created_at else None,
-                'alert_type': frame.alert_type,
-                'image_url': frame.image_path,
-            }
-            return data
+            # 如果有对应的本地缓存文件需要删除，也可在这里做
+            if frame.image_path and os.path.exists(frame.image_path):
+                os.remove(frame.image_path)
         except Exception as e:
-            logger.error(f"获取人脸告警视频详情失败: {e}")
-            return {'error': '获取失败'}, 500    
-        
+            return {'success': False, 'message': f'删除文件失败: {str(e)}'}, 500
 
+        db.session.delete(frame)
+        db.session.commit()
+        return {'success': True, 'message': '告警帧已删除'}
+
+        
+# (可用）路面检测视频
 @ns.route('/alert_videos')
 class AlertVideos(Resource):               
     def get(self):

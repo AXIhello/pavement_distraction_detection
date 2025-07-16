@@ -676,7 +676,7 @@ function toggleAutoPlay() {
   if (autoPlay.value) {
     autoPlayTimer.value = setInterval(() => {
       frameResults.value.length > 0 && nextImage()
-    }, 1000)
+    }, 300)
   } else {
     clearInterval(autoPlayTimer.value)
     autoPlayTimer.value = null
@@ -701,18 +701,18 @@ onBeforeRouteLeave((to, from, next) => {
 </script>
 <style scoped>
 .detect-container {
-  max-width: 1200px;
+  max-width: 960px;
   margin: auto;
   padding: 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fefef9;
+  background: transparent;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 30px;
+  text-align: left; 
+  margin-top: 20px;
 }
 
 .page-title {
@@ -721,16 +721,16 @@ onBeforeRouteLeave((to, from, next) => {
   margin: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; 
   gap: 12px;
 }
-
 .button-icon {
   margin-right: 8px;
 }
 
 .upload-mode {
   margin-bottom: 24px;
+  margin-top:10px;
   display: flex;
   justify-content: center;
   gap: 16px;
