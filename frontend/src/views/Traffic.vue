@@ -55,6 +55,9 @@
           <button @click="showAnalysis = !showAnalysis">
             {{ showAnalysis ? '隐藏分析数据' : '显示分析数据' }}
           </button>
+          <button @click="onClearMapOverlays" style="margin-left: 10px;">
+            清空地图
+          </button>
         </div>
       </main>
     </div>
@@ -69,25 +72,144 @@
       <div class="analysis-body">
         <!-- 左侧按钮栏 -->
         <div class="analysis-sidebar">
-          <button @click="activeAnalysis = 'population'">人口分布</button>
-          <button @click="activeAnalysis = 'flow'">客流量</button>
-          <button @click="activeAnalysis = 'weather'">天气与客流</button>
+          <button @click="onTogglePopulation">人口分布</button>
+          <button @click="onGoToShandong">山东省地图</button>
+          <button @click="activeAnalysis = 'flow'">客流量查询</button>
+          <button @click="activeAnalysis = 'weather'">客流与天气</button>
           <button @click="activeAnalysis = 'speed'">道路速度</button>
+          <button @click="onShowHeatmap">上客点查询</button>
+          <button @click="activeAnalysis = 'dynamicHeatmap'">动态热力图</button>
+          <button @click="activeAnalysis = 'bus'">载客车数量</button>
+          <button @click="activeAnalysis = 'orders'">路程的分析</button>
+          <button @click="activeAnalysis = 'orderStats'">时间与距离</button>
         </div>
 
         <!-- 右侧内容区域 -->
         <div class="analysis-content">
-          <div v-if="activeAnalysis === 'population'">
-            <p>人口分布分析结果内容...</p>
+          <div v-if="activeAnalysis === 'flow'">
+            <form @submit.prevent="onQueryFlow">
+              <div class="form-group">
+                <label>起始时间：</label>
+                <input type="datetime-local" v-model="flowStartTime" required />
+              </div>
+              <div class="form-group">
+                <label>结束时间：</label>
+                <input type="datetime-local" v-model="flowEndTime" required />
+              </div>
+              <button type="submit">查询客流量</button>
+            </form>
+            <EchartsTable ref="flowChartRef" />
           </div>
-          <div v-else-if="activeAnalysis === 'flow'">
-            <p>客流量分析结果内容...</p>
+          
+          <div v-else-if="activeAnalysis === 'speed'">
+            <form @submit.prevent="onQueryRoadSpeed">
+              <div class="form-group">
+                <label>查询时间：</label>
+                <input type="datetime-local" v-model="speedQueryTime" required />
+              </div>
+              <button type="submit">查询道路速度</button>
+            </form>
+            <div class="info-text">
+              <p>💡 提示：查询后地图上将显示道路线条，颜色表示速度：<span style="color: #00ff00;">绿色(快速)</span> | <span style="color: #ffff00;">黄色(中等)</span> | <span style="color: #ff0000;">红色(慢速)</span></p>
+            </div>
+          </div>
+          <div v-else-if="activeAnalysis === 'dynamicHeatmap'">
+            <form @submit.prevent="onShowDynamicHeatmap">
+              <div class="form-group">
+                <label>起始时间：</label>
+                <input type="datetime-local" v-model="dynamicHeatmapStartTime" required />
+              </div>
+              <div class="form-group">
+                <label>结束时间：</label>
+                <input type="datetime-local" v-model="dynamicHeatmapEndTime" required />
+              </div>
+              <div class="form-group">
+                <label>时间间隔：</label>
+                <select v-model="dynamicHeatmapInterval" required>
+                  <option value="15">15分钟</option>
+                  <option value="30">30分钟</option>
+                  <option value="60">1小时</option>
+                  <option value="120">2小时</option>
+                  <option value="240">4小时</option>
+                </select>
+              </div>
+              <button type="submit">显示动态热力图</button>
+            </form>
+            <div class="info-text">
+              <p>💡 提示：点击"显示动态热力图"后，地图右上角会出现控制面板，可以手动切换不同时段的热力图显示。</p>
+            </div>
+          </div>
+          <div v-if="activeAnalysis === 'bus'">
+            <form @submit.prevent="onQueryBusCount">
+              <label>起始时间：</label>
+              <input type="datetime-local" v-model="busStartTime" required />
+              <label>结束时间：</label>
+              <input type="datetime-local" v-model="busEndTime" required />
+              <label>间隔时间：</label>
+              <select v-model="busInterval" required>
+                <option value="15">15分钟</option>
+                <option value="30">30分钟</option>
+                <option value="60">1小时</option>
+              </select>
+              <button type="submit">查询载客车数量</button>
+            </form>
+            <EchartsTable ref="busChartRef" />
           </div>
           <div v-else-if="activeAnalysis === 'weather'">
-            <p>天气与客流关系分析结果内容...</p>
+            <form @submit.prevent="onQueryWeatherFlow">
+              <div class="form-group">
+                <label>起始时间：</label>
+                <input type="datetime-local" v-model="weatherStartTime" required />
+              </div>
+              <div class="form-group">
+                <label>结束时间：</label>
+                <input type="datetime-local" v-model="weatherEndTime" required />
+              </div>
+              <div class="form-group">
+                <label>时间间隔：</label>
+                <select v-model="weatherInterval" required>
+                  <option value="15">15分钟</option>
+                  <option value="30">30分钟</option>
+                  <option value="60">1小时</option>
+                  <option value="240">4小时</option>
+                  <option value="1440">1天</option>
+                </select>
+              </div>
+              <button type="submit">查询客流与天气</button>
+            </form>
+            <EchartsTable ref="weatherChartRef" />
           </div>
-          <div v-else-if="activeAnalysis === 'speed'">
-            <p>道路速度分析结果内容...</p>
+          <div v-else-if="activeAnalysis === 'orders'">
+            <form @submit.prevent="onQueryOrderDistribution">
+              <div class="form-group">
+                <label>起始时间：</label>
+                <input type="datetime-local" v-model="orderStartTime" step="1" required />
+              </div>
+              <div class="form-group">
+                <label>结束时间：</label>
+                <input type="datetime-local" v-model="orderEndTime" step="1" required />
+              </div>
+              <button type="submit">查询订单占比</button>
+            </form>
+            <EchartsTable ref="orderChartRef" />
+          </div>
+          <div v-else-if="activeAnalysis === 'orderStats'">
+            <form @submit.prevent="onQueryOrderStats">
+              <div class="form-group">
+                <label>起始时间：</label>
+                <input type="datetime-local" v-model="statStartTime" required />
+              </div>
+              <div class="form-group">
+                <label>结束时间：</label>
+                <input type="datetime-local" v-model="statEndTime" required />
+              </div>
+              <div class="form-group">
+                <label>时间间隔(分钟)：</label>
+                <input type="number" v-model="statInterval" min="1" required />
+              </div>
+              <button type="submit">查询订单统计</button>
+            </form>
+            <EchartsTable ref="statChartRef" />
           </div>
         </div>
       </div>
@@ -100,9 +222,9 @@ import BaiDuMap from '@/components/BaiDuMap.vue'
 import Navigation from '@/components/Navigation.vue'
 import { useRouter } from 'vue-router'
 import { ref } from 'vue'
+import EchartsTable from '@/components/EchartsTable.vue'
 
 const baiDuMapRef = ref(null)
-const router = useRouter()
 
 const startTime = ref('2013-09-12T00:00:00')
 const endTime = ref('2013-09-12T00:00:00')
@@ -113,40 +235,657 @@ const carPlate = ref('')
 const showAnalysis = ref(false)
 const activeAnalysis = ref('population')
 
+const busStartTime = ref('2013-09-12T00:00:00')
+const busEndTime = ref('2013-09-12T00:15:00')
+const busInterval = ref('15')
+const busChartRef = ref(null)
+
+const weatherStartTime = ref('2013-09-12T08:00:00')
+const weatherEndTime = ref('2013-09-12T18:00:00')
+const weatherInterval = ref('60')
+const weatherChartRef = ref(null)
+
+const flowStartTime = ref('2013-09-12T00:00:00')
+const flowEndTime = ref('2013-09-12T00:15:00')
+const flowChartRef = ref(null)
+
+const dynamicHeatmapStartTime = ref('2013-09-12T08:00:00')
+const dynamicHeatmapEndTime = ref('2013-09-12T12:00:00')
+const dynamicHeatmapInterval = ref('30')
+
+const orderStartTime = ref('2013-09-12T00:00:00')
+const orderEndTime = ref('2013-09-12T23:59:59')
+const orderChartRef = ref(null)
+
+const statStartTime = ref('2013-09-12T00:00:00')
+const statEndTime = ref('2013-09-12T12:00:00')
+const statInterval = ref('60')
+const statChartRef = ref(null)
+
+const speedQueryTime = ref('2013-09-12T08:00:00')
+
 async function onTimeQuery() {
   try {
-    baiDuMapRef.value?.showPoints([])
-    const response = await fetch(`/api/points/?start_time=${encodeURIComponent(startTime.value)}&end_time=${encodeURIComponent(endTime.value)}`)
-    const data = await response.json()
-    baiDuMapRef.value?.showPoints(data)
+    const response = await fetch(
+      `/api/traffic_analysis/points/?start_time=${encodeURIComponent(startTime.value)}&end_time=${encodeURIComponent(endTime.value)}`
+    );
+    const data = await response.json();
+    console.log('接口返回数据:', data)
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints(data);
+    }
   } catch (error) {
-    alert('查询失败')
+    console.error('查询失败', error)
+    alert('查询失败');
   }
 }
 
 async function onCarQuery() {
   try {
-    baiDuMapRef.value?.showPoints([])
-    const response = await fetch(`/api/car_points/?commaddr=${encodeURIComponent(carPlate.value)}&start_time=${encodeURIComponent(carStartTime.value)}&end_time=${encodeURIComponent(carEndTime.value)}`)
-    const data = await response.json()
-    baiDuMapRef.value?.showPoints(data)
+    // 先清空地图上的标识点
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints([]);
+    }
+    const response = await fetch(
+      `/api/traffic_analysis/car_points/?commaddr=${encodeURIComponent(carPlate.value)}&start_time=${encodeURIComponent(carStartTime.value)}&end_time=${encodeURIComponent(carEndTime.value)}`
+    );
+    const data = await response.json();
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints(data);
+    }
   } catch (error) {
-    alert('查询失败')
+    alert('查询失败');
   }
 }
 
 async function onShowHeatmap() {
   try {
-    baiDuMapRef.value?.showPoints([])
-    const response = await fetch(`/api/pickup_points/?time=${encodeURIComponent(startTime.value)}`)
-    const data = await response.json()
-    if (typeof baiDuMapRef.value?.showHeatmap === 'function') {
-      baiDuMapRef.value.showHeatmap(data)
+    // 先清空地图上的标识点
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints([]);
+    }
+    const response = await fetch(
+      `/api/traffic_analysis/pickup_points/?time=${encodeURIComponent(startTime.value)}`
+    );
+    const data = await response.json();
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showHeatmap === 'function') {
+      baiDuMapRef.value.showHeatmap(data);
     } else {
-      alert('地图组件未实现 showHeatmap 方法')
+      alert('地图组件未实现 showHeatmap 方法');
     }
   } catch (error) {
-    alert('热力图查询失败: ' + (error?.message || error))
+    alert('热力图查询失败: ' + (error && error.message ? error.message : error));
+  }
+}
+
+async function onShowDynamicHeatmap() {
+  try {
+    // 先清空地图上的标识点
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints([]);
+    }
+
+    // 构建请求参数
+    const params = new URLSearchParams({
+      start_time: dynamicHeatmapStartTime.value,
+      end_time: dynamicHeatmapEndTime.value,
+      time_interval: dynamicHeatmapInterval.value
+    });
+
+    console.log('动态热力图请求参数:', params.toString());
+
+    const response = await fetch(`/api/traffic_analysis/dynamic_heatmap/?${params.toString()}`);
+    const data = await response.json();
+
+    console.log('动态热力图返回数据:', data);
+
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showDynamicHeatmap === 'function') {
+      baiDuMapRef.value.showDynamicHeatmap(data);
+    } else {
+      alert('地图组件未实现 showDynamicHeatmap 方法');
+    }
+  } catch (error) {
+    console.error('动态热力图查询失败:', error);
+    alert('动态热力图查询失败: ' + (error && error.message ? error.message : error));
+  }
+}
+
+async function onQueryFlow() {
+  try {
+    // 直接使用本地时间格式，避免UTC转换
+    const params = new URLSearchParams({
+      start_time: flowStartTime.value,
+      end_time: flowEndTime.value
+    })
+    
+    const response = await fetch(`/api/traffic_analysis/flow/?${params.toString()}`)
+    const result = await response.json()
+    
+    if (result.time_slots && flowChartRef.value) {
+      const option = {
+        title: { 
+          text: '客流量分析',
+          subtext: `时间间隔: ${result.interval_minutes}分钟`
+        },
+        tooltip: { 
+          trigger: 'axis',
+          formatter: function(params) {
+            return `${params[0].axisValue}<br/>订单数量: ${params[0].value}`
+          }
+        },
+        xAxis: {
+          type: 'category',
+          data: result.time_slots.map(slot => slot.start_time.slice(11, 16)) // 只显示时:分
+        },
+        yAxis: { 
+          type: 'value', 
+          name: '订单数量',
+          minInterval: 1
+        },
+        series: [{
+          name: '订单数量',
+          type: 'line',
+          data: result.time_slots.map(slot => slot.order_count),
+          itemStyle: { color: '#5470c6' },
+          lineStyle: { width: 3 },
+          smooth: true
+        }]
+      }
+      
+      flowChartRef.value.setChartData(option)
+      console.log('客流量图表已更新:', option)
+    } else {
+      console.error('返回数据格式错误:', result)
+      alert('数据格式错误')
+    }
+  } catch (error) {
+    console.error('查询失败:', error)
+    alert('查询失败')
+  }
+}
+
+async function onQueryBusCount() {
+  console.log('onQueryBusCount 被调用')
+  const params = new URLSearchParams({
+    start_time: busStartTime.value,
+    end_time: busEndTime.value,
+    interval: busInterval.value
+  })
+  const response = await fetch(`/api/traffic_analysis/passenger_count/?${params.toString()}`)
+  const data = await response.json()
+  // 处理数据并渲染ECharts
+  if (busChartRef.value && typeof busChartRef.value.setChartData === 'function') {
+    // 生成时间区间标签，格式如 "00:00-00:15"
+    const timeLabels = data.time_slots.map((slot, index) => {
+      const startTime = slot.start_time.slice(11, 16) // 获取时:分
+      // 根据时间间隔计算结束时间
+      const intervalMinutes = parseInt(busInterval.value)
+      const startDate = new Date(slot.start_time)
+      const endDate = new Date(startDate.getTime() + intervalMinutes * 60 * 1000)
+      const endTime = endDate.toTimeString().slice(0, 5) // 获取时:分
+      return `${startTime}-${endTime}`
+    })
+    
+    const option = {
+      title: { text: '载客车数量-时段折线图' },
+      tooltip: { 
+        trigger: 'axis',
+        formatter: function(params) {
+          return `${params[0].axisValue}<br/>载客车数量: ${params[0].value}`
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: timeLabels,
+        axisLabel: {
+          rotate: 35,  // 标签旋转35度
+          interval: 0, // 显示所有标签
+          textStyle: {
+            fontSize: 12
+          }
+        }
+      },
+      yAxis: { type: 'value', name: '载客车数量' },
+      series: [{
+        name: '载客车数量',
+        type: 'line',
+        data: data.time_slots.map(slot => slot.passenger_car_count),
+        itemStyle: { color: '#5470c6' },
+        lineStyle: { width: 3 },
+        smooth: true
+      }]
+    }
+    console.log('option:', option)
+    busChartRef.value.setChartData(option)
+    console.log('setChartData 被调用', option)
+  }
+}
+
+async function onQueryWeatherFlow() {
+  try {
+    const params = new URLSearchParams({
+      start_time: weatherStartTime.value,
+      end_time: weatherEndTime.value,
+      interval: weatherInterval.value
+    })
+    
+    const response = await fetch(`/api/traffic_analysis/weather_flow/?${params.toString()}`)
+    const result = await response.json()
+    
+    if (result.data && weatherChartRef.value) {
+      // 构建多轴折线图配置，显示更多天气信息
+      const option = {
+        title: { 
+          text: '客流与天气关系图',
+          subtext: `时间范围: ${result.start_time?.slice(11, 16)} - ${result.end_time?.slice(11, 16)}`
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+          formatter: function(params) {
+            let html = params[0].axisValue + '<br/>';
+            params.forEach(param => {
+              html += param.marker + param.seriesName + ': ' + param.value;
+              if (param.seriesName === '温度') html += '°C';
+              if (param.seriesName === '湿度') html += '%';
+              if (param.seriesName === '风速') html += 'm/s';
+              if (param.seriesName === '降水量') html += 'mm';
+              html += '<br/>';
+            });
+            return html;
+          }
+        },
+        legend: {
+          data: ['客流量', '温度', '湿度', '风速', '降水量'],
+          top: 30,
+          textStyle: {
+            fontSize: 12
+          }
+        },
+        grid: {
+          top: 80,
+          bottom: 60,
+          left: 60,
+          right: 120
+        },
+        xAxis: {
+          type: 'category',
+          data: result.data.map(item => item.hour),
+          axisLabel: {
+            rotate: 35,
+            interval: 0
+          }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '客流量',
+            position: 'left',
+            axisLine: { show: true },
+            axisLabel: { color: '#5470c6' }
+          },
+          {
+            type: 'value',
+            name: '温度(°C)',
+            position: 'right',
+            offset: 0,
+            axisLine: { show: true },
+            axisLabel: { color: '#ff6b6b' }
+          },
+          {
+            type: 'value',
+            name: '湿度(%)',
+            position: 'right',
+            offset: 40,
+            axisLine: { show: true },
+            axisLabel: { color: '#91cc75' }
+          },
+          {
+            type: 'value',
+            name: '风速(m/s)',
+            position: 'right',
+            offset: 80,
+            axisLine: { show: true },
+            axisLabel: { color: '#fac858' }
+          }
+        ],
+        series: [
+          {
+            name: '客流量',
+            type: 'line',
+            yAxisIndex: 0,
+            data: result.data.map(item => item.passenger_flow),
+            lineStyle: { width: 3 },
+            itemStyle: { color: '#5470c6' },
+            smooth: true
+          },
+          {
+            name: '温度',
+            type: 'line',
+            yAxisIndex: 1,
+            data: result.data.map(item => item.weather.temperature),
+            lineStyle: { color: '#ff6b6b', width: 2 },
+            itemStyle: { color: '#ff6b6b' },
+            smooth: true
+          },
+          {
+            name: '湿度',
+            type: 'line',
+            yAxisIndex: 2,
+            data: result.data.map(item => item.weather.humidity),
+            lineStyle: { color: '#91cc75', width: 2 },
+            itemStyle: { color: '#91cc75' },
+            smooth: true
+          },
+          {
+            name: '风速',
+            type: 'line',
+            yAxisIndex: 3,
+            data: result.data.map(item => item.weather.wind_speed),
+            lineStyle: { color: '#fac858', width: 2 },
+            itemStyle: { color: '#fac858' },
+            smooth: true
+          },
+          {
+            name: '降水量',
+            type: 'bar',
+            yAxisIndex: 0,
+            data: result.data.map(item => item.weather.precip),
+            itemStyle: { 
+              color: '#73c0de',
+              opacity: 0.6
+            },
+            barWidth: '60%'
+          }
+        ]
+      }
+      
+      weatherChartRef.value.setChartData(option)
+      console.log('天气客流图表已更新:', option)
+    } else {
+      console.error('返回数据格式错误:', result)
+      alert('数据格式错误')
+    }
+  } catch (error) {
+    console.error('查询失败:', error)
+    alert('查询失败')
+  }
+}
+
+async function onQueryOrderDistribution() {
+  try {
+    // 直接使用本地时间格式，避免UTC转换
+    const params = new URLSearchParams({
+      start_time: orderStartTime.value,
+      end_time: orderEndTime.value
+    });
+
+    const response = await fetch(`/api/traffic_analysis/order_distribution/?${params.toString()}`);
+    const result = await response.json();
+
+    if (result.categories && orderChartRef.value) {
+      const option = {
+        title: {
+          text: '订单类型占比分析',
+          subtext: `总订单数: ${result.total_orders}`
+        },
+        tooltip: {
+          trigger: 'item',
+          formatter: function(params) {
+            return `${params.name}<br/>数量: ${params.value}<br/>占比: ${params.percent}%`
+          }
+        },
+        legend: {
+          orient: 'horizontal',
+          top: 60,
+          left: 'center',
+          itemWidth: 24,
+          itemHeight: 16,
+          textStyle: {
+            fontSize: 16
+          }
+        },
+        series: [
+          {
+            name: '订单占比',
+            type: 'pie',
+            radius: '50%',
+            center: ['60%', '50%'],
+            data: result.categories.map(item => ({
+              name: item.category_name,
+              value: item.count,
+              itemStyle: {
+                color: getCategoryColor(item.category)
+              }
+            })),
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowOffsetX: 0,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            },
+            label: {
+              formatter: function(params) {
+                // params.name: 订单类型名
+                // params.value: 数量
+                // params.percent: 占比
+                return `${params.name}: ${params.value}单 (${params.percent}%)`
+              }
+            }
+          }
+        ]
+      }
+      
+      orderChartRef.value.setChartData(option)
+      console.log('订单占比图表已更新:', option)
+    } else {
+      console.error('返回数据格式错误:', result)
+      alert('数据格式错误')
+    }
+  } catch (error) {
+    console.error('查询失败:', error)
+    alert('查询失败')
+  }
+}
+
+async function onQueryOrderStats() {
+  try {
+    // 直接使用本地时间格式，避免UTC转换
+    const params = new URLSearchParams({
+      start_time: statStartTime.value,
+      end_time: statEndTime.value,
+      interval: statInterval.value
+    })
+    const response = await fetch(`/api/traffic_analysis/order_stats/?${params.toString()}`)
+    const result = await response.json()
+
+    if (result.time_slots && statChartRef.value) {
+      // 构建3D散点图数据
+      const scatterData = []
+      const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
+      
+      result.time_slots.forEach((slot, slotIndex) => {
+        const timeLabel = slot.start_time.slice(11, 16) // 获取时:分作为Z轴标签
+        const color = colors[slotIndex % colors.length]
+        
+        // 处理每个时段内的订单数据
+        if (slot.orders && slot.orders.length > 0) {
+          // 如果有详细的订单数据，使用实际数据
+          slot.orders.forEach(order => {
+            scatterData.push([
+              order.duration_minutes,  // X轴：耗时
+              order.distance_km,       // Y轴：距离
+              slotIndex,               // Z轴：时段索引（数值）
+              color                    // 颜色
+            ])
+          })
+        } else {
+          // 如果没有详细订单数据，使用统计数据的平均值作为示例点
+          scatterData.push([
+            slot.avg_duration_minutes || 0,  // X轴：平均耗时
+            slot.avg_distance_km || 0,       // Y轴：平均距离
+            slotIndex,                       // Z轴：时段索引（数值）
+            color                            // 颜色
+          ])
+        }
+      })
+
+      const option = {
+        title: { 
+          text: '订单耗时-距离3D散点图',
+          subtext: `时间范围: ${result.start_time?.slice(11, 16)} - ${result.end_time?.slice(11, 16)}`
+        },
+        tooltip: {
+          formatter: function(params) {
+            return `时段: ${params.value[2]}<br/>耗时: ${params.value[0]}分钟<br/>距离: ${params.value[1]}公里`
+          }
+        },
+        legend: {
+          data: ['订单分布'],
+          top: 30
+        },
+        grid3D: {
+          viewControl: {
+            // 3D视角控制
+            alpha: 20,
+            beta: 40,
+            distance: 200,
+            autoRotate: false
+          },
+          light: {
+            main: {
+              intensity: 1.2
+            },
+            ambient: {
+              intensity: 0.3
+            }
+          }
+        },
+        xAxis3D: {
+          type: 'value',
+          name: '耗时(分钟)',
+          nameTextStyle: {
+            color: '#333'
+          }
+        },
+        yAxis3D: {
+          type: 'value', 
+          name: '距离(公里)',
+          nameTextStyle: {
+            color: '#333'
+          }
+        },
+        zAxis3D: {
+          type: 'value',
+          name: '时段',
+          nameTextStyle: {
+            color: '#333'
+          },
+          axisLabel: {
+            formatter: function(value) {
+              // 将数值映射回时间标签
+              const timeLabels = result.time_slots.map(slot => slot.start_time.slice(11, 16))
+              return timeLabels[Math.floor(value)] || value
+            }
+          }
+        },
+        series: [
+          {
+            name: '订单分布',
+            type: 'scatter3D',
+            data: scatterData,
+            symbolSize: 8,
+            itemStyle: {
+              opacity: 0.8
+            },
+            emphasis: {
+              itemStyle: {
+                opacity: 1,
+                symbolSize: 12
+              }
+            }
+          }
+        ]
+      }
+      
+      console.log('3D散点图数据:', scatterData)
+      console.log('3D散点图配置:', option)
+      statChartRef.value.setChartData(option)
+      console.log('3D散点图已更新')
+    } else {
+      alert('数据格式错误')
+    }
+  } catch (error) {
+    console.error('查询失败:', error)
+    alert('查询失败')
+  }
+}
+
+function getCategoryColor(category) {
+  const colors = {
+    'short': '#87CEEB',   // 浅蓝 - 短途
+    'medium': '#90EE90',  // 浅绿 - 中途
+    'long': '#FFB6C1'     // 粉红 - 长途
+  }
+  return colors[category] || '#87CEEB'
+}
+
+function calculateOptimalInterval(startTime, endTime) {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const diffHours = (end - start) / (1000 * 60 * 60);
+  
+  if (diffHours <= 3) return '15';      
+  if (diffHours <= 6) return '30'; 
+  if (diffHours <= 12) return '60';
+  if (diffHours <= 18) return '90';
+  if (diffHours <= 24) return '120';
+  if (diffHours <= 168) return '240';   
+  return '1440';                        
+}
+
+function onClearMapOverlays() {
+  if (baiDuMapRef.value && typeof baiDuMapRef.value.clearMapOverlays === 'function') {
+    baiDuMapRef.value.clearMapOverlays();
+  }
+}
+
+// 人口显示
+function onTogglePopulation() {
+  baiDuMapRef.value?.togglePopulation()
+}
+
+function onGoToShandong() {
+  baiDuMapRef.value?.goToShandong()
+}
+
+async function onQueryRoadSpeed() {
+  try {
+    // 先清空地图上的标识点
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
+      baiDuMapRef.value.showPoints([]);
+    }
+
+    const params = new URLSearchParams({
+      query_time: speedQueryTime.value
+    });
+
+    console.log('道路速度查询参数:', params.toString());
+
+    const response = await fetch(`/api/traffic_analysis/road_speed/?${params.toString()}`);
+    const data = await response.json();
+
+    console.log('道路速度返回数据:', data);
+
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showRoadSpeed === 'function') {
+      baiDuMapRef.value.showRoadSpeed(data);
+    } else {
+      alert('地图组件未实现 showRoadSpeed 方法');
+    }
+  } catch (error) {
+    console.error('道路速度查询失败:', error);
+    alert('道路速度查询失败: ' + (error && error.message ? error.message : error));
   }
 }
 </script>
@@ -187,6 +926,15 @@ async function onShowHeatmap() {
 .map-analysis-btn {
   padding: 1rem;
   text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px; /* 按钮间距 */
+}
+.map-analysis-btn button {
+  width: auto;
+  min-width: 120px;
+  margin: 0;
 }
 .card {
   background: #efdb9384;
@@ -284,5 +1032,20 @@ button:hover {
   font-size: 1.4rem;
   color: #333;
   margin: 0;
+}
+
+.info-text {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border-left: 4px solid #007bff;
+}
+
+.info-text p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #fff;
+  line-height: 1.4;
 }
 </style>
