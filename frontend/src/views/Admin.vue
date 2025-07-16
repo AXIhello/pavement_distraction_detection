@@ -95,6 +95,13 @@
                         </svg>
                         修改
                       </button>
+                      <button class="face-btn btn-secondary" @click="showFaceManagement(user)">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="7" r="4"></circle>
+                          <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
+                        </svg>
+                        人脸管理
+                      </button>
                       <button class="delete-btn btn-secondary" @click="confirmDelete(user)">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <polyline points="3 6 5 6 21 6"></polyline>
@@ -188,6 +195,49 @@
           </div>
         </div>
       </div>
+      
+      <!-- 人脸管理弹窗 -->
+      <div v-if="showFaceModal" class="modal-overlay">
+        <div class="face-management-modal">
+          <div class="modal-header">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="7" r="4"></circle>
+              <path d="M5 21v-2a7 7 0 0 1 14 0v2"></path>
+            </svg>
+            <h3>{{ currentFaceUser.name }} 的人脸管理</h3>
+          </div>
+          
+          <div class="face-images-container">
+            <div v-if="faceImages.length > 0" class="face-images-grid">
+              <div v-for="image in faceImages" :key="image.id" class="face-image-item">
+                <div class="face-image-wrapper">
+                  <img :src="image.url" :alt="'人脸图片 ' + image.id" class="face-image" />
+                  <button @click="confirmDeleteFace(image.id)" class="delete-face-btn btn-danger">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="face-image-name">{{ image.name }}</div>
+              </div>
+            </div>
+            <div v-else class="empty-face-state">
+              <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="8" y1="15" x2="16" y2="15"></line>
+                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+              </svg>
+              <h4>暂无已录入的人脸数据</h4>
+              <p>该用户尚未录入任何人脸信息</p>
+            </div>
+          </div>
+          <div class="modal-buttons">
+            <button class="close-modal-btn btn-secondary" @click="closeFaceModal">关闭</button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -224,6 +274,11 @@ const paginatedUsers = computed(() => {
 // 删除相关
 const showDeleteModal = ref(false)
 const userToDelete = ref(null)
+
+// 人脸管理相关状态
+const showFaceModal = ref(false)
+const currentFaceUser = ref(null)
+const faceImages = ref([])
 
 // 初始化时获取用户数据
 onMounted(async () => {
@@ -395,6 +450,74 @@ watch(currentPage, () => {
     tableContainer.scrollTop = 0
   }
 })
+
+// 显示人脸管理弹窗
+async function showFaceManagement(user) {
+  currentFaceUser.value = user
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${user.id}/faces`, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+    const data = await response.json()
+    if (data.success) {
+      faceImages.value = data.images.map(img => ({
+        id: img.id,
+        url: "http://127.0.0.1:8000/static/" + img.image_url.replace(/^data\//, ''),
+        name: img.name || `人脸图片 ${img.id}`
+      }))
+      showFaceModal.value = true
+    } else {
+      console.error('获取人脸数据失败:', data.message)
+      faceImages.value = []
+      showFaceModal.value = true
+    }
+  } catch (error) {
+    console.error('请求人脸数据失败:', error)
+    faceImages.value = []
+    showFaceModal.value = true
+  }
+}
+
+// 关闭人脸管理弹窗
+function closeFaceModal() {
+  showFaceModal.value = false
+  currentFaceUser.value = null
+  faceImages.value = []
+}
+
+// 确认删除人脸
+function confirmDeleteFace(faceId) {
+  if (confirm('确定要删除这张人脸图片吗？此操作不可撤销')) {
+    deleteFace(faceId)
+  }
+}
+
+// 删除人脸
+async function deleteFace(faceId) {
+  try {
+    const userId = currentFaceUser.value.id  // ✅ 正确获取用户ID
+
+    const response = await fetch(`http://127.0.0.1:8000/api/user_admin/${userId}/faces/${faceId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+
+    const data = await response.json()
+    if (data.success) {
+      // 从当前列表中移除已删除的人脸
+      faceImages.value = faceImages.value.filter(img => img.id !== faceId)
+    } else {
+      console.error('删除人脸失败:', data.message)
+    }
+  } catch (error) {
+    console.error('请求删除人脸失败:', error)
+  }
+}
 </script>
 
 <style>
@@ -932,6 +1055,175 @@ watch(currentPage, () => {
   .search-input,
   .search-btn {
     width: 100%;
+  }
+}
+
+/* 人脸管理弹窗样式 */
+.face-management-modal {
+  background-color: white;
+  padding: 24px;
+  border-radius: 16px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  animation: modalFadeIn 0.3s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #1f2937;
+}
+
+.face-images-container {
+  margin: 20px 0;
+}
+
+.face-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.face-image-item {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.face-image-item:hover {
+  transform: translateY(-5px);
+}
+
+.face-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+
+.face-image-wrapper:hover .delete-face-btn {
+  opacity: 1;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.face-image-name {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #333;
+  word-break: break-all; /* 避免名字太长溢出 */
+}
+
+.face-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.delete-face-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  padding: 0;
+  background: rgba(255, 0, 0, 0.8);
+  border: none;
+  cursor: pointer;
+}
+
+.delete-face-btn:hover {
+  background-color: rgba(220, 38, 38, 0.9);
+}
+
+.delete-face-btn .icon {
+  width: 16px;
+  height: 16px;
+  stroke: white;
+}
+
+.empty-face-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empty-face-state h4 {
+  margin: 16px 0 8px;
+  color: #374151;
+}
+
+.empty-face-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  gap: 12px;
+}
+
+.close-modal-btn {
+  padding: 10px 24px;
+}
+
+/* 人脸管理按钮样式 */
+.face-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .face-images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  
+  .face-image {
+    height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .face-images-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .modal-header h3 {
+    font-size: 18px;
   }
 }
 </style>

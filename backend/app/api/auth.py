@@ -9,6 +9,8 @@ from ..extensions import db
 import random, string, io
 from captcha.image import ImageCaptcha
 from datetime import datetime
+from app.core.models import FaceFeature
+import os
 
 # 权限校验装饰器
 def admin_required(f):
@@ -91,6 +93,58 @@ class UserDetail(Resource):
         db.session.delete(user)
         db.session.commit()
         return {'success': True, 'message': '删除成功'}
+    
+@user_ns.route('/<int:user_id>/faces')
+class UserFaceList(Resource):
+    @admin_required
+    def get(self, user_id):
+        """
+        获取指定用户的人脸图片列表（管理员操作）
+        """
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+
+        face_features = FaceFeature.query.filter_by(user_id=user_id).all()
+
+        images = []
+        for face in face_features:
+            images.append({
+                'id': face.id,
+                'name': face.name,
+                'image_url': face.image_path
+            })
+
+        return {'success': True, 'images': images}, 200
+    
+@user_ns.route('/<int:user_id>/faces/<int:face_id>')
+class UserFaceDelete(Resource):
+    @admin_required
+    def delete(self, user_id, face_id):
+        """
+        删除指定用户的人脸图片（管理员操作）
+        """
+        user = User.query.get(user_id)
+        if not user:
+            return {'success': False, 'message': '用户不存在'}, 404
+
+        feature = FaceFeature.query.get(face_id)
+        if not feature:
+            return {'success': False, 'message': '人脸数据不存在'}, 404
+        
+        if feature.user_id != user_id:
+            return {'success': False, 'message': '用户与人脸数据不匹配'}, 400
+        
+        # 删除图片文件（如果有存储图片）
+        if feature.image_path:
+            relative_path = feature.image_path.replace('data/', '', 1)
+            image_full_path = os.path.join(current_app.root_path, 'static', relative_path)
+            if os.path.exists(image_full_path):
+                os.remove(image_full_path)
+
+        db.session.delete(feature)
+        db.session.commit()
+        return {'success': True, 'message': '人脸数据删除成功'}
 
 # 1. 定义一个命名空间 'ns'
 ns = Namespace('auth', description='认证相关操作')
