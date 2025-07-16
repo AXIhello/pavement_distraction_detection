@@ -42,6 +42,15 @@ else:
     config_class = DevelopmentConfig
 
 app = Flask(__name__,static_folder=None)
+
+from flask import send_from_directory
+
+# 静态资源访问配置：映射 /data/** 到 backend/data 目录
+@app.route('/data/<path:filename>')
+def serve_data(filename):
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+    return send_from_directory(root_dir, filename)
+
 app.config.from_object(config_class)
 app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'your_secret_key')
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # 必须是 None 才能跨域传 Cookie
@@ -128,7 +137,6 @@ api.add_namespace(user_ns)  # 注册用户管理命名空间
 
 # 获取路面检测的Socket.IO处理器
 pavement_handlers = get_pavement_socketio_handlers()
-
 
 # --- SocketIO 事件处理 ---
 @socketio.on('connect')
@@ -336,7 +344,7 @@ def create_admin_if_not_exists():
 if __name__ == '__main__':
     with app.app_context():
         try:
-            # db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
