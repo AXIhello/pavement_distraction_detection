@@ -164,18 +164,29 @@ class ClearLogsByTime(Resource):
         level 可选
         """
         data = request.json
-        start_time_str = data['startTime'].strip()
-        end_time_str = data['endTime'].strip()
-        level = data.get('level', '').strip().upper()  # 用get防止key不存在
-        if len(start_time_str) == 10:
+        start_time_str = data.get('startTime', '').strip()
+        end_time_str = data.get('endTime', '').strip()
+        level = data.get('level', '').strip().upper()
+
+        query = LogEntry.query
+
+        # 时间处理
+        if start_time_str and len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
-        if len(end_time_str) == 10:
+        if end_time_str and len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
-        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
+
+        if start_time_str:
+            start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LogEntry.timestamp >= start_time)
+        if end_time_str:
+            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LogEntry.timestamp <= end_time)
+
+        # 级别处理
         if level:
             query = query.filter(LogEntry.level == level)
+
         logs = query.all()
         count = len(logs)
         for log in logs:
@@ -192,18 +203,27 @@ class ExportLogsByTime(Resource):
         """
         start_time_str = request.args.get('startTime', '').strip()
         end_time_str = request.args.get('endTime', '').strip()
-        level = request.args.get('level', '').strip().upper()  # 新增
+        level = request.args.get('level', '').strip().upper()
 
-        if len(start_time_str) == 10:
+        query = LogEntry.query
+
+        # 时间处理
+        if start_time_str and len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
-        if len(end_time_str) == 10:
+        if end_time_str and len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
-        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
 
-        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
+        if start_time_str:
+            start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LogEntry.timestamp >= start_time)
+        if end_time_str:
+            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+            query = query.filter(LogEntry.timestamp <= end_time)
+
+        # 级别处理
         if level:
             query = query.filter(LogEntry.level == level)
+
         logs = query.all()
 
         def generate():
