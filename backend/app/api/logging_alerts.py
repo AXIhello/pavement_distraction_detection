@@ -182,13 +182,24 @@ class ClearLogsByTime(Resource):
 @ns.route('/logs/export_by_time')
 class ExportLogsByTime(Resource):
     def get(self):
-        try:
-            videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
-            data = [video.to_dict() for video in videos]
-            return data
-        except Exception as e:
-            logger.error(f"获取路面灾害告警信息失败: {e}")
-            return {'error': '获取失败'}, 500
+        """
+        按时间区间导出日志为CSV
+        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10
+        """
+        start_time_str = request.args.get('startTime', '').strip()
+        end_time_str = request.args.get('endTime', '').strip()
+        if len(start_time_str) == 10:
+            start_time_str += ' 00:00:00'
+        if len(end_time_str) == 10:
+            end_time_str += ' 23:59:59'
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        def generate():
+            yield 'id,timestamp,level,message,pathname,lineno,module\n'
+            for log in logs:
+                yield f'{log.id},{log.timestamp},{log.level},{log.message},{log.pathname},{log.lineno},{log.module}\n'
+        return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=logs.csv"})
 
 # 获取所有人脸识别告警信息（之前）
 @ns.route('/face_alert_frames')
@@ -294,4 +305,4 @@ class AlertVideos(Resource):
             return data
         except Exception as e:
             logger.error(f"获取路面告警视频失败: {e}")
-            return {'error': '获取失败'}, 500 
+            return {'error': '获取失败'}, 500
