@@ -269,4 +269,51 @@ class AlertVideos(Resource):
             return data
         except Exception as e:
             logger.error(f"获取路面告警视频失败: {e}")
-            return {'error': '获取失败'}, 500 
+            return {'error': '获取失败'}, 500
+
+@ns.route('/logs/clear_by_time')
+class ClearLogsByTime(Resource):
+    @admin_required
+    def post(self):
+        """
+        按时间区间批量删除日志
+        前端传递: {"startTime": "2024-07-01", "endTime": "2024-07-10"}
+        """
+        data = request.json
+        # 只传日期时自动补全时间
+        start_time_str = data['startTime'].strip()
+        end_time_str = data['endTime'].strip()
+        if len(start_time_str) == 10:
+            start_time_str += ' 00:00:00'
+        if len(end_time_str) == 10:
+            end_time_str += ' 23:59:59'
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        count = len(logs)
+        for log in logs:
+            db.session.delete(log)
+        db.session.commit()
+        return {"success": True, "deleted": count}
+
+@ns.route('/logs/export_by_time')
+class ExportLogsByTime(Resource):
+    def get(self):
+        """
+        按时间区间导出日志为CSV
+        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10
+        """
+        start_time_str = request.args.get('startTime', '').strip()
+        end_time_str = request.args.get('endTime', '').strip()
+        if len(start_time_str) == 10:
+            start_time_str += ' 00:00:00'
+        if len(end_time_str) == 10:
+            end_time_str += ' 23:59:59'
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        def generate():
+            yield 'id,timestamp,level,message,pathname,lineno,module\n'
+            for log in logs:
+                yield f'{log.id},{log.timestamp},{log.level},{log.message},{log.pathname},{log.lineno},{log.module}\n'
+        return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=logs.csv"})
