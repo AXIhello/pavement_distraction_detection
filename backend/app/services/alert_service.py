@@ -26,7 +26,7 @@ def create_alert_video(db_type: str, video_name: str, save_dir: str, total_frame
     db.session.commit()
     return video.id
 
-def save_alert_frame(db_type: str,  image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None, bboxes: list = None,save_dir: str = None) -> str:
+def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None, bboxes: list = None,save_dir0: str = None) -> str:
     if db_type == 'road':
         VideoModel = AlertVideo
         FrameModel = AlertFrame
@@ -42,7 +42,7 @@ def save_alert_frame(db_type: str,  image_base64: str,confidence: float,video_id
 
     elif db_type == 'face':
         FrameModel = FaceAlertFrame
-        save_path = Path(save_dir)
+        save_path = Path(save_dir0)
     else:
         raise ValueError(f"不支持的告警类型: {db_type}")
 

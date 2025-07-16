@@ -7,11 +7,9 @@ from ..services.logging_service import LoggingService
 # 导入你的日志器
 from ..utils.logger import get_logger
 from ..core.models import AlertVideo,db, AlertFrame, FaceAlertFrame,LogEntry
-import shutil, os
 from functools import wraps
 from flask import Response
 from datetime import datetime
-import csv
 
 logger = get_logger(__name__)
 
@@ -44,7 +42,7 @@ pagination_parser.add_argument('page', type=int, help='页码', default=1)
 pagination_parser.add_argument('per_page', type=int, help='每页数量', default=10)
 
 
-# --- 日志 API (与我之前给您的内容一致) ---
+# --- 日志 API  ---
 @ns.route('/logs')
 class LogList(Resource):
     @ns.doc('获取系统日志列表', parser=pagination_parser)
@@ -76,7 +74,7 @@ class LogList(Resource):
         return logs_data
 
 
-# --- 告警 API (与我之前给您的内容一致) ---
+# --- 告警 API  ---
 @ns.route('/alerts')
 class AlertList(Resource):
     @ns.doc('获取告警事件列表', parser=pagination_parser)
@@ -192,13 +190,11 @@ class ExportLogsByTime(Resource):
             logger.error(f"获取路面灾害告警信息失败: {e}")
             return {'error': '获取失败'}, 500
 
-
-
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
         try:
-            frames = FaceAlertVideo.query.order_by(FaceAlertVideo.created_at.desc()).all()
+            frames = FaceAlertFrame.query.order_by(FaceAlertFrame.created_at.desc()).all()
             data = [frame.to_dict() for frame in frames]
             return data
         except Exception as e:
@@ -244,16 +240,16 @@ class AlertVideoDetail(Resource):
     def get(self, video_id):
         try:
             # 查询视频信息
-            video = FaceAlertVideo.query.get(video_id)
-            if not video:
-                return {'error': '未找到对应视频'}, 404
+            # video = FaceAlertFrame.query.get(video_id)
+            # if not video:
+            #     return {'error': '未找到对应视频'}, 404
 
             # 查询该视频下的所有帧（如果有）
-            frame = FaceAlertFrame.query.filter_by(video_id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
+            frame = FaceAlertFrame.query.filter_by(id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
 
             # 构造响应数据
             data = {
-                'id': frame.video_id,
+                'id': frame.id,
                 'created_at': frame.created_at.isoformat() if frame.created_at else None,
                 'alert_type': frame.alert_type,
                 'image_url': frame.image_path,
@@ -263,3 +259,14 @@ class AlertVideoDetail(Resource):
             logger.error(f"获取人脸告警视频详情失败: {e}")
             return {'error': '获取失败'}, 500    
         
+
+@ns.route('/alert_videos')
+class AlertVideos(Resource):               
+    def get(self):
+        try:
+            videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
+            data = [videos.to_dict() for videos in videos]
+            return data
+        except Exception as e:
+            logger.error(f"获取路面告警视频失败: {e}")
+            return {'error': '获取失败'}, 500 

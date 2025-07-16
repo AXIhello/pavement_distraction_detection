@@ -120,7 +120,7 @@ def get_pavement_socketio_handlers():
                 save_dir.mkdir(parents=True, exist_ok=True)
 
                 # 2. 路面病害告警
-                video_id = create_alert_video('road',f'video_{timestamp}', str(save_dir), 0, 0, None)   # none为用户 后续关联
+                video_id = create_alert_video('road',f'video_{timestamp}', str(save_dir), 0, 0)
 
                 frame_count = 0  # 重置帧计数
                 alert_count = 0  # 重置告警计数
@@ -140,7 +140,7 @@ def get_pavement_socketio_handlers():
                 if(len(result.get('detections', [])) > 0):
                     alert_count += 1
                     # 保存检测结果到数据库
-                    save_alert_frame('road',video_id, frame_index+1, result['annotated_image'], result['detections'][0]['confidence'], result['detections'][0]['class'],bboxes=[d['bbox'] for d in result['detections']])
+                    save_alert_frame('road',result['annotated_image'],result['detections'][0]['confidence'],video_id, frame_index+1,result['detections'][0]['class'])
             else:
                 logger.warning(f"视频帧检测失败: {result.get('message')}")
             
