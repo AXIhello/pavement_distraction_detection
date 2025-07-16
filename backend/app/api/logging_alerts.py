@@ -159,21 +159,21 @@ class ClearLogsByTime(Resource):
     @admin_required
     def post(self):
         """
-        按时间区间批量删除日志
-        前端传递: {"startTime": "2024-07-01", "endTime": "2024-07-10"}
+        按时间区间和日志级别批量删除日志
+        前端传递: {"startTime": "2024-07-01", "endTime": "2024-07-10", "level": "ERROR"}
+        level 可选
         """
         data = request.json
-        # 只传日期时自动补全时间
         start_time_str = data['startTime'].strip()
         end_time_str = data['endTime'].strip()
-        level = data['level'].strip().upper()  # 新增
+        level = data.get('level', '').strip().upper()  # 用get防止key不存在
         if len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
         if len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
         start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
         if level:
             query = query.filter(LogEntry.level == level)
         logs = query.all()
