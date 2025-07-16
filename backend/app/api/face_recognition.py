@@ -140,20 +140,6 @@ class FaceRecognition(Resource):
                     'success': False, 
                     'message': '未检测到人脸'
                 }
-            
-            # 检查是否有告警情况
-            if recognition_results[0].get("name") == "deepfake" or recognition_results[0].get("name") == "陌生人":
-                # 1️. 自动生成保存路径
-                now = datetime.now()
-                timestamp = now.strftime('%Y%m%d_%H%M%S')
-                save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
-
-                # 2. 人脸告警帧
-                distance = recognition_results[0].get("distance")
-                if distance is None:
-                    distance = 0  # 或者其他合理默认值
-                confidence = 1 - distance
-                save_alert_frame('face', image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),save_dir=str(save_dir))
 
             return {
                 'success': True,
