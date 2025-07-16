@@ -1,136 +1,172 @@
 <template>
-  <div class="table-wrapper">
-    <div class="title">人脸识别告警</div>
-  <FaceAlertDetail
+  <div class="face-warn-wrapper">
+    <div class="title-section">
+      <h3>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        人脸识别告警
+      </h3>
+      <div class="alert-count">
+        <span>共 {{ displayedData.length }} 条记录</span>
+      </div>
+    </div>
+
+    <FaceAlertDetail
       v-if="selectedItem"
       :detail="detailData"
       @back="backToList"
     />
+
     <div v-else>
-    <!-- 状态切换按钮 -->
-    <div class="status-toggle">
-      <button
-        @click="activeTab = 'unprocessed'"
-        :class="['status-btn', { active: activeTab === 'unprocessed' }]"
-      >
-        未处理
-      </button>
-      <button
-        @click="activeTab = 'processed'"
-        :class="['status-btn', { active: activeTab === 'processed' }]"
-      >
-        已处理
-      </button>
-    </div>
+      <!-- 筛选区域 -->
+      <div class="filters-card">
+        <div class="filters-header">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"></polygon>
+          </svg>
+          <span>筛选条件</span>
+        </div>
 
-    <!-- 过滤器区域：仅保留日期 -->
-    <div class="filters">
-      <div class="filter-group">
-        <label class="filter-label">
-          <span class="label-text">日期:</span>
-          <input type="date" v-model="filterDate" class="filter-input" />
-        </label>
+        <div class="filters">
+          <div class="filter-item">
+            <label>日期</label>
+            <input type="date" v-model="filterDate" />
+          </div>
+          <div class="filter-item">
+            <label>类型</label>
+           <select v-model="filterType">
+  <option value="">全部</option>
+  <option
+    v-for="type in alertTypeOptions"
+    :key="type"
+    :value="type"
+  >
+    {{ formatType(type) }}
+  </option>
+</select>
 
-        <button @click="clearFilters" class="clear-btn">
-          <span class="btn-icon">🗑️</span> 清除筛选
-        </button>
+          </div>
+          <div class="filter-actions">
+            <button @click="clearFilters" class="btn-secondary">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+              </svg>
+              清除筛选
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 表格区域 -->
+      <div class="table-card">
+        <div class="table-container" v-if="displayedData.length > 0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th @click="sortBy('date')" class="sortable-header">
+                  <div class="header-content">
+                    <span>告警时间</span>
+                    <span v-if="sortKey === 'date'" class="sort-indicator">
+                      {{ sortOrder === 1 ? '▲' : '▼' }}
+                    </span>
+                  </div>
+                </th>
+                <th>类型</th>
+                <th class="action-header">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in displayedData" :key="item.id" class="data-row">
+                <td class="date-cell">{{ item.date }}</td>
+                <td class="type-cell">{{ formatType(item.type) }}</td>
+                <td class="action-cell">
+                  <button @click="viewDetails(item)" class="detail-btn">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    查看详情
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-else class="empty-state">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="8" y1="15" x2="16" y2="15"></line>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+          </svg>
+          <h4>暂无告警数据</h4>
+          <p>当前没有人脸识别告警记录</p>
+        </div>
       </div>
     </div>
-
-    <!-- 表格 -->
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th @click="sortBy('date')" class="sortable-header">
-              <div class="header-content">
-                <span>告警时间</span>
-                <span v-if="sortKey === 'date'" class="sort-indicator">
-                  {{ sortOrder === 1 ? '▲' : '▼' }}
-                </span>
-              </div>
-            </th>
-            <th class="action-header">查看详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in displayedData" :key="item.id" class="data-row">
-            <td class="date-cell">{{ item.date }}</td>
-            <td class="action-cell">
-              <button @click="viewDetails(item)" class="detail-btn">
-                <span class="btn-icon">👁️</span> 查看详情
-              </button>
-            </td>
-          </tr>
-          <tr v-if="displayedData.length === 0" class="empty-row">
-            <td colspan="2" class="empty-cell">
-              <div class="empty-content">
-                <span class="empty-icon">📋</span>
-                <span class="empty-text">暂无数据</span>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
   </div>
 </template>
+
+
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import FaceAlertDetail from './FaceAlertDetail.vue'
 
+const alertTypeOptions = ref([])
 
-const logWarnings = ref([])           // 补充声明
-const activeTab = ref('unprocessed') // 补充声明，默认tab
-
+const logWarnings = ref([])
 const selectedItem = ref(null)
 const detailData = ref(null)
-
 const sortKey = ref('')
 const sortOrder = ref(1)
 
 const filterDate = ref('')
+const filterType = ref('')
 
-// 获取后端数据
+// 获取数据
 async function fetchData() {
   try {
     const res = await axios.get('http://localhost:8000/api/logs_alerts/face_alert_frames')
-    // 这里对后端返回的数据做字段映射，转成前端展示需要的格式
-   logWarnings.value = res.data.map(item => ({
-  id: item.id,
-  video_id: item.video_id,
-  frame_index: item.frame_index,
-  created_at: item.created_at,
-  alert_type: item.alert_type,
-  confidence: item.confidence,
-  image_url: item.image_url,
-  date: item.created_at ? item.created_at.split('T')[0] : '未知',
-  type: item.alert_type,
-  // 如果后端没返回status，可以先默认未处理
-  status: 'unprocessed'
-}))
+    const data = res.data.map(item => ({
+      id: item.id,
+      video_id: item.video_id,
+      frame_index: item.frame_index,
+      created_at: item.created_at,
+      alert_type: item.alert_type ? item.alert_type.toLowerCase() : 'unknown',
+      confidence: item.confidence,
+      image_url: item.image_url,
+      date: item.created_at ? item.created_at.split('T')[0] : '未知',
+      type: item.alert_type ? item.alert_type.toLowerCase() : 'unknown'
+    }))
+
+    logWarnings.value = data
+
+    // 提取并去重类型
+    const types = [...new Set(data.map(i => i.type).filter(Boolean))]
+    alertTypeOptions.value = types
   } catch (e) {
-    console.error('获取登录告警失败', e)
+    console.error('获取人脸告警失败', e)
     logWarnings.value = []
+    alertTypeOptions.value = []
   }
 }
 
-// 状态筛选
-const filteredByTab = computed(() =>
-  logWarnings.value.filter(item => item.status === activeTab.value)
-)
-
-// 日期筛选
+// 过滤逻辑
 const filteredByFilter = computed(() => {
-  return filteredByTab.value.filter(item =>
-    filterDate.value ? item.date.startsWith(filterDate.value) : true
-  )
+  return logWarnings.value.filter(item => {
+    const matchDate = filterDate.value ? item.date.startsWith(filterDate.value) : true
+    const matchType = filterType.value ? item.type === filterType.value : true
+    return matchDate && matchType
+  })
 })
 
-// 排序
+// 排序逻辑
 const displayedData = computed(() => {
   if (!sortKey.value) return filteredByFilter.value
 
@@ -140,6 +176,16 @@ const displayedData = computed(() => {
     return 0
   })
 })
+
+// 类型名称格式化函数
+function formatType(type) {
+  switch (type) {
+    case 'deepfake': return 'Deepfake'
+    case 'stranger': return '陌生人'
+    case 'blacklist': return '黑名单'
+    default: return type || '未知'
+  }
+}
 
 function sortBy(key) {
   if (sortKey.value === key) {
@@ -155,29 +201,15 @@ function viewDetails(item) {
   selectedItem.value = item
 }
 
-
-
-
-
-// async function fetchDetail(id) {
-//   try {
-//     const res = await axios.get(`http://localhost:8000/api/face_alert_detail/${id}`)
-//     detailData.value = res.data
-//   } catch (e) {
-//     console.error('获取详情失败', e)
-//     detailData.value = null
-//   }
-// }
-
 function backToList() {
   selectedItem.value = null
   detailData.value = null
-  // 重新拉取数据刷新列表
   fetchData()
 }
 
 function clearFilters() {
   filterDate.value = ''
+  filterType.value = ''
 }
 
 onMounted(() => {
@@ -185,52 +217,88 @@ onMounted(() => {
 })
 </script>
 
-<!-- 样式 -->
+
+
 <style scoped>
-.table-wrapper {
-  position: relative;
-  margin-top: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+.face-warn-wrapper {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: transparent;
 }
-.title {
-  position: sticky;
-  top: 20px;
-  left: 20px;
-  font-size: 24px;
-  font-weight: bold;
-  color: #1f2937;
-  background-color: rgba(255, 255, 255, 0.7);
-  padding: 8px 16px;
-  border-radius: 4px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-/* 独立的状态切换按钮组 */
-.status-toggle {
-  /* 取消绝对定位 */
-  position: static;
-  margin-bottom: 16px;
-  
+
+.title-section {
   display: flex;
-  justify-content: center; /* 水平居中 */
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #1f2937;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.alert-count {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* 状态切换卡片 */
+.status-toggle-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-toggle-header {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  margin-bottom: 20px;
+  color: #374151;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.status-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-
 .status-btn {
-  padding: 8px 16px;
+  padding: 12px 32px;
   border: none;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   user-select: none;
-  min-width: 80px;
-  
-  /* 未激活状态：灰底白字 */
-  background-color: #6b7280;
+  min-width: 120px;
+  background: #6b7280;
   color: #ffffff;
 }
 
@@ -243,115 +311,212 @@ onMounted(() => {
 }
 
 .status-btn:hover:not(.active) {
-  background-color: #4b5563;
+  background: #4b5563;
   transform: translateY(-1px);
 }
 
 .status-btn.active {
-  /* 激活状态：黑底白字 */
-  background-color: #1f2937;
+  background: #00040a;
   color: #ffffff;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 过滤器区域 */
-.filters {
-  margin-top: 40px;
-  margin-bottom: 20px;
-  padding: 20px;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+/* 状态切换卡片 */
+.status-toggle-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.filter-group {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.filter-label {
+.status-toggle-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  margin-bottom: 20px;
   color: #374151;
-  user-select: none;
+  font-weight: 600;
+  font-size: 16px;
 }
 
-.label-text {
-  color: #6b7280;
-  font-weight: 400;
+.status-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.filter-select,
-.filter-input {
-  padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+.status-btn {
+  padding: 12px 32px;
+  border: none;
   font-size: 14px;
-  background-color: #ffffff;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
   min-width: 120px;
+  background: #6b7280;
+  color: #ffffff;
 }
 
-.filter-select:focus,
-.filter-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+.status-btn:first-child {
+  border-radius: 8px 0 0 8px;
 }
 
-.clear-btn {
+.status-btn:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.status-btn:hover:not(.active) {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.status-btn.active {
+  background: #00040a;
+  color: #ffffff;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 筛选区域 */
+.filters-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.filters-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: none;
-  background: linear-gradient(45deg, #ef4444, #dc2626);
-  color: white;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  user-select: none;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: #374151;
+  font-weight: 600;
+  font-size: 16px;
 }
 
-.clear-btn:hover {
-  background: linear-gradient(45deg, #dc2626, #b91c1c);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  align-items: end;
 }
 
-/* 表格容器 */
-.table-container {
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filter-item select {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
   background: white;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.filter-item select:focus {
+  outline: none;
+  border-color: #00040a;
+  box-shadow: 0 0 0 3px rgba(0, 4, 10, 0.1);
+}
+
+
+.filter-item label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+}
+
+.filter-item input {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.filter-item input:focus {
+  outline: none;
+  border-color: #00040a;
+  box-shadow: 0 0 0 3px rgba(0, 4, 10, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  transform: translateY(-1px);
+}
+
+/* 表格样式 */
+.table-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.table-container {
+  overflow-x: auto;
 }
 
 .data-table {
   width: 100%;
-  border-collapse: collapse;
-  background: white;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
 }
 
-/* 表头样式 */
-.data-table thead {
-  background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+.data-table th {
+  background: linear-gradient(135deg, #f9f4ecfa 0%, #e8d9c9 100%);
+  padding: 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .sortable-header {
-  padding: 16px;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s ease;
-  color: #ffffff;
-  font-weight: 600;
 }
 
 .sortable-header:hover {
@@ -359,9 +524,6 @@ onMounted(() => {
 }
 
 .action-header {
-  padding: 16px;
-  color: #ffffff;
-  font-weight: 600;
   text-align: center;
 }
 
@@ -378,40 +540,25 @@ onMounted(() => {
   font-weight: bold;
 }
 
-/* 表格行样式 */
 .data-row {
-  transition: background-color 0.2s ease;
-  border-bottom: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .data-row:hover {
-  background-color: #f9fafb;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  transform: scale(1.01);
 }
 
-.data-row:last-child {
-  border-bottom: none;
-}
-
-.type-cell,
-.date-cell,
-.action-cell {
+.data-table td {
   padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
-}
-
-.type-tag {
-  display: inline-block;
-  padding: 4px 12px;
-  background: linear-gradient(45deg, #3b82f6, #1d4ed8);
-  color: white;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .date-cell {
   color: #6b7280;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: 'Courier New', monospace;
   font-size: 13px;
 }
 
@@ -422,12 +569,12 @@ onMounted(() => {
 .detail-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 16px;
   border: none;
   background: linear-gradient(45deg, #10b981, #059669);
   color: white;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -441,74 +588,66 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.btn-icon {
-  font-size: 14px;
-}
-
-/* 空数据样式 */
-.empty-row {
-  background-color: #f9fafb;
-}
-
-.empty-cell {
-  padding: 40px;
+/* 空状态样式 */
+.empty-state {
   text-align: center;
-}
-
-.empty-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  padding: 60px 20px;
   color: #6b7280;
 }
 
 .empty-icon {
-  font-size: 48px;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
   opacity: 0.5;
 }
 
-.empty-text {
-  font-size: 16px;
+.empty-state h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #374151;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+.type-cell {
+  color: #1f2937;
+  font-size: 13px;
   font-weight: 500;
+  text-transform: capitalize;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .filter-group {
+  .title-section {
     flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  
-  .filter-label {
-    flex-direction: column;
+    gap: 16px;
     align-items: flex-start;
-    gap: 4px;
-  }
-  
-  .filter-select,
-  .filter-input {
-    width: 100%;
-  }
-  
-  .status-toggle {
-    position: static;
-    margin-bottom: 20px;
-    align-self: flex-start;
   }
   
   .filters {
-    margin-top: 0;
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-actions {
+    justify-content: stretch;
+  }
+  
+  .filter-actions button {
+    flex: 1;
+  }
+  
+  .table-container {
+    overflow-x: auto;
   }
   
   .data-table {
-    font-size: 14px;
+    font-size: 12px;
   }
   
-  .type-cell,
-  .date-cell,
-  .action-cell {
+  .data-table td {
     padding: 12px 8px;
   }
 }
