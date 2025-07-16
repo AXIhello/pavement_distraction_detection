@@ -19,7 +19,19 @@
       <!-- 基本信息卡片 -->
       <div class="info-card">
         <h2 class="card-title">
-          <i class="icon-title">👤</i> 基本信息
+          <div class="title-left">
+            <i class="icon-title">👤</i> 基本信息
+          </div>
+          <!-- 右侧悬浮拉条 -->
+          <div class="edit-sidebar" @mouseenter="showEditOptions = true" @mouseleave="showEditOptions = false">
+            <div class="edit-handle">⚙️</div>
+            <transition name="fade">
+              <div v-if="showEditOptions" class="edit-options">
+                <button @click="openUsernameDialog" class="btn small-btn">修改账号</button>
+                <button @click="openPasswordDialog" class="btn small-btn">修改密码</button>
+              </div>
+            </transition>
+          </div>
         </h2>
         <div class="info-grid">
           <div class="info-item">
@@ -39,7 +51,7 @@
 
       <!-- 人脸照片管理卡片 -->
       <div class="info-card">
-        <h2 class="card-title">
+        <h2 class="card-title no-action">
           <i class="icon-title">📷</i> 人脸照片管理
         </h2>
         <div class="face-container">
@@ -62,77 +74,49 @@
         </div>
       </div>
 
-      <!-- 修改用户名卡片 -->
-      <div class="info-card">
-        <h2 class="card-title">
-          <i class="icon-title">✏️</i> 修改账号
-        </h2>
-        <div class="form-group">
-          <label for="username-input" class="form-label">新用户名</label>
-          <input 
-            id="username-input"
-            v-model="newUsername" 
-            placeholder="请输入3-20位新用户名" 
-            class="form-input"
-          />
-          <button @click="changeUsername" class="btn primary-btn">
-            <i class="icon-confirm">✓</i> 确认修改
-          </button>
-          <span class="message" :class="{ success: usernameMsg && usernameMsg.includes('成功'), error: usernameMsg && !usernameMsg.includes('成功') }">
-            {{ usernameMsg }}
-          </span>
-        </div>
-      </div>
-
-      <!-- 修改密码卡片 -->
-      <div class="info-card">
-        <h2 class="card-title">
-          <i class="icon-title">🔒</i> 修改密码
-        </h2>
-        <div class="form-group">
-          <label for="password-input" class="form-label">新密码</label>
-          <input 
-            id="password-input"
-            v-model="newPassword" 
-            type="password" 
-            placeholder="请输入至少8位新密码" 
-            class="form-input"
-          />
-        </div>
-        <div class="form-group">
-          <label for="code-input" class="form-label">邮箱验证码</label>
-          <div class="code-input-group">
-            <input 
-              id="code-input"
-              v-model="emailCode" 
-              placeholder="请输入6位验证码" 
-              class="form-input"
-            />
-            <button 
-              @click="sendEmailCode" 
-              :disabled="codeSent" 
-              class="btn secondary-btn code-btn"
-              :class="{ disabled: codeSent }"
-            >
-              {{ codeSent ? `已发送 (${countdown}s)` : '获取验证码' }}
-            </button>
+      <!-- 修改账号弹窗 -->
+      <dialog ref="usernameDialog" class="edit-dialog">
+        <form @submit.prevent="changeUsername">
+          <h3>修改账号</h3>
+          <input v-model="newUsername" placeholder="请输入3-20位新用户名" />
+          <div class="dialog-buttons">
+            <button type="submit" class="btn primary-btn">确认修改</button>
+            <button type="button" class="btn secondary-btn" @click="closeUsernameDialog">取消</button>
           </div>
-        </div>
-        <div class="form-group">
-          <button @click="changePassword" class="btn primary-btn">
-            <i class="icon-confirm">✓</i> 确认修改密码
+        </form>
+      </dialog>
+
+      <!-- 修改密码弹窗 -->
+      <dialog ref="passwordDialog" class="edit-dialog">
+        <form @submit.prevent="changePassword">
+          <h3>修改密码</h3>
+          <input type="password" v-model="newPassword" placeholder="请输入至少8位新密码" />
+          <input v-model="emailCode" placeholder="请输入6位邮箱验证码" />
+          <button type="button" @click="sendEmailCode" :disabled="codeSent" class="btn secondary-btn code-btn">
+            {{ codeSent ? `已发送 (${countdown}s)` : '获取验证码' }}
           </button>
-          <span class="message" :class="{ success: passwordMsg && passwordMsg.includes('成功'), error: passwordMsg && !passwordMsg.includes('成功') }">
-            {{ passwordMsg }}
-          </span>
+          <div class="dialog-buttons">
+            <button type="submit" class="btn primary-btn">确认修改密码</button>
+            <button type="button" class="btn secondary-btn" @click="closePasswordDialog">取消</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- 操作结果弹窗 -->
+      <dialog ref="resultDialog" class="result-dialog">
+        <div class="result-content">
+          <i :class="resultIcon">{{ resultIcon === 'icon-success' ? '✓' : '⚠️' }}</i>
+          <h3>{{ resultTitle }}</h3>
+          <p>{{ resultMessage }}</p>
+          <button @click="closeResultDialog" class="btn primary-btn">确定</button>
         </div>
-      </div>
+      </dialog>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import Header from '@/components/Navigation.vue'
 
 const user = ref({})
@@ -211,18 +195,14 @@ async function deleteFace(faceId) {
     const data = await res.json()
     if (data.success) {
       await fetchFaceImages()
+      showResult('success', '删除成功', '人脸照片已成功删除')
     } else {
-      alert(data.message || '删除失败')
+      showResult('error', '删除失败', data.message || '删除操作未能完成')
     }
   } catch (err) {
     console.error(err)
-    alert('删除失败，请检查后端服务')
+    showResult('error', '删除失败', '删除过程中出现错误，请稍后重试')
   }
-}
-
-// 新增上传照片对话框
-const showUploadDialog = () => {
-  alert('照片上传功能即将上线，敬请期待！')
 }
 
 onMounted(async () => {
@@ -231,15 +211,14 @@ onMounted(async () => {
 
 // 修改用户名相关
 const newUsername = ref('')
-const usernameMsg = ref('')
 
 async function changeUsername() {
   if (!newUsername.value) {
-    usernameMsg.value = '新用户名不能为空'
+    showResult('error', '修改失败', '新用户名不能为空')
     return
   }
   if (newUsername.value.length < 3) {
-    usernameMsg.value = '用户名长度不能少于3位'
+    showResult('error', '修改失败', '用户名长度不能少于3位')
     return
   }
   try {
@@ -255,25 +234,25 @@ async function changeUsername() {
     if (data.success) {
       user.value.username = newUsername.value
       newUsername.value = ''
-      usernameMsg.value = '用户名修改成功'
+      closeUsernameDialog()
+      showResult('success', '修改成功', '用户名已成功修改')
     } else {
-      usernameMsg.value = data.message || '修改失败'
+      showResult('error', '修改失败', data.message || '用户名修改失败')
     }
   } catch (err) {
     console.error(err)
-    usernameMsg.value = '修改失败，请检查后端服务'
+    showResult('error', '修改失败', '修改过程中出现错误，请稍后重试')
   }
 }
 
 // 修改密码相关
 const newPassword = ref('')
 const emailCode = ref('')
-const passwordMsg = ref('')
 const codeSent = ref(false)
 
 async function sendEmailCode() {
   if (!user.value.email) {
-    passwordMsg.value = '未获取到用户邮箱信息'
+    showResult('error', '操作失败', '未获取到用户邮箱信息')
     return
   }
   try {
@@ -288,14 +267,14 @@ async function sendEmailCode() {
     const data = await res.json()
     if (data.success) {
       codeSent.value = true
-      passwordMsg.value = '验证码已发送至您的邮箱'
       startCountdown()
+      showResult('success', '验证码已发送', '验证码已发送至您的邮箱，请查收')
     } else {
-      passwordMsg.value = data.message || '发送失败'
+      showResult('error', '发送失败', data.message || '验证码发送失败')
     }
   } catch (err) {
     console.error(err)
-    passwordMsg.value = '发送失败，请检查后端服务'
+    showResult('error', '发送失败', '验证码发送过程中出现错误')
   }
 }
 
@@ -313,15 +292,15 @@ function startCountdown() {
 
 async function changePassword() {
   if (!newPassword.value) {
-    passwordMsg.value = '新密码不能为空'
+    showResult('error', '修改失败', '新密码不能为空')
     return
   }
   if (newPassword.value.length < 8) {
-    passwordMsg.value = '密码长度不能少于8位'
+    showResult('error', '修改失败', '密码长度不能少于8位')
     return
   }
   if (!emailCode.value) {
-    passwordMsg.value = '请输入邮箱验证码'
+    showResult('error', '修改失败', '请输入邮箱验证码')
     return
   }
   try {
@@ -339,15 +318,56 @@ async function changePassword() {
       emailCode.value = ''
       codeSent.value = false
       clearInterval(countdownTimer.value)
-      passwordMsg.value = '密码修改成功'
+      closePasswordDialog()
+      showResult('success', '修改成功', '密码已成功修改')
     } else {
-      passwordMsg.value = data.message || '修改失败'
+      showResult('error', '修改失败', data.message || '密码修改失败')
     }
   } catch (err) {
     console.error(err)
-    passwordMsg.value = '修改失败，请检查后端服务'
+    showResult('error', '修改失败', '修改过程中出现错误，请稍后重试')
   }
 }
+
+const showEditOptions = ref(false)
+
+// 弹窗引用
+const usernameDialog = ref(null)
+const passwordDialog = ref(null)
+const resultDialog = ref(null)
+const resultTitle = ref('')
+const resultMessage = ref('')
+const resultIcon = ref('icon-success')
+
+function showResult(type, title, message) {
+  resultIcon.value = type === 'success' ? 'icon-success' : 'icon-error'
+  resultTitle.value = title
+  resultMessage.value = message
+  resultDialog.value.showModal()
+}
+
+function closeResultDialog() {
+  resultDialog.value.close()
+}
+
+function openUsernameDialog() {
+  usernameDialog.value.showModal()
+  showEditOptions.value = false
+}
+
+function closeUsernameDialog() {
+  usernameDialog.value.close()
+}
+
+function openPasswordDialog() {
+  passwordDialog.value.showModal()
+  showEditOptions.value = false
+}
+
+function closePasswordDialog() {
+  passwordDialog.value.close()
+}
+
 </script>
 
 <style scoped>
@@ -477,12 +497,23 @@ h1::after {
 }
 
 .card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin: 0 0 20px 0;
   font-size: 20px;
   color: var(--text-primary);
   font-weight: 600;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
+}
+
+.card-title.no-action {
+  justify-content: flex-start; /* 让内容靠左 */
+  gap: 10px;                    /* 图标和文字的间距 */
+}
+
+.title-left {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -657,13 +688,9 @@ h1::after {
   font-size: 14px;
 }
 
-.code-input-group {
-  display: flex;
-  gap: 10px;
-}
-
 .code-btn {
-  min-width: 120px;
+  width: 100%;
+  margin-bottom: 15px;
 }
 
 /* 按钮样式 */
@@ -720,25 +747,6 @@ h1::after {
   font-size: 18px;
 }
 
-/* 消息提示样式 */
-.message {
-  font-size: 14px;
-  margin-top: 8px;
-  display: block;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-}
-
-.message.success {
-  color: var(--success-color);
-  background-color: rgba(52, 168, 83, 0.1);
-}
-
-.message.error {
-  color: var(--error-color);
-  background-color: rgba(234, 67, 53, 0.1);
-}
-
 /* 响应式调整 */
 @media (max-width: 768px) {
   .home-container {
@@ -764,10 +772,6 @@ h1::after {
   .form-group {
     gap: 10px;
   }
-
-  .code-input-group {
-    flex-direction: column;
-  }
   
   .code-btn {
     width: 100%;
@@ -792,5 +796,163 @@ h1::after {
     padding: 10px 15px;
     font-size: 15px;
   }
+}
+
+.basic-info-wrapper {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* 右侧悬浮拉条 */
+.edit-sidebar {
+  width: auto;
+  height: auto;
+  background-color: transparent;
+  box-shadow: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.edit-handle {
+  font-size: 26px;
+  margin-bottom: 10px;
+  user-select: none;
+}
+
+/* 编辑按钮组 */
+.edit-options {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.small-btn {
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  font-weight: 600;
+  white-space: nowrap; /* 防止文字换行 */
+}
+
+/* 弹窗样式 */
+.edit-dialog::backdrop {
+  background: rgba(0,0,0,0.3);
+}
+
+.edit-dialog {
+  border-radius: 10px;
+  padding: 25px;
+  width: 350px;
+  max-width: 90%;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  border: none;
+}
+
+.edit-dialog h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.edit-dialog input {
+  padding: 12px 15px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: 0.3s;
+  width: 100%;
+  margin-bottom: 15px;
+  box-sizing: border-box;
+}
+
+.edit-dialog input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 8px rgba(66, 133, 244, 0.3);
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.dialog-buttons .btn {
+  flex: 1;
+  padding: 12px;
+}
+
+/* 结果弹窗样式 */
+.result-dialog::backdrop {
+  background: rgba(0,0,0,0.3);
+}
+
+.result-dialog {
+  border-radius: 10px;
+  padding: 30px;
+  width: 300px;
+  max-width: 90%;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  border: none;
+  text-align: center;
+}
+
+.result-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.result-content h3 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.result-content p {
+  margin: 0 0 20px 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.icon-success {
+  font-size: 50px;
+  color: var(--success-color);
+  margin-bottom: 10px;
+}
+
+.icon-error {
+  font-size: 50px;
+  color: var(--error-color);
+  margin-bottom: 10px;
+}
+
+.result-dialog .btn {
+  width: 100%;
+  padding: 12px;
+}
+
+/* 淡入淡出动画 */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>

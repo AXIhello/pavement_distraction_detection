@@ -2,7 +2,7 @@
   <div id="admin">
     <Header ref="headerRef" />
 
-    <main class="centered-content">
+    <div class="centered-content" :style="{ paddingTop: headerHeight + 'px' }">
       <!-- 用户管理区域 -->
       <div class="admin-container">
         <div class="header-section">
@@ -238,7 +238,7 @@
           </div>
         </div>
       </div>
-    </main>
+    </div>
   </div>
 </template>
 
@@ -528,10 +528,9 @@ async function deleteFace(faceId) {
 
 /* 固定宽度的居中内容容器 */
 .centered-content {
-  max-width: 1200px;
+  max-width: 960px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 20px;
   box-sizing: border-box;
   padding-top: 20px;
   padding-bottom: 20px;
@@ -539,7 +538,8 @@ async function deleteFace(faceId) {
 
 .admin-container {
   width: 100%;
-  padding-top: calc(20px + var(--header-height, 64px));
+  padding: 0; /* 移除不必要的 padding */
+  margin: 0;
 }
 
 .header-section {
