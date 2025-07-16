@@ -1,3 +1,5 @@
+
+
 <template>
   <div class="face-camera">
     <h2>人脸识别</h2>
@@ -59,7 +61,14 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
+import { onUnmounted } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 
+onUnmounted(() => { stopAll() })
+onBeforeRouteLeave((to, from, next) => {
+  stopAll()
+  next()
+})
 const recognizedName = ref('')
 const recognitionFinished = ref(false)
 const router = useRouter()
@@ -242,7 +251,7 @@ function handleRecognitionResult(face) {
 
     alert('告警：检测到陌生人！')
     stopAll()
-    router.push('/login')
+    router.push('/face_register')
     return
   }
   //  if (face.name === '未知人员') {
@@ -500,3 +509,5 @@ button:hover {
   color: #666;
 }
 </style>
+
+

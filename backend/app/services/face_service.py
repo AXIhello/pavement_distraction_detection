@@ -235,7 +235,7 @@ class FaceRecognitionService:
                     face_descriptor_np = np.array(face_descriptor)  # 转换为 numpy 数组以便计算
 
                     min_dist = float('inf')
-                    recognized_name = "未知人员"
+                    recognized_name = "陌生人"
 
                     # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
@@ -249,13 +249,13 @@ class FaceRecognitionService:
                         # 自动生成保存路径
                         now = datetime.now()
                         timestamp = now.strftime('%Y%m%d_%H%M%S')
-                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+                        save_dir = Path(f'data/alert_videos/face')
 
                         face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
                         _, buffer = cv2.imencode('.jpg', face_img_bgr)
                         image_bytes = base64.b64encode(buffer).decode('utf-8')
                         # 人脸告警帧
-                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=fake_prob,disease_type="deepfake",save_dir=str(save_dir))
+                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=fake_prob,disease_type="deepfake",save_dir0=str(save_dir))
 
                     else:
                         # 如果不是DeepFake，进行正常的人脸识别
@@ -271,15 +271,14 @@ class FaceRecognitionService:
                                         recognized_name = "陌生人"
                                         # 写入告警模块
                                         # 自动生成保存路径
-                                        now = datetime.now()
-                                        timestamp = now.strftime('%Y%m%d_%H%M%S')
-                                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+                                        save_dir = Path(f'data/alert_videos/face')
+                                        save_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
                                         face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
                                         _, buffer = cv2.imencode('.jpg', face_img_resized)
                                         image_bytes = base64.b64encode(buffer).decode('utf-8')
                                         # 人脸告警帧
                                         distance = round(min_dist, 3) if min_dist != float('inf') else None
-                                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=distance,disease_type="陌生人",save_dir=str(save_dir))
+                                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=distance,disease_type="陌生人",save_dir0=str(save_dir))
 
 
                     recognition_results.append({

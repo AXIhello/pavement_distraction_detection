@@ -8,9 +8,12 @@ from functools import wraps
 from ..extensions import db
 import random, string, io
 from captcha.image import ImageCaptcha
+from ..utils.logger import get_logger
 from datetime import datetime
 from app.core.models import FaceFeature
 import os
+
+logger = get_logger(__name__)
 
 # 权限校验装饰器
 def admin_required(f):
@@ -203,7 +206,7 @@ class UserLogin(Resource):
             return {
                 'success': False,
                 'message': '无效的用户名或密码'
-            }, 401
+            }
 
 # 邮箱验证码发送请求模型
 send_email_code_model = ns.model('SendEmailCode', {
@@ -353,6 +356,11 @@ class DeleteFace(Resource):
             return {'success': False, 'message': '无权限或人脸不存在'}, 403
         db.session.delete(feature)
         db.session.commit()
+        try:
+            current_app.face_recognition_service.reload_face_database()
+        except Exception as e:
+            logger.error(f"删除人脸后重载数据库失败: {e}")
+            return {'success': False, 'message': '人脸信息删除失败'}
         return {'success': True, 'message': '人脸信息已删除'}
 # ... existing code ...
 # ... 其他认证相关的Resource ...

@@ -7,11 +7,9 @@ from ..services.logging_service import LoggingService
 # 导入你的日志器
 from ..utils.logger import get_logger
 from ..core.models import AlertVideo,db, AlertFrame, FaceAlertFrame,LogEntry
-import shutil, os
 from functools import wraps
 from flask import Response
 from datetime import datetime
-import csv
 
 logger = get_logger(__name__)
 
@@ -44,7 +42,7 @@ pagination_parser.add_argument('page', type=int, help='页码', default=1)
 pagination_parser.add_argument('per_page', type=int, help='每页数量', default=10)
 
 
-# --- 日志 API (与我之前给您的内容一致) ---
+# --- 日志 API  ---
 @ns.route('/logs')
 class LogList(Resource):
     @ns.doc('获取系统日志列表', parser=pagination_parser)
@@ -76,7 +74,7 @@ class LogList(Resource):
         return logs_data
 
 
-# --- 告警 API (与我之前给您的内容一致) ---
+# --- 告警 API  ---
 @ns.route('/alerts')
 class AlertList(Resource):
     @ns.doc('获取告警事件列表', parser=pagination_parser)
@@ -184,27 +182,39 @@ class ClearLogsByTime(Resource):
 @ns.route('/logs/export_by_time')
 class ExportLogsByTime(Resource):
     def get(self):
-        try:
-            videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
-            data = [video.to_dict() for video in videos]
-            return data
-        except Exception as e:
-            logger.error(f"获取路面灾害告警信息失败: {e}")
-            return {'error': '获取失败'}, 500
+        """
+        按时间区间导出日志为CSV
+        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10
+        """
+        start_time_str = request.args.get('startTime', '').strip()
+        end_time_str = request.args.get('endTime', '').strip()
+        if len(start_time_str) == 10:
+            start_time_str += ' 00:00:00'
+        if len(end_time_str) == 10:
+            end_time_str += ' 23:59:59'
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        def generate():
+            yield 'id,timestamp,level,message,pathname,lineno,module\n'
+            for log in logs:
+                yield f'{log.id},{log.timestamp},{log.level},{log.message},{log.pathname},{log.lineno},{log.module}\n'
+        return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=logs.csv"})
 
-
-
+# 获取所有人脸识别告警信息（之前）
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
         try:
-            frames = FaceAlertVideo.query.order_by(FaceAlertVideo.created_at.desc()).all()
+            frames = FaceAlertFrame.query.order_by(FaceAlertFrame.created_at.desc()).all()
             data = [frame.to_dict() for frame in frames]
             return data
         except Exception as e:
             logger.error(f"获取人脸告警帧失败: {e}")
-            return {'error': '获取失败'}, 500 
-        
+            return {'error': '获取失败'}, 500
+
+
+# （可用）根据视频ID获取路面灾害告警详情
 @ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
 class AlertVideoDetail(Resource):               
     def get(self, video_id):
@@ -239,27 +249,60 @@ class AlertVideoDetail(Resource):
             logger.error(f"获取人脸告警视频详情失败: {e}")
             return {'error': '获取失败'}, 500    
         
-@ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
-class AlertVideoDetail(Resource):               
-    def get(self, video_id):
+# @ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
+# class AlertVideoDetail(Resource):
+#     def get(self, video_id):
+#         try:
+#             # 查询视频信息
+#             # video = FaceAlertFrame.query.get(video_id)
+#             # if not video:
+#             #     return {'error': '未找到对应视频'}, 404
+#
+#             # 查询该视频下的所有帧（如果有）
+#             frame = FaceAlertFrame.query.filter_by(id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
+#
+#             # 构造响应数据
+#             data = {
+#                 'id': frame.id,
+#                 'created_at': frame.created_at.isoformat() if frame.created_at else None,
+#                 'alert_type': frame.alert_type,
+#                 'image_url': frame.image_path,
+#             }
+#             return data
+#         except Exception as e:
+#             logger.error(f"获取人脸告警视频详情失败: {e}")
+#             return {'error': '获取失败'}, 500
+
+# 删除人脸识别告警帧
+import os
+@ns.route('/face_alert_frames/<int:frame_id>')
+class FaceAlertFrameDelete(Resource):
+    @admin_required
+    def delete(self, frame_id):
+        frame = FaceAlertFrame.query.get(frame_id)
+        if not frame:
+            return {'success': False, 'message': '告警帧不存在'}, 404
+
         try:
-            # 查询视频信息
-            video = FaceAlertVideo.query.get(video_id)
-            if not video:
-                return {'error': '未找到对应视频'}, 404
+            # 如果有对应的本地缓存文件需要删除，也可在这里做
+            if frame.image_path and os.path.exists(frame.image_path):
+                os.remove(frame.image_path)
+        except Exception as e:
+            return {'success': False, 'message': f'删除文件失败: {str(e)}'}, 500
 
-            # 查询该视频下的所有帧（如果有）
-            frame = FaceAlertFrame.query.filter_by(video_id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
+        db.session.delete(frame)
+        db.session.commit()
+        return {'success': True, 'message': '告警帧已删除'}
 
-            # 构造响应数据
-            data = {
-                'id': frame.video_id,
-                'created_at': frame.created_at.isoformat() if frame.created_at else None,
-                'alert_type': frame.alert_type,
-                'image_url': frame.image_path,
-            }
+        
+# (可用）路面检测视频
+@ns.route('/alert_videos')
+class AlertVideos(Resource):               
+    def get(self):
+        try:
+            videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
+            data = [videos.to_dict() for videos in videos]
             return data
         except Exception as e:
-            logger.error(f"获取人脸告警视频详情失败: {e}")
-            return {'error': '获取失败'}, 500    
-        
+            logger.error(f"获取路面告警视频失败: {e}")
+            return {'error': '获取失败'}, 500

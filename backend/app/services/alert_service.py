@@ -26,7 +26,7 @@ def create_alert_video(db_type: str, video_name: str, save_dir: str, total_frame
     db.session.commit()
     return video.id
 
-def save_alert_frame(db_type: str,  image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None, bboxes: list = None,save_dir: str = None) -> str:
+def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None, bboxes: list = None,save_dir0: str = None) -> str:
     if db_type == 'road':
         VideoModel = AlertVideo
         FrameModel = AlertFrame
@@ -42,7 +42,14 @@ def save_alert_frame(db_type: str,  image_base64: str,confidence: float,video_id
 
     elif db_type == 'face':
         FrameModel = FaceAlertFrame
-        save_path = Path(save_dir)
+
+        # 确保传入的 save_dir0 有效
+        if save_dir0 is None:
+            raise ValueError("face 类型必须提供有效的 save_dir0 参数")
+        
+        save_dir = Path(save_dir0)
+        save_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
+        save_path = save_dir / f"frame_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jpg"  # 动态生成文件名
     else:
         raise ValueError(f"不支持的告警类型: {db_type}")
 
