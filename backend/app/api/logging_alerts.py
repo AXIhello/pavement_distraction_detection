@@ -166,13 +166,17 @@ class ClearLogsByTime(Resource):
         # 只传日期时自动补全时间
         start_time_str = data['startTime'].strip()
         end_time_str = data['endTime'].strip()
+        level = data['level'].strip().upper()  # 新增
         if len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
         if len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
         start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+        if level:
+            query = query.filter(LogEntry.level == level)
+        logs = query.all()
         count = len(logs)
         for log in logs:
             db.session.delete(log)
@@ -183,18 +187,25 @@ class ClearLogsByTime(Resource):
 class ExportLogsByTime(Resource):
     def get(self):
         """
-        按时间区间导出日志为CSV
-        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10
+        按时间区间和日志级别导出日志为CSV
+        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10&level=INFO
         """
         start_time_str = request.args.get('startTime', '').strip()
         end_time_str = request.args.get('endTime', '').strip()
+        level = request.args.get('level', '').strip().upper()  # 新增
+
         if len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
         if len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
         start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
         end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        logs = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time).all()
+
+        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
+        if level:
+            query = query.filter(LogEntry.level == level)
+        logs = query.all()
+
         def generate():
             yield 'id,timestamp,level,message,pathname,lineno,module\n'
             for log in logs:
