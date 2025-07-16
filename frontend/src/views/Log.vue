@@ -69,6 +69,16 @@
                 重置
               </button>
             </div>
+            <div class="export-clear-actions">
+    <button @click="exportLogs" class="btn-secondary">
+      <!-- 图标 -->
+      导出
+    </button>
+    <button @click="clearLogs" class="btn-secondary btn-danger">
+      <!-- 图标 -->
+      清除
+    </button>
+  </div>
           </div>
         </div>
 
@@ -234,6 +244,72 @@ function nextPage() {
     page.value++
   }
 }
+
+//导出日志
+function exportLogs() {
+  const { start_time, end_time, level } = filters.value
+  if (!start_time || !end_time) {
+    alert('请先选择开始和结束时间')
+    return
+  }
+
+  const url = new URL('http://localhost:8000/api/logs_alerts/logs/export_by_time')
+  url.searchParams.append('startTime', start_time.slice(0, 10))
+  url.searchParams.append('endTime', end_time.slice(0, 10))
+  if (level) url.searchParams.append('level', level)
+
+  fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: 'Bearer ' + localStorage.getItem('token')
+    }
+  })
+    .then(res => res.blob())
+    .then(blob => {
+      const link = document.createElement('a')
+      const downloadUrl = window.URL.createObjectURL(blob)
+      link.href = downloadUrl
+      link.download = `logs_${start_time.slice(0, 10)}_${end_time.slice(0, 10)}.csv`
+      link.click()
+      window.URL.revokeObjectURL(downloadUrl)
+    })
+    .catch(err => {
+      console.error('导出失败：', err)
+      alert('导出失败，请检查网络或重试')
+    })
+}
+
+//清除日志
+function clearLogs() {
+  const { start_time, end_time, level } = filters.value
+  if (!start_time || !end_time) {
+    alert('请先选择开始和结束时间')
+    return
+  }
+  if (!confirm('确定要删除当前筛选范围内的日志吗？此操作不可恢复')) return
+
+  const url = new URL('http://localhost:8000/api/logs_alerts/logs/delete_by_time')
+  url.searchParams.append('startTime', start_time.slice(0, 10))
+  url.searchParams.append('endTime', end_time.slice(0, 10))
+  if (level) url.searchParams.append('level', level)
+
+  fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: 'Bearer ' + localStorage.getItem('token')
+    }
+  })
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message || '日志已清除')
+      fetchLogs()
+    })
+    .catch(err => {
+      console.error('清除失败：', err)
+      alert('清除失败，请稍后再试')
+    })
+}
+
 
 // 监听页码变化，自动刷新数据
 watch(page, fetchLogs)
@@ -604,6 +680,33 @@ onMounted(async () => {
   font-weight: 500;
   border: 1px solid rgba(229, 231, 235, 0.5);
 }
+
+.export-clear-actions {
+  grid-column: 1 / -1; /* 跨满所有列 */
+  margin-top: 16px; /* 跟上一行间距 */
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start; /* 按钮靠左 */
+  align-items: center;
+
+  width: 50%;       /* 宽度占一半 */
+  margin-left: auto; /* 靠右排列 */
+}
+.btn-danger {
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #b91c1c;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  color: white;
+  border-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+}
+
 
 @media (max-width: 768px) {
   .container {
