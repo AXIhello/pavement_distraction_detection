@@ -38,10 +38,6 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # 关联上传的视频
-    alert_videos = db.relationship('AlertVideo', backref='user', lazy=True)
-    face_alert_videos = db.relationship('FaceAlertVideo', backref='user', lazy=True)
-
     def set_password(self, password):
         self.password = generate_password_hash(password)
 
@@ -102,7 +98,6 @@ class AlertVideo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     video_name = db.Column(db.String(255), nullable=False)  # 原始视频名称
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     save_dir = db.Column(db.String(512), nullable=False)  # 病害图像保存目录
     total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
     alert_frame_count = db.Column(db.Integer, nullable=False)  # 病害帧数量
@@ -114,7 +109,6 @@ class AlertVideo(db.Model):
         return {
             'id': self.id,
             'video_name': self.video_name,
-            'user_id': self.user_id,
             'save_dir': self.save_dir,
             'disease_type':'未知',
             'total_frames': self.total_frames,
@@ -145,49 +139,19 @@ class AlertFrame(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-# 人脸告警视频表
-class FaceAlertVideo(db.Model):
-    __tablename__ = 'face_alert_videos'
-
-    id = db.Column(db.Integer, primary_key=True)
-    video_name = db.Column(db.String(255), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    save_dir = db.Column(db.String(512), nullable=False)
-    total_frames = db.Column(db.Integer, nullable=False)  # 视频总帧数
-    alert_frame_count = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    face_alert_frames = db.relationship('FaceAlertFrame', backref='video', cascade='all, delete-orphan')
-
-    def to_dict(self):
-        return {            
-            'id': self.id,            
-            'video_name': self.video_name,            
-            'user_id': self.user_id,                        
-            'save_dir': self.save_dir,            
-            'total_frames': self.total_frames,                        
-            'alert_frame_count': self.alert_frame_count,
-            'created_at': self.created_at.isoformat() if self.created_at else None      
-        }                        
-
-
 # 人脸告警帧表
 class FaceAlertFrame(db.Model):
     __tablename__ = 'face_alert_frames'
 
     id = db.Column(db.Integer, primary_key=True)
-    video_id = db.Column(db.Integer, db.ForeignKey('face_alert_videos.id'), nullable=False)
-    frame_index = db.Column(db.Integer, nullable=False)
     image_path = db.Column(db.String(512), nullable=False)
-    alert_type = db.Column(db.String(128), nullable=False)  # 告警类型（如打电话、低头等）
+    alert_type = db.Column(db.String(128), nullable=False)  # 告警类型（如陌生人、伪人等）
     confidence = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
         return {
-                'id': self.id,            
-                'video_id': self.video_id,                        
-                'frame_index': self.frame_index,                                                
+                'id': self.id,
                 'image_url': self.image_path,
                 'alert_type': self.alert_type,                                                          
                 'confidence': self.confidence,

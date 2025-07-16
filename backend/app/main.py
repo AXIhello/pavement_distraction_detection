@@ -176,18 +176,15 @@ def handle_face_recognition(data):
         app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
         return
 
-    # 首帧处理逻辑（如初始化告警模块、记录日志、写数据库等）
-    if not first_frame_processed[sid]:
-        app_logger.info(f"首次接收到人脸图像，sid={sid}")
-        first_frame_processed[sid] = True
-        # 自动生成保存路径
-        now = datetime.now()
-        timestamp = now.strftime('%Y%m%d_%H%M%S')
-        save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
-        save_dir.mkdir(parents=True, exist_ok=True)
-        # 创建人脸告警视频记录
-        video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 0, 0, user_id=None)
-        video_id_map[sid] = video_id  # 保存视频ID到映射中
+    # # 首帧处理逻辑（如初始化告警模块、记录日志、写数据库等）
+    # if not first_frame_processed[sid]:
+    #     app_logger.info(f"首次接收到人脸图像，sid={sid}")
+    #     first_frame_processed[sid] = True
+    #     # 自动生成保存路径
+    #     now = datetime.now()
+    #     timestamp = now.strftime('%Y%m%d_%H%M%S')
+    #     save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
+    #     video_id_map[sid] = video_id  # 保存视频ID到映射中
 
     app_logger.info("收到人脸识别请求")
     try:
@@ -217,7 +214,7 @@ def handle_face_recognition(data):
                 "bboxes": bboxes,
                 "req_id": req_id
             })
-        # 直接返回本帧识别结果给前端（不再做三帧一致判定，交由前端处理）
+        # 直接返回本帧识别结果给前端
         emit('face_result', {
             "success": True,
             "faces": recognition_results,

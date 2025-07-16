@@ -12,7 +12,10 @@ import tensorflow as tf
 from .face_db_service import FaceDatabaseService
 # 获取日志器
 logger = logging.getLogger(__name__)
-
+# 告警
+from .alert_service import save_alert_frame
+from datetime import datetime
+from pathlib import Path
 
 class FaceRecognitionService:
     def __init__(self, app_config_data):
@@ -72,7 +75,7 @@ class FaceRecognitionService:
         Args:
             name: 人名
             base64_image_data: Base64编码的图像数据
-            user_id: 用户ID（可选）
+            user_id: 用户ID
         Returns:
             注册结果字典
         """
@@ -107,7 +110,7 @@ class FaceRecognitionService:
             shape = self.predictor(img_rgb, face)
             face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
             face_descriptor_np = np.array(face_descriptor)
-            #查重
+            #查重，是否已经存在同样的人脸
             from .face_db_service import FaceDatabaseService
             all_features = FaceDatabaseService.get_all_features()
             duplicate_name = None
@@ -154,11 +157,7 @@ class FaceRecognitionService:
             return {'success': False, 'message': f'注册失败: {str(e)}'}
 
     def _load_face_database(self, path_features_known_csv=None):
-        """
-        从数据库加载已知人脸特征和名字。
-        Args:
-            path_features_known_csv: CSV文件路径（可选，用于兼容性）
-        """
+
         self.features_known_list = []
         self.face_name_known_list = []
         
@@ -213,7 +212,7 @@ class FaceRecognitionService:
                 logger.warning("无法解码图像数据。")
                 return [{"status": "error", "message": "Invalid image data."}]
 
-            # 将 BGR 转换为 RGB (dlib 需要 RGB)
+            # 将 BGR 转换为 RGB
             img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
 
             faces = self.detector(img_rgb, 0)  # 0 代表不向上采样
@@ -236,7 +235,7 @@ class FaceRecognitionService:
                     face_descriptor_np = np.array(face_descriptor)  # 转换为 numpy 数组以便计算
 
                     min_dist = float('inf')
-                    recognized_name = "未知人员"
+                    recognized_name = "陌生人"
 
                     # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
@@ -246,6 +245,18 @@ class FaceRecognitionService:
                         # 如果是DeepFake，直接返回deepfake身份
                         recognized_name = "deepfake"
                         logger.warning(f"!!! DeepFake警告: 概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
+                        # 写入告警模块
+                        # 自动生成保存路径
+                        now = datetime.now()
+                        timestamp = now.strftime('%Y%m%d_%H%M%S')
+                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+
+                        face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
+                        _, buffer = cv2.imencode('.jpg', face_img_bgr)
+                        image_bytes = base64.b64encode(buffer).decode('utf-8')
+                        # 人脸告警帧
+                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=fake_prob,disease_type="deepfake",save_dir=str(save_dir))
+
                     else:
                         # 如果不是DeepFake，进行正常的人脸识别
                         # 遍历已知人脸库进行比对
@@ -258,11 +269,23 @@ class FaceRecognitionService:
                                         recognized_name = self.face_name_known_list[j]
                                     else:
                                         recognized_name = "陌生人"
+                                        # 写入告警模块
+                                        # 自动生成保存路径
+                                        now = datetime.now()
+                                        timestamp = now.strftime('%Y%m%d_%H%M%S')
+                                        save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
+                                        face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
+                                        _, buffer = cv2.imencode('.jpg', face_img_resized)
+                                        image_bytes = base64.b64encode(buffer).decode('utf-8')
+                                        # 人脸告警帧
+                                        distance = round(min_dist, 3) if min_dist != float('inf') else None
+                                        save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=distance,disease_type="陌生人",save_dir=str(save_dir))
+
 
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
-                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,
+                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,  
                         "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()}
                     })
                     logger.info(
@@ -281,7 +304,7 @@ class FaceRecognitionService:
 
     def extract_all_features_to_csv(self):
         """
-        提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性方法）
+        提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性方法，现在没有使用）
         """
         try:
             from .face_db_service import FaceDatabaseService
@@ -307,7 +330,6 @@ class FaceRecognitionService:
                 'message': f'成功导出 {len(features_data)} 个特征到CSV文件',
                 'file_path': csv_path
             }
-            
         except Exception as e:
             logger.error(f"特征导出失败: {e}", exc_info=True)
             return {'success': False, 'message': f'特征导出失败: {str(e)}'}

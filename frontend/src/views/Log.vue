@@ -251,7 +251,6 @@ onMounted(async () => {
 <style scoped>
 .log-view {
   padding: 0;
-  background: #fefdf9;
   min-height: calc(100vh - 64px);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }

@@ -1,5 +1,4 @@
 # 认证相关接口
-# backend/app/api/auth.py
 from flask_restx import Namespace, Resource, fields,marshal
 from ..core.models import User, find_user_by_username, find_user_by_email, create_user
 from ..core.security import create_jwt_token
@@ -9,10 +8,10 @@ from functools import wraps
 from ..extensions import db
 import random, string, io
 from captcha.image import ImageCaptcha
+from ..utils.logger import get_logger
 from datetime import datetime
-
+logger = get_logger(__name__)
 # 权限校验装饰器
-# 你应该改为 返回字典 + 状态码，而不是 Flask 的 jsonify。Flask-RESTx 会自动处理 JSON 序列化。
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -48,7 +47,7 @@ user_list_response = user_ns.model('UserListResponse', {
 
 @user_ns.route('/')
 class UserList(Resource):
-    # @admin_required
+    @admin_required
     @user_ns.marshal_with(user_list_response)
     def get(self):
         users = User.query.all()
@@ -301,6 +300,11 @@ class DeleteFace(Resource):
             return {'success': False, 'message': '无权限或人脸不存在'}, 403
         db.session.delete(feature)
         db.session.commit()
+        try:
+            current_app.face_recognition_service.reload_face_database()
+        except Exception as e:
+            logger.error(f"删除人脸后重载数据库失败: {e}")
+            return {'success': False, 'message': '人脸信息删除失败'}
         return {'success': True, 'message': '人脸信息已删除'}
 # ... existing code ...
 # ... 其他认证相关的Resource ...
@@ -319,3 +323,20 @@ class Captcha(Resource):
         response = make_response(send_file(buf, mimetype='image/png'))
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
+    
+# 修改用户名
+@ns.route('/change_username')
+class ChangeUsername(Resource):
+    @token_required
+    def post(self):
+        user = g.user
+        data = request.json
+        new_username = data.get('new_username')
+        if not new_username:
+            return {'success': False, 'message': '新用户名不能为空'}, 400
+        if find_user_by_username(new_username):
+            return {'success': False, 'message': '用户名已存在'}, 400        
+        user.username = new_username
+        from ..extensions import db
+        db.session.commit()
+        return {'success': True, 'message': '用户名修改成功'}

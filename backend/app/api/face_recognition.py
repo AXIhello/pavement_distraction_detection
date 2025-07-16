@@ -3,7 +3,7 @@ from flask import request, current_app, g
 import logging
 from ..core.models import FaceFeature, db
 from functools import wraps
-from ..services.alert_service import create_alert_video, save_alert_frame
+from ..services.alert_service import save_alert_frame
 from datetime import datetime
 from pathlib import Path
 
@@ -146,24 +146,14 @@ class FaceRecognition(Resource):
                 # 1️. 自动生成保存路径
                 now = datetime.now()
                 timestamp = now.strftime('%Y%m%d_%H%M%S')
-                save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
-                save_dir.mkdir(parents=True, exist_ok=True)
+                save_dir = Path(f'data/alert_videos/face/frame_{timestamp}.jpg')
 
-                # 2. 人脸告警视频
-                video_id = create_alert_video('face', f'video_{timestamp}', str(save_dir), 1, 1, user_id=None) # none为用户 后续关联
-
-                # 3. 人脸告警帧
-                bbox = [
-                        recognition_results[0]['bbox'].get('left', 0),
-                        recognition_results[0]['bbox'].get('top', 0),
-                        recognition_results[0]['bbox'].get('right', 0),
-                        recognition_results[0]['bbox'].get('bottom', 0)
-                    ]
+                # 2. 人脸告警帧
                 distance = recognition_results[0].get("distance")
                 if distance is None:
                     distance = 0  # 或者其他合理默认值
                 confidence = 1 - distance
-                save_alert_frame('face', video_id, 1, image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),bboxes=[bbox])
+                save_alert_frame('face', image_base64, confidence=confidence,disease_type=recognition_results[0].get("name"),save_dir=str(save_dir))
 
             return {
                 'success': True,
@@ -243,7 +233,7 @@ class FaceFeatureDetail(Resource):
             logger.error(f"删除 {name} 的特征失败: {e}")
             return {'success': False, 'message': f'删除失败: {str(e)}'}
 
-# 特征提取接口（保留用于兼容性）
+# 特征提取接口
 @ns.route('/features_extract')
 class FaceFeaturesExtract(Resource):
     def post(self):
@@ -299,3 +289,15 @@ class MyFaces(Resource):
             'success': True,
             'images': image_objs
         }
+
+@ns.route('/user_faces/<int:user_id>')
+class UserFaces(Resource):
+    def get(self, user_id):
+        """根据user_id查询该用户所有人脸信息（face_id和name）"""
+        from ..core.models import FaceFeature
+        features = FaceFeature.query.filter_by(user_id=user_id).all()
+        result = [
+            {'face_id': f.id, 'name': f.name}
+            for f in features
+        ]
+        return {'success': True, 'faces': result}
