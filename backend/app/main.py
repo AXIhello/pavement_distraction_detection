@@ -336,7 +336,7 @@ def create_admin_if_not_exists():
 if __name__ == '__main__':
     with app.app_context():
         try:
-            db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")

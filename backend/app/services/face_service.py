@@ -235,7 +235,7 @@ class FaceRecognitionService:
                     face_descriptor_np = np.array(face_descriptor)  # 转换为 numpy 数组以便计算
 
                     min_dist = float('inf')
-                    recognized_name = "未知人员"
+                    recognized_name = "陌生人"
 
                     # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
