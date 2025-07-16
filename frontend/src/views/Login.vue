@@ -3,162 +3,99 @@
     <Header />
 
     <main>
-      <!-- 地图区域 -->
-      <div class="map-container">
-        <img :src="map" alt="地图图标" />
-        <div class="map-markers">
-          <div class="marker" style="left: 10%; top: 30%;">1</div>
-          <div class="marker" style="left: 20%; top: 50%;">2</div>
-          <div class="marker" style="left: 25%; top: 55%;">3</div>
-          <div class="marker" style="left: 35%; top: 50%;">4</div>
-          <div class="marker" style="left: 40%; top: 40%;">5</div>
-        </div>
-      </div>
+      <div class="auth-wrapper">
+        <div class="auth-container">
+          <!-- 主标签页 -->
+          <div class="main-tabs">
+            <button :class="{ active: mainTab === 'login' }" @click="mainTab = 'login'">登录</button>
+            <button :class="{ active: mainTab === 'register' }" @click="mainTab = 'register'">注册</button>
+          </div>
 
-      <!-- 登录注册容器 -->
-      <div class="auth-container">
-        <!-- 主标签页 -->
-        <div class="main-tabs">
-          <button
-            :class="{ active: mainTab === 'login' }"
-            @click="mainTab = 'login'">登录</button>
-          <button
-            :class="{ active: mainTab === 'register' }"
-            @click="mainTab = 'register'">注册</button>
-        </div>
-
-        <!-- 登录表单 -->
-        <div v-if="mainTab === 'login'" class="form-container">
-          <h2>登录</h2>
-
-          <form @submit.prevent="handleLogin">
-            <div v-if="loginMethod === 'password'">
-              <div class="form-group">
-                <label for="account">账号</label>
-                <input
-                  type="text"
-                  id="account"
-                  placeholder="账号"
-                  v-model="account"
-                  required />
+          <!-- 登录表单 -->
+          <div v-if="mainTab === 'login'" class="form-container">
+            <h2>登录</h2>
+            <form @submit.prevent="handleLogin">
+              <div v-if="loginMethod === 'password'">
+                <div class="form-group">
+                  <label for="account">账号</label>
+                  <input type="text" id="account" v-model="account" required />
+                </div>
+                <div class="form-group">
+                  <label for="password">密码</label>
+                  <input type="password" id="password" v-model="password" required />
+                </div>
+                <div class="form-group code-group">
+                  <label for="captcha">验证码</label>
+                  <input type="text" id="captcha" v-model="captcha" maxlength="4" required autocomplete="off" />
+                  <img :src="captchaImgUrl" @click="refreshCaptcha" alt="验证码" />
+                </div>
               </div>
 
-              <div class="form-group">
-                <label for="password">密码</label>
-                <input
-                  type="password"
-                  id="password"
-                  v-model="password"
-                  required />
+              <div v-else-if="loginMethod === 'sms'">
+                <div class="form-group">
+                  <label for="email">邮箱</label>
+                  <input type="email" id="email" v-model="email" required />
+                </div>
+                <div class="form-group code-group">
+                  <label for="smsCode">验证码</label>
+                  <input type="text" id="smsCode" v-model="smsCode" required />
+                  <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
+                    {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
+                  </button>
+                </div>
               </div>
 
-              <div class="form-group code-group">
-                <label for="captcha">验证码</label>
-                <input type="text" id="captcha" v-model="captcha" maxlength="4" required autocomplete="off" />
-                <img :src="captchaImgUrl" @click="refreshCaptcha" alt="验证码" style="cursor:pointer;height:40px;border-radius:4px;border:1px solid #ccc;" title="点击刷新验证码" />
-              </div>
-            </div>
+              <button type="submit">登录</button>
+              <p :style="{ color: messageColor }">{{ message }}</p>
+            </form>
 
-            <div v-else-if="loginMethod === 'sms'">
-              <div class="form-group">
-                <label for="email">账号</label>
-                <input
-                  type="tel"
-                  id="email"
-                  placeholder="账号"
-                  v-model="email"
-                  required />
+            <div class="other-login-methods">
+              <span>其他登录方式</span>
+              <div class="login-method-buttons">
+                <button :class="{ active: loginMethod === 'password' }" @click="loginMethod = 'password'">账号密码登录</button>
+                <button :class="{ active: loginMethod === 'sms' }" @click="loginMethod = 'sms'">邮箱验证码登录</button>
               </div>
-
-              <div class="form-group code-group">
-                <label for="smsCode">验证码</label>
-                <input type="text" id="smsCode" v-model="smsCode" required />
-                <button type="button" :disabled="countdown > 0" @click="sendSmsCode">
-                  {{ countdown > 0 ? `${countdown}s 后重发` : '获取验证码' }}
-                </button>
+              <div class="register-hint">
+                <span>没有账号？</span>
+                <button type="button" class="link-button" @click="mainTab = 'register'">去注册</button>
               </div>
             </div>
+          </div>
 
-            <button type="submit">登录</button>
-
-            <p :style="{ color: messageColor }">{{ message }}</p>
-          </form>
-
-          <div class="other-login-methods">
-            <span>其他登录方式</span>
-            <div class="login-method-buttons">
-              <button
-                :class="{ active: loginMethod === 'password' }"
-                @click="loginMethod = 'password'">账号密码登录</button>
-              <button
-                :class="{ active: loginMethod === 'sms' }"
-                @click="loginMethod = 'sms'">邮箱验证码登录</button>
-            </div>
+          <!-- 注册表单 -->
+          <div v-else class="form-container">
+            <h2>注册</h2>
+            <form @submit.prevent="handleRegister">
+              <div class="form-group">
+                <label for="reg-account">账号</label>
+                <input type="text" id="reg-account" v-model="regAccount" required />
+              </div>
+              <div class="form-group">
+                <label for="reg-email">邮箱</label>
+                <input type="email" id="reg-email" v-model="regEmail" required  />
+              </div>
+              <div class="form-group">
+                <label for="reg-password">密码</label>
+                <input type="password" id="reg-password" v-model="regPassword" required />
+              </div>
+              <div class="form-group">
+                <label for="reg-confirm-password">确认密码</label>
+                <input type="password" id="reg-confirm-password" v-model="regConfirmPassword" required />
+              </div>
+              <button type="submit">注册</button>
+              <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
+            </form>
             <div class="register-hint">
-              <span>没有账号？</span>
-              <button type="button" class="link-button" @click="mainTab = 'register'">去注册</button>
+              <span>已有账号？</span>
+              <button type="button" class="link-button" @click="mainTab = 'login'">去登录</button>
             </div>
           </div>
         </div>
-
-       <!-- 注册表单 -->
-<div v-else-if="mainTab === 'register'" class="form-container">
-  <h2>注册</h2>
-
-  <form @submit.prevent="handleRegister">
-    <div class="form-group">
-      <label for="reg-account">账号</label>
-      <input
-        type="text"
-        id="reg-account"
-        placeholder="账号"
-        v-model="regAccount"
-        required />
-    </div>
-
-    <div class="form-group">
-      <label for="reg-email">邮箱</label>
-      <input
-        type="email"
-        id="reg-email"
-        placeholder="邮箱"
-        v-model="regEmail"
-        required />
-    </div>
-
-    <div class="form-group">
-      <label for="reg-password">密码</label>
-      <input
-        type="password"
-        id="reg-password"
-        v-model="regPassword"
-        required />
-    </div>
-
-    <div class="form-group">
-      <label for="reg-confirm-password">确认密码</label>
-      <input
-        type="password"
-        id="reg-confirm-password"
-        v-model="regConfirmPassword"
-        required />
-    </div>
-
-    <button type="submit">注册</button>
-
-    <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
-  </form>
-
-  <div class="register-hint">
-    <span>已有账号？</span>
-    <button type="button" class="link-button" @click="mainTab = 'login'">去登录</button>
-  </div>
-</div>
-
       </div>
     </main>
   </div>
 </template>
+
 
 <script setup>
 import { ref } from 'vue'
@@ -463,45 +400,26 @@ async function handleRegister() {
 
 main {
   display: flex;
-  gap: 40px;
-  padding: 20px;
-  align-items: flex-start;
-  margin-top: 80px;
+  justify-content: center;
+  align-items: flex-start; 
+  padding: 120px 20px 60px; 
+  min-height: calc(100vh - 80px);
+  background-color: transparent;
 }
 
-.map-container {
-  position: relative;
-  flex: 1;
-  max-width: 50%;
-}
-
-.map-container img {
+.auth-wrapper {
+  display: flex;
+  justify-content: center;
   width: 100%;
-  height: auto;
-  display: block;
-  border: 1px solid #ccc;
-}
-
-.map-markers {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.marker {
-  position: absolute;
-  background-color: red;
-  color: white;
-  border-radius: 50%;
-  padding: 5px;
-  font-size: 12px;
 }
 
 .auth-container {
-  flex: 1;
+  background-color:rgb(250,250,250,0.8);
+  padding: 40px 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   max-width: 400px;
+  width: 100%;
 }
 
 .main-tabs {
@@ -512,24 +430,20 @@ main {
 
 .main-tabs button {
   flex: 1;
-  padding: 15px;
+  padding: 12px 0;
   border: none;
   background-color: transparent;
-  cursor: pointer;
   font-size: 16px;
   font-weight: bold;
-  color: #666;
+  cursor: pointer;
+  color: #888;
   border-bottom: 2px solid transparent;
-  transition: all 0.3s ease;
+  transition: all 0.3s;
 }
 
 .main-tabs button.active {
   color: #000;
   border-bottom-color: #000;
-}
-
-.main-tabs button:hover {
-  color: #000;
 }
 
 .form-container {
@@ -538,61 +452,76 @@ main {
 
 .form-group {
   margin-bottom: 15px;
-  width: 100%;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #333;
 }
 
 .form-group input {
   width: 100%;
-  padding: 8px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
   box-sizing: border-box;
+  box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.3);
+  transition: box-shadow 0.3s ease;
 }
 
 .code-group {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-.code-group label {
-  width: 70px;
-  margin: 0;
-  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .code-group input {
   flex: 1;
-  padding: 8px;
-  box-sizing: border-box;
+  min-width: 0;
+}
+
+.code-group img {
+  height: 40px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  cursor: pointer;
 }
 
 .code-group button {
-  padding: 8px 12px;
+  flex: 0 0 auto;   /* 固定宽度，不放大不缩小 */
+  width: 110px;     /* 可根据需求调整 */
+  padding: 6px 10px;
+  font-size: 14px;
+  border-radius: 6px;
   border: 1px solid #000;
   background-color: #eee;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  width: auto;
+  transition: background-color 0.3s;
 }
 
 button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   margin-top: 10px;
   background-color: #000;
   color: #fff;
   border: none;
+  border-radius: 6px;
+  font-size: 16px;
   cursor: pointer;
 }
 
 button[type="button"] {
   background-color: #ccc;
+  color: #000;
+}
+
+button:hover {
+  opacity: 0.9;
 }
 
 .other-login-methods {
@@ -608,12 +537,12 @@ button[type="button"] {
 .login-method-buttons button {
   flex: 1;
   padding: 10px;
-  border: none;
-  cursor: pointer;
   background-color: #ccc;
-  color: white;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
   font-weight: bold;
-  border-radius: 4px;
+  cursor: pointer;
 }
 
 .login-method-buttons button.active {
@@ -622,15 +551,23 @@ button[type="button"] {
 }
 
 .register-hint {
-  margin-top: 15px;
+  margin: 24px 0;              
   text-align: center;
-  font-size: 12px;
-  color: #666;
+  font-size: 14px;
+  color: #ddd;                /* 文字颜色根据背景调整 */
+  display: flex;
+  justify-content: center;    /* 水平居中 */
+  align-items: center;        /* 垂直居中 */
+  gap: 10px;      
+
+  white-space: nowrap
+
+}
+.register-hint span {
+  color: #333;       /* 深色 */
 }
 
-.register-hint span {
-  margin-right: 5px;
-}
+
 
 .link-button {
   background: none;
@@ -638,13 +575,13 @@ button[type="button"] {
   color: #007bff;
   cursor: pointer;
   text-decoration: underline;
-  font-size: 12px;
+  font-size: 14px;
   padding: 0;
-  width: auto;
   margin: 0;
 }
 
 .link-button:hover {
   color: #0056b3;
 }
+
 </style>
