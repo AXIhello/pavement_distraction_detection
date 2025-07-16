@@ -676,7 +676,7 @@ function toggleAutoPlay() {
   if (autoPlay.value) {
     autoPlayTimer.value = setInterval(() => {
       frameResults.value.length > 0 && nextImage()
-    }, 1000)
+    }, 300)
   } else {
     clearInterval(autoPlayTimer.value)
     autoPlayTimer.value = null
