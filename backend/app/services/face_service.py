@@ -116,7 +116,7 @@ class FaceRecognitionService:
             duplicate_name = None
             for exist_name, exist_feature in all_features:
                 dist = np.linalg.norm(face_descriptor_np - exist_feature)
-                if dist < 0.5:  # 阈值可调整
+                if dist < 0.4:  # 阈值可调整
                     duplicate_name = exist_name
                     break
             if duplicate_name:
@@ -265,7 +265,7 @@ class FaceRecognitionService:
                                 dist = self._return_euclidean_distance(face_descriptor_np, known_feature)
                                 if dist < min_dist:
                                     min_dist = dist
-                                    if min_dist < 0.5:  # 设置一个阈值，小于这个距离认为是同一个人
+                                    if min_dist < 0.4:  # 设置一个阈值，小于这个距离认为是同一个人
                                         recognized_name = self.face_name_known_list[j]
                                     else:
                                         recognized_name = "陌生人"
