@@ -75,7 +75,7 @@ class FaceRecognitionService:
         Args:
             name: 人名
             base64_image_data: Base64编码的图像数据
-            user_id: 用户ID（可选）
+            user_id: 用户ID
         Returns:
             注册结果字典
         """
@@ -110,7 +110,7 @@ class FaceRecognitionService:
             shape = self.predictor(img_rgb, face)
             face_descriptor = self.face_reco_model.compute_face_descriptor(img_rgb, shape)
             face_descriptor_np = np.array(face_descriptor)
-            #查重
+            #查重，是否已经存在同样的人脸
             from .face_db_service import FaceDatabaseService
             all_features = FaceDatabaseService.get_all_features()
             duplicate_name = None
@@ -157,11 +157,7 @@ class FaceRecognitionService:
             return {'success': False, 'message': f'注册失败: {str(e)}'}
 
     def _load_face_database(self, path_features_known_csv=None):
-        """
-        从数据库加载已知人脸特征和名字。
-        Args:
-            path_features_known_csv: CSV文件路径（可选，用于兼容性）
-        """
+
         self.features_known_list = []
         self.face_name_known_list = []
         
@@ -216,7 +212,7 @@ class FaceRecognitionService:
                 logger.warning("无法解码图像数据。")
                 return [{"status": "error", "message": "Invalid image data."}]
 
-            # 将 BGR 转换为 RGB (dlib 需要 RGB)
+            # 将 BGR 转换为 RGB
             img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
 
             faces = self.detector(img_rgb, 0)  # 0 代表不向上采样
@@ -308,7 +304,7 @@ class FaceRecognitionService:
 
     def extract_all_features_to_csv(self):
         """
-        提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性方法）
+        提取所有已录入人脸的128D特征，生成 features_all.csv（兼容性方法，现在没有使用）
         """
         try:
             from .face_db_service import FaceDatabaseService
@@ -334,7 +330,6 @@ class FaceRecognitionService:
                 'message': f'成功导出 {len(features_data)} 个特征到CSV文件',
                 'file_path': csv_path
             }
-            
         except Exception as e:
             logger.error(f"特征导出失败: {e}", exc_info=True)
             return {'success': False, 'message': f'特征导出失败: {str(e)}'}

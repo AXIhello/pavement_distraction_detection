@@ -1,5 +1,4 @@
 # 认证相关接口
-# backend/app/api/auth.py
 from flask_restx import Namespace, Resource, fields,marshal
 from ..core.models import User, find_user_by_username, find_user_by_email, create_user
 from ..core.security import create_jwt_token
@@ -12,7 +11,6 @@ from captcha.image import ImageCaptcha
 from datetime import datetime
 
 # 权限校验装饰器
-# 你应该改为 返回字典 + 状态码，而不是 Flask 的 jsonify。Flask-RESTx 会自动处理 JSON 序列化。
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

@@ -233,7 +233,7 @@ class FaceFeatureDetail(Resource):
             logger.error(f"删除 {name} 的特征失败: {e}")
             return {'success': False, 'message': f'删除失败: {str(e)}'}
 
-# 特征提取接口（保留用于兼容性）
+# 特征提取接口
 @ns.route('/features_extract')
 class FaceFeaturesExtract(Resource):
     def post(self):

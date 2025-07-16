@@ -206,7 +206,7 @@ def handle_face_recognition(data):
                 "bboxes": bboxes,
                 "req_id": req_id
             })
-        # 直接返回本帧识别结果给前端（不再做三帧一致判定，交由前端处理）
+        # 直接返回本帧识别结果给前端
         emit('face_result', {
             "success": True,
             "faces": recognition_results,

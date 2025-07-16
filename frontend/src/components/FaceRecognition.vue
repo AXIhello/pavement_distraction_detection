@@ -235,6 +235,7 @@ function handleRecognitionResult(face) {
   if(face.name === 'deepfake') {
     alert(`⚠️ 警告：检测到DeepFake人脸！`)
     stopAll()
+     router.push('/login')
     return
   }
   if (face.name === '陌生人') {
@@ -244,12 +245,12 @@ function handleRecognitionResult(face) {
     router.push('/login')
     return
   }
-   if (face.name === '未知人员') {
-    alert('人脸数据库中无数据，请前去录入')
-    stopAll()
-    router.push('/face_register')
-    return
-  }
+  //  if (face.name === '未知人员') {
+  //   alert('人脸数据库中无数据，请前去录入')
+  //   stopAll()
+  //   router.push('/face_register')
+  //   return
+  // }
   recognizedName.value = face.name || ''
   recognitionFinished.value = true
   stopAll()
