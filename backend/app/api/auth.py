@@ -12,6 +12,7 @@ from ..utils.logger import get_logger
 from datetime import datetime
 from app.core.models import FaceFeature
 import os
+import re
 
 logger = get_logger(__name__)
 
@@ -287,7 +288,10 @@ class UserRegister(Resource):
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
-
+        # 密码强度校验
+        ok, msg = self.check_password_strength(password)
+        if not ok:
+            return {'success': False, 'message': msg}, 400
         if find_user_by_username(username):
             return {'success': False, 'message': '用户名已存在'}, 400
         
@@ -296,6 +300,20 @@ class UserRegister(Resource):
 
         create_user(username,email,password)
         return {'success': True, 'message': '注册成功'}
+    @staticmethod
+    def check_password_strength(password):
+        if len(password) < 8:
+            return False, "密码长度不能少于8位"
+        has_lower = re.search(r'[a-z]', password)
+        has_upper = re.search(r'[A-Z]', password)
+        has_digit = re.search(r'\d', password)
+        has_special = re.search(r'[^A-Za-z0-9]', password)
+        has_letter = has_lower or has_upper
+        if has_letter and has_digit and not has_special:
+            return True, "中"
+        if has_letter and has_digit and has_special:
+            return True, "强"
+        return False, "密码过于简单，需包含字母、数字和特殊字符"
     
 
 # 显示当前用户信息

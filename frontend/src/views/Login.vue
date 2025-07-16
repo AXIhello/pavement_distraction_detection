@@ -49,8 +49,9 @@
                   type="password"
                   id="password"
                   v-model="password"
-                  required />
-              </div>
+                  required
+                />
+        </div>
 
               <div class="form-group code-group">
                 <label for="captcha">验证码</label>
@@ -132,7 +133,15 @@
         type="password"
         id="reg-password"
         v-model="regPassword"
-        required />
+        required
+        @input="checkRegPasswordStrength"
+      />
+      <div :style="{ color: regStrengthColor }">
+        密码强度：{{ regPasswordStrength }}
+      </div>
+      <div v-if="regPasswordStrength === '弱' && regPassword" style="color: red;">
+        密码过于简单，请至少包含字母、数字和特殊字符中的两种，且不少于8位
+      </div>
     </div>
 
     <div class="form-group">
@@ -144,7 +153,8 @@
         required />
     </div>
 
-    <button type="submit">注册</button>
+<!--    <button type="submit">注册</button>-->
+    <button type="submit" :disabled="regPasswordStrength === '弱'">注册</button>
 
     <p :style="{ color: regMessageColor }">{{ regMessage }}</p>
   </form>
@@ -454,6 +464,33 @@ async function handleRegister() {
   }
 }
 
+import { computed } from 'vue'
+
+const regPasswordStrength = ref('弱')
+
+function getPasswordStrength(password) {
+  if (password.length < 8) return '弱'
+  let hasLower = /[a-z]/.test(password)
+  let hasUpper = /[A-Z]/.test(password)
+  let hasDigit = /\d/.test(password)
+  let hasSpecial = /[^A-Za-z0-9]/.test(password)
+  let types = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length
+
+  // 必须包含字母和数字才算“中”或“强”
+  if ((hasLower || hasUpper) && hasDigit && types === 2) return '中'
+  if ((hasLower || hasUpper) && hasDigit && types >= 3) return '强'
+  return '弱'
+}
+
+function checkRegPasswordStrength() {
+  regPasswordStrength.value = getPasswordStrength(regPassword.value)
+}
+
+const regStrengthColor = computed(() => {
+  if (regPasswordStrength.value === '强') return 'green'
+  if (regPasswordStrength.value === '中') return 'orange'
+  return 'red'
+})
 </script>
 
 <style>
@@ -646,5 +683,12 @@ button[type="button"] {
 
 .link-button:hover {
   color: #0056b3;
+}
+button:disabled {
+  background-color: #ccc !important;
+  color: #fff !important;
+  cursor: not-allowed !important;
+  border: none !important;
+  opacity: 0.7;
 }
 </style>
