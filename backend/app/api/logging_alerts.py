@@ -43,12 +43,14 @@ pagination_parser.add_argument('per_page', type=int, help='每页数量', defaul
 
 
 # --- 日志 API  ---
+from datetime import datetime
+
 @ns.route('/logs')
 class LogList(Resource):
     @ns.doc('获取系统日志列表', parser=pagination_parser)
     @ns.param('level', '按日志级别过滤 (INFO, WARNING, ERROR, DEBUG)')
-    @ns.param('start_time', '开始时间 (ISO格式，如 2023-01-01T00:00:00)')
-    @ns.param('end_time', '结束时间 (ISO格式，如 2023-01-01T23:59:59)')
+    @ns.param('start_time', '开始时间 (ISO格式，如 2023-01-01T00:00:00 或 2023-01-01)')
+    @ns.param('end_time', '结束时间 (ISO格式，如 2023-01-01T23:59:59 或 2023-01-01)')
     @ns.marshal_with(ns.model('LogsResponse', {
         'logs': fields.List(fields.Nested(log_entry_model)),
         'total': fields.Integer(description='总日志数'),
@@ -61,13 +63,19 @@ class LogList(Resource):
         """
         args = pagination_parser.parse_args()
         level = request.args.get('level')
-        start_time = request.args.get('start_time')
-        end_time = request.args.get('end_time')
+        start_time = request.args.get('start_time', '').strip()
+        end_time = request.args.get('end_time', '').strip()
+
+        # 自动补全时间字符串，如果只有日期部分则补全时分秒
+        if start_time and len(start_time) == 10:
+            start_time += 'T00:00:00'  # 补成当天开始时间，符合 ISO8601 格式
+        if end_time and len(end_time) == 10:
+            end_time += 'T23:59:59'  # 补成当天结束时间，符合 ISO8601 格式
 
         logs_data = LoggingService.get_logs(
             level=level,
-            start_time=start_time,
-            end_time=end_time,
+            start_time=start_time if start_time else None,
+            end_time=end_time if end_time else None,
             page=args['page'],
             per_page=args['per_page']
         )
@@ -188,29 +196,65 @@ class ExportLogsByTime(Resource):
     def get(self):
         """
         按时间区间和日志级别导出日志为CSV
-        前端GET参数: ?startTime=2024-07-01&endTime=2024-07-10&level=INFO
+        GET参数: ?startTime=2024-07-01&endTime=2024-07-10&level=INFO
         """
+        import csv, io
+        from flask import Response, request
+        from datetime import datetime
+
         start_time_str = request.args.get('startTime', '').strip()
         end_time_str = request.args.get('endTime', '').strip()
-        level = request.args.get('level', '').strip().upper()  # 新增
+        level = request.args.get('level', '').strip().upper()
 
+        # 自动补全时间
         if len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
         if len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
-        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
 
-        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
+        try:
+            start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S") if start_time_str else None
+            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
+        except ValueError:
+            return {"message": "时间格式错误，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS"}, 400
+
+        query = LogEntry.query
+        if start_time:
+            query = query.filter(LogEntry.timestamp >= start_time)
+        if end_time:
+            query = query.filter(LogEntry.timestamp <= end_time)
         if level:
             query = query.filter(LogEntry.level == level)
+
         logs = query.all()
 
-        def generate():
-            yield 'id,timestamp,level,message,pathname,lineno,module\n'
-            for log in logs:
-                yield f'{log.id},{log.timestamp},{log.level},{log.message},{log.pathname},{log.lineno},{log.module}\n'
-        return Response(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment;filename=logs.csv"})
+        # 提前脱离 session：序列化为 dict，避免 lazy loading 错误
+        logs_data = [{
+            'id': log.id,
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'level': log.level,
+            'message': log.message,
+            'pathname': log.pathname,
+            'lineno': log.lineno,
+            'module': log.module
+        } for log in logs]
+
+        # 生成 CSV
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=['id', 'timestamp', 'level', 'message', 'pathname', 'lineno', 'module'])
+        writer.writeheader()
+        for row in logs_data:
+            writer.writerow(row)
+
+        # 在写完所有内容后再加 BOM 前缀
+        bom = '\ufeff'
+        csv_data = bom + output.getvalue()
+        output.close()
+
+        filename = f"logs_{start_time_str[:10] if start_time else 'ALL'}_{end_time_str[:10] if end_time else 'ALL'}.csv"
+        return Response(csv_data, mimetype='text/csv; charset=utf-8',
+                        headers={"Content-Disposition": f"attachment; filename={filename}"})
+
 
 # 获取所有人脸识别告警信息（之前）
 @ns.route('/face_alert_frames')

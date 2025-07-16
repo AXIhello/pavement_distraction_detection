@@ -43,15 +43,24 @@
               </select>
             </div>
 
-            <div class="filter-item">
-              <label>开始时间</label>
-              <input type="datetime-local" v-model="filters.start_time" />
-            </div>
+           <div class="filter-item">
+  <label>开始时间</label>
+  <input
+    type="date"
+    v-model="filters.start_time"
+    :max="filters.end_time || ''"  
+  />
+</div>
 
-            <div class="filter-item">
-              <label>结束时间</label>
-              <input type="datetime-local" v-model="filters.end_time" />
-            </div>
+<div class="filter-item">
+  <label>结束时间</label>
+  <input
+    type="date"
+    v-model="filters.end_time"
+    :min="filters.start_time || ''"  
+  />
+</div>
+
 
             <div class="filter-actions">
               <button @click="onFilter" class="btn-primary">
@@ -247,15 +256,12 @@ function nextPage() {
 
 //导出日志
 function exportLogs() {
-  const { start_time, end_time, level } = filters.value
-  if (!start_time || !end_time) {
-    alert('请先选择开始和结束时间')
-    return
-  }
+  if (!confirmLogAction('export', filters.value)) return
 
+  const { start_time, end_time, level } = filters.value
   const url = new URL('http://localhost:8000/api/logs_alerts/logs/export_by_time')
-  url.searchParams.append('startTime', start_time.slice(0, 10))
-  url.searchParams.append('endTime', end_time.slice(0, 10))
+  if (start_time) url.searchParams.append('startTime', start_time)
+  if (end_time) url.searchParams.append('endTime', end_time)
   if (level) url.searchParams.append('level', level)
 
   fetch(url, {
@@ -269,7 +275,10 @@ function exportLogs() {
       const link = document.createElement('a')
       const downloadUrl = window.URL.createObjectURL(blob)
       link.href = downloadUrl
-      link.download = `logs_${start_time.slice(0, 10)}_${end_time.slice(0, 10)}.csv`
+
+      const s = start_time ? start_time : 'ALL'
+      const e = end_time ? end_time : 'ALL'
+      link.download = `logs_${s}_${e}.csv`
       link.click()
       window.URL.revokeObjectURL(downloadUrl)
     })
@@ -279,35 +288,58 @@ function exportLogs() {
     })
 }
 
+
 //清除日志
 function clearLogs() {
+  if (!confirmLogAction('clear', filters.value)) return
+
   const { start_time, end_time, level } = filters.value
-  if (!start_time || !end_time) {
-    alert('请先选择开始和结束时间')
-    return
+  const payload = {
+    ...(start_time && { startTime: start_time }),
+    ...(end_time && { endTime: end_time }),
+    ...(level && { level })
   }
-  if (!confirm('确定要删除当前筛选范围内的日志吗？此操作不可恢复')) return
 
-  const url = new URL('http://localhost:8000/api/logs_alerts/logs/delete_by_time')
-  url.searchParams.append('startTime', start_time.slice(0, 10))
-  url.searchParams.append('endTime', end_time.slice(0, 10))
-  if (level) url.searchParams.append('level', level)
-
-  fetch(url, {
-    method: 'DELETE',
+  fetch('http://localhost:8000/api/logs_alerts/logs/clear_by_time', {
+    method: 'POST',
     headers: {
+      'Content-Type': 'application/json',
       Authorization: 'Bearer ' + localStorage.getItem('token')
-    }
+    },
+    body: JSON.stringify(payload)
   })
     .then(res => res.json())
     .then(data => {
-      alert(data.message || '日志已清除')
+      alert(`清除成功，共删除 ${data.deleted || 0} 条日志`)
       fetchLogs()
     })
     .catch(err => {
       console.error('清除失败：', err)
       alert('清除失败，请稍后再试')
     })
+}
+
+
+function confirmLogAction(type, filters) {
+  const { start_time, end_time, level } = filters
+  const timeLabel = (() => {
+    const s = start_time ? start_time : '全部'
+    const e = end_time ? end_time : '全部'
+    return s === e ? s : `${s} ~ ${e}`
+  })()
+  const levelLabel = level || '全部级别'
+
+  let message = ''
+  if (type === 'export') {
+    message = `是否确认导出 ${timeLabel} 的 ${levelLabel} 日志？`
+  } else if (type === 'clear') {
+    message = `是否确认清除 ${timeLabel} 的 ${levelLabel} 日志？此操作不可恢复`
+  } else {
+    console.warn('未知操作类型:', type)
+    return false
+  }
+
+  return confirm(message)
 }
 
 
