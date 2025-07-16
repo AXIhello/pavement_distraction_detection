@@ -171,25 +171,49 @@ class ClearLogsByTime(Resource):
         前端传递: {"startTime": "2024-07-01", "endTime": "2024-07-10", "level": "ERROR"}
         level 可选
         """
+        from datetime import datetime
+
         data = request.json
-        start_time_str = data['startTime'].strip()
-        end_time_str = data['endTime'].strip()
-        level = data.get('level', '').strip().upper()  # 用get防止key不存在
-        if len(start_time_str) == 10:
+        start_time_str = data.get('startTime', '').strip()
+        end_time_str = data.get('endTime', '').strip()
+        level = data.get('level', '').strip().upper()
+
+        # 初始化，防止未定义错误
+        start_time = None
+        end_time = None
+
+        # 自动补全时间
+        if start_time_str and len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
-        if len(end_time_str) == 10:
+        if end_time_str and len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
-        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-        end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-        query = LogEntry.query.filter(LogEntry.timestamp >= start_time, LogEntry.timestamp <= end_time)
+
+        # 转换时间字符串为 datetime 对象，容错处理
+        try:
+            if start_time_str:
+                start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+            if end_time_str:
+                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return {"message": "时间格式错误，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS"}, 400
+
+        query = LogEntry.query
+        if start_time:
+            query = query.filter(LogEntry.timestamp >= start_time)
+        if end_time:
+            query = query.filter(LogEntry.timestamp <= end_time)
         if level:
             query = query.filter(LogEntry.level == level)
+
         logs = query.all()
         count = len(logs)
+
         for log in logs:
             db.session.delete(log)
         db.session.commit()
+
         return {"success": True, "deleted": count}
+
 
 @ns.route('/logs/export_by_time')
 class ExportLogsByTime(Resource):
@@ -206,23 +230,29 @@ class ExportLogsByTime(Resource):
         end_time_str = request.args.get('endTime', '').strip()
         level = request.args.get('level', '').strip().upper()
 
-        # 自动补全时间
-        if len(start_time_str) == 10:
+        query = LogEntry.query
+
+        # 初始化，防止变量未定义
+        start_time = None
+        end_time = None
+
+        # 时间处理
+        if start_time_str and len(start_time_str) == 10:
             start_time_str += ' 00:00:00'
-        if len(end_time_str) == 10:
+        if end_time_str and len(end_time_str) == 10:
             end_time_str += ' 23:59:59'
 
         try:
-            start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S") if start_time_str else None
-            end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S") if end_time_str else None
+            if start_time_str:
+                start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+                query = query.filter(LogEntry.timestamp >= start_time)
+            if end_time_str:
+                end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+                query = query.filter(LogEntry.timestamp <= end_time)
         except ValueError:
             return {"message": "时间格式错误，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS"}, 400
 
-        query = LogEntry.query
-        if start_time:
-            query = query.filter(LogEntry.timestamp >= start_time)
-        if end_time:
-            query = query.filter(LogEntry.timestamp <= end_time)
+        # 级别处理
         if level:
             query = query.filter(LogEntry.level == level)
 
@@ -246,7 +276,7 @@ class ExportLogsByTime(Resource):
         for row in logs_data:
             writer.writerow(row)
 
-        # 在写完所有内容后再加 BOM 前缀
+        # 加 BOM 前缀防止中文乱码
         bom = '\ufeff'
         csv_data = bom + output.getvalue()
         output.close()
