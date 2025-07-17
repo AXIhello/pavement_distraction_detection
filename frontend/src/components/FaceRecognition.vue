@@ -249,7 +249,7 @@ function handleRecognitionResult(face) {
   }
   if (face.name === '陌生人') {
 
-    alert('告警：检测到陌生人！')
+    alert('告警：检测到陌生人！请前去录入！')
     stopAll()
     router.push('/face_register')
     return
