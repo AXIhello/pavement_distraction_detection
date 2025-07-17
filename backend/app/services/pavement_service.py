@@ -89,9 +89,7 @@ def detect_single_image(base64_image: str) -> Dict:
         _, encoded = base64_image.split(',', 1)
         image_bytes = base64.b64decode(encoded)
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        orig_w, orig_h = image.size
-        image_resized = image.resize((640, 640))
-        image_np = np.array(image_resized)
+        image_np = np.array(image)
 
         # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
         results = model(image_np, conf=0.30, verbose=False)
@@ -112,18 +110,11 @@ def detect_single_image(base64_image: str) -> Dict:
                     # 从模型的类别名称获取标签
                     label_key = model.names[cls]
 
-                    # 缩放回原始尺寸
-                    w_scale = orig_w / 640
-                    h_scale = orig_h / 640
-                    xmin_r = float(x1 * w_scale)
-                    ymin_r = float(y1 * h_scale)
-                    xmax_r = float(x2 * w_scale)
-                    ymax_r = float(y2 * h_scale)
-
+                    # 直接使用原始坐标，无需缩放
                     detections.append({
                         'class': id2label.get(label_key, label_key),
                         'confidence': round(conf, 3),
-                        'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
+                        'bbox': [round(float(x1), 2), round(float(y1), 2), round(float(x2), 2), round(float(y2), 2)]
                     })
 
         annotated = draw_detections(image.copy(), detections)
@@ -160,11 +151,7 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
             _, encoded = base64_str.split(',', 1)
             image_bytes = base64.b64decode(encoded)
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            orig_w, orig_h = image.size
-            image_resized = image.resize((640, 640))
-            image_np = np.array(image_resized)
-            w_scale = orig_w / 640
-            h_scale = orig_h / 640
+            image_np = np.array(image)
 
             # 使用YOLOv11进行推理，设置置信度阈值，关闭verbose输出
             result_batch = model(image_np, conf=0.30, verbose=False)
@@ -184,16 +171,11 @@ def detect_batch_images(base64_images: List[str]) -> List[Dict]:
                         # 从模型的类别名称获取标签
                         label_key = model.names[cls]
 
-                        # 缩放回原始尺寸
-                        xmin_r = float(x1 * w_scale)
-                        ymin_r = float(y1 * h_scale)
-                        xmax_r = float(x2 * w_scale)
-                        ymax_r = float(y2 * h_scale)
-
+                        # 直接使用原始坐标，无需缩放
                         detections.append({
                             'class': id2label.get(label_key, label_key),
                             'confidence': round(conf, 3),
-                            'bbox': [round(xmin_r, 2), round(ymin_r, 2), round(xmax_r, 2), round(ymax_r, 2)]
+                            'bbox': [round(float(x1), 2), round(float(y1), 2), round(float(x2), 2), round(float(y2), 2)]
                         })
 
             annotated = draw_detections(image.copy(), detections)
