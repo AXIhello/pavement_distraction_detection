@@ -340,6 +340,9 @@ async function handleRecognitionResult(face) {
       console.log(`[DEBUG] 正常情况，发送最终判定: normal`)
       await sendFinalJudgement('normal')
     }
+    recognizedName.value = face.name || ''
+    recognitionFinished.value = true
+    stopAll()
   }
   //  if (face.name === '未知人员') {
   //   alert('人脸数据库中无数据，请前去录入')
@@ -347,9 +350,6 @@ async function handleRecognitionResult(face) {
   //   router.push('/face_register')
   //   return
   // }
-  recognizedName.value = face.name || ''
-  recognitionFinished.value = true
-  stopAll()
 }
 
 function sendRecognitionEndSignal() {
@@ -513,6 +513,7 @@ function processRecognitionResult(result) {
   } else if (lastResults.length === 3) {
     if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
       progress.value = 100;
+      // 只在最终三帧一致时调用handleRecognitionResult
       handleRecognitionResult(result.faces[0]);
       recognitionFinished.value = true;
       stopAll();
