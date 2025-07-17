@@ -12,6 +12,7 @@ from ..utils.logger import get_logger
 from datetime import datetime
 from app.core.models import FaceFeature
 import os
+import re
 
 logger = get_logger(__name__)
 
@@ -174,39 +175,34 @@ class UserLogin(Resource):
     @ns.expect(login_model, validate=True)
     @ns.marshal_with(login_response_model)
     def post(self):
-        """
-        处理用户登录请求，验证凭据并返回JWT令牌。
-        """
         data = ns.payload
         username = data.get('username')
         password = data.get('password')
         captcha = data.get('captcha')
 
-        # 校验验证码
         code = session.get('captcha_code')
 
         if not code:
             return {'success': False, 'message': '验证码已过期，请刷新验证码'}, 400
         if not captcha or captcha.upper() != code:
             return {'success': False, 'message': '验证码错误'}, 400
-        # 验证通过后清除验证码，防止重用
+
         session.pop('captcha_code', None)
 
-        # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
         user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            access_token = create_jwt_token(user)
-            return {
-                'success': True,
-                'message': '登录成功',
-                'access_token': access_token,
-                'token_type': 'bearer'
-            }
-        else:
-            return {
-                'success': False,
-                'message': '无效的用户名或密码'
-            }
+        if not user:
+            return {'success': False, 'message': '用户名不存在'}, 400
+        if not user.check_password(password):
+            return {'success': False, 'message': '密码错误'}, 400
+
+        access_token = create_jwt_token(user)
+        return {
+            'success': True,
+            'message': '登录成功',
+            'access_token': access_token,
+            'token_type': 'bearer'
+        }
+
 
 # 邮箱验证码发送请求模型
 send_email_code_model = ns.model('SendEmailCode', {
@@ -248,12 +244,15 @@ class LoginWithEmailCode(Resource):
         email = data.get('email')
         code = data.get('code')
 
-        if not verify_email_code(email, code):
-            return {'success': False, 'message': '验证码无效或已过期'}, 401
+        if not email or not code:
+            return {'success': False, 'message': '邮箱和验证码不能为空'}, 400
 
         user = User.query.filter_by(email=email).first()
         if not user:
-            return {'success': False, 'message': '用户不存在'}, 404
+            return {'success': False, 'message': '该邮箱尚未注册'}, 404
+
+        if not verify_email_code(email, code):
+            return {'success': False, 'message': '验证码错误或已过期'}, 400
 
         token = create_jwt_token(user)
         return {
@@ -262,6 +261,7 @@ class LoginWithEmailCode(Resource):
             'access_token': token,
             'token_type': 'bearer'
         }
+
     
 # 注册
 register_model = ns.model('Register', {
@@ -287,7 +287,10 @@ class UserRegister(Resource):
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
-
+        # 密码强度校验
+        ok, msg = self.check_password_strength(password)
+        if not ok:
+            return {'success': False, 'message': msg}, 400
         if find_user_by_username(username):
             return {'success': False, 'message': '用户名已存在'}, 400
         
@@ -296,6 +299,20 @@ class UserRegister(Resource):
 
         create_user(username,email,password)
         return {'success': True, 'message': '注册成功'}
+    @staticmethod
+    def check_password_strength(password):
+        if len(password) < 8:
+            return False, "密码长度不能少于8位"
+        has_lower = re.search(r'[a-z]', password)
+        has_upper = re.search(r'[A-Z]', password)
+        has_digit = re.search(r'\d', password)
+        has_special = re.search(r'[^A-Za-z0-9]', password)
+        has_letter = has_lower or has_upper
+        if has_letter and has_digit and not has_special:
+            return True, "中"
+        if has_letter and has_digit and has_special:
+            return True, "强"
+        return False, "密码过于简单，需包含字母、数字和特殊字符"
     
 
 # 显示当前用户信息
