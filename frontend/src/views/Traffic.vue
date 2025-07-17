@@ -5,8 +5,14 @@
     <div class="content">
       <!-- 左侧 -->
       <aside class="sidebar left">
-        <div class="card">
-          <div class="card-title"><span class="icon">🕒</span> UTC时间查询</div>
+        <div class="card utc-time-card">
+          <div class="card-title time-query-title">
+            UTC时间查询
+            <button @click="showTimeConvert = true" class="icon-btn time-convert-btn" title="时间转换">
+              <span class="icon-clock">🕒</span>
+            </button>
+          </div>
+          <div style="font-size: 16px; color: #888; margin-top: 4px;">快点击旁边的时钟试试吧!</div>
         </div>
         <div class="card">
           <div class="card-title"><span class="icon">📈</span> 按时间查询</div>
@@ -35,9 +41,9 @@
             </div>
             <div class="form-group">
               <label>请输入车牌标识:</label>
-              <input v-model="carPlate" placeholder="请输入车牌标识(如15053110001)" required />
+              <input v-model="carPlate" placeholder="如15053110001" required />
             </div>
-            <button type="submit">提交</button>
+            <button type="submit">查询车辆轨迹</button>
           </form>
         </div>
       </aside>
@@ -72,16 +78,47 @@
       <div class="analysis-body">
         <!-- 左侧按钮栏 -->
         <div class="analysis-sidebar">
-          <button @click="onTogglePopulation">人口分布</button>
-          <button @click="onGoToShandong">山东省地图</button>
-          <button @click="activeAnalysis = 'flow'">客流量查询</button>
-          <button @click="activeAnalysis = 'weather'">客流与天气</button>
-          <button @click="activeAnalysis = 'speed'">道路速度</button>
-          <button @click="onShowHeatmap">上客点查询</button>
-          <button @click="activeAnalysis = 'dynamicHeatmap'">动态热力图</button>
-          <button @click="activeAnalysis = 'bus'">载客车数量</button>
-          <button @click="activeAnalysis = 'orders'">路程的分析</button>
-          <button @click="activeAnalysis = 'orderStats'">时间与距离</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'population' }"
+            @click="onTogglePopulation"
+          >人口分布</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'shandong' }"
+            @click="onGoToShandong"
+
+          >山东省地图</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'flow' }"
+            @click="activeAnalysis = 'flow'"
+          >客流量查询</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'weather' }"
+            @click="activeAnalysis = 'weather'"
+          >客流与天气</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'speed' }"
+            @click="activeAnalysis = 'speed'"
+          >道路速度</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'heatmap' }"
+            @click="activeAnalysis = 'heatmap'"
+          >上客点查询</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'dynamicHeatmap' }"
+            @click="activeAnalysis = 'dynamicHeatmap'"
+          >动态热力图</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'bus' }"
+            @click="activeAnalysis = 'bus'"
+          >载客车数量</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'orders' }"
+            @click="activeAnalysis = 'orders'"
+          >路程的分析</button>
+          <button
+            :class="{ 'active-analysis-btn': activeAnalysis === 'orderStats' }"
+            @click="activeAnalysis = 'orderStats'"
+          >时间与距离</button>
         </div>
 
         <!-- 右侧内容区域 -->
@@ -95,6 +132,11 @@
               <div class="form-group">
                 <label>结束时间：</label>
                 <input type="datetime-local" v-model="flowEndTime" required />
+              </div>
+              <div class="form-group">
+                <label>时间间隔：</label>
+                <input type="number" v-model="flowInterval" min="1" required style="width: 100px; display: inline-block;" />
+                <span style="margin-left: 6px;">分钟</span>
               </div>
               <button type="submit">查询客流量</button>
             </form>
@@ -110,7 +152,19 @@
               <button type="submit">查询道路速度</button>
             </form>
             <div class="info-text">
-              <p>💡 提示：查询后地图上将显示道路线条，颜色表示速度：<span style="color: #00ff00;">绿色(快速)</span> | <span style="color: #ffff00;">黄色(中等)</span> | <span style="color: #ff0000;">红色(慢速)</span></p>
+              <p style="color: #2C3E50;">💡 提示：查询后地图上将显示道路线条，颜色表示速度：<span style="color: #00ff00;">绿色(快速)</span> | <span style="color: #ffff00;">黄色(中等)</span> | <span style="color: #ff0000;">红色(慢速)</span></p>
+            </div>
+          </div>
+          <div v-else-if="activeAnalysis === 'heatmap'">
+            <form @submit.prevent="onShowHeatmap">
+              <div class="form-group">
+                <label>查询时间：</label>
+                <input type="datetime-local" v-model="heatmapQueryTime" required />
+              </div>
+              <button type="submit">查询上客点热力图</button>
+            </form>
+            <div class="info-text">
+              <p style="color: #2C3E50;">💡 提示：查询后将显示该时间点后15分钟内的上客点热力图，颜色越深表示上客点越密集。</p>
             </div>
           </div>
           <div v-else-if="activeAnalysis === 'dynamicHeatmap'">
@@ -215,6 +269,22 @@
       </div>
     </div>
   </div>
+
+  <!-- 时间转换弹窗 -->
+  <div v-if="showTimeConvert" class="time-convert-dialog" style="z-index:2000;">
+    <div>
+      <label>UTC时间戳：</label>
+      <input v-model="utc" @input="utcToBeijing" placeholder="如 1721193600" />
+    </div>
+    <div>
+      <label>北京时间：</label>
+      <input v-model="beijing" @input="beijingToUtc" placeholder="如 2024-07-17 08:00:00" />
+    </div>
+    <div style="font-size:12px;color:#888;margin-top:4px;">
+      支持互转，输入一个自动转换另一个
+    </div>
+    <button @click="showTimeConvert = false" class="close-btn">关闭</button>
+  </div>
 </template>
 
 <script setup>
@@ -233,7 +303,7 @@ const carEndTime = ref('2013-09-12T00:00:00')
 const carPlate = ref('')
 
 const showAnalysis = ref(false)
-const activeAnalysis = ref('population')
+const activeAnalysis = ref('') // 初始无激活
 
 const busStartTime = ref('2013-09-12T00:00:00')
 const busEndTime = ref('2013-09-12T00:15:00')
@@ -248,6 +318,7 @@ const weatherChartRef = ref(null)
 const flowStartTime = ref('2013-09-12T00:00:00')
 const flowEndTime = ref('2013-09-12T00:15:00')
 const flowChartRef = ref(null)
+const flowInterval = ref('30')
 
 const dynamicHeatmapStartTime = ref('2013-09-12T08:00:00')
 const dynamicHeatmapEndTime = ref('2013-09-12T12:00:00')
@@ -263,6 +334,38 @@ const statInterval = ref('60')
 const statChartRef = ref(null)
 
 const speedQueryTime = ref('2013-09-12T08:00:00')
+const heatmapQueryTime = ref('2013-09-12T08:00:00')
+
+const showTimeConvert = ref(false)
+const utc = ref('')
+const beijing = ref('')
+
+function utcToBeijing() {
+  if (!utc.value) {
+    beijing.value = ''
+    return
+  }
+  const ts = parseInt(utc.value)
+  if (!isNaN(ts)) {
+    const date = new Date(ts * 1000)
+    // 北京时间 = UTC+8
+    date.setHours(date.getHours() + 8)
+    beijing.value = date.toISOString().replace('T', ' ').substring(0, 19)
+  }
+}
+
+function beijingToUtc() {
+  if (!beijing.value) {
+    utc.value = ''
+    return
+  }
+  const date = new Date(beijing.value.replace(' ', 'T'))
+  if (!isNaN(date.getTime())) {
+    // UTC = 北京时间 - 8小时
+    date.setHours(date.getHours() - 8)
+    utc.value = Math.floor(date.getTime() / 1000)
+  }
+}
 
 async function onTimeQuery() {
   try {
@@ -286,15 +389,37 @@ async function onCarQuery() {
     if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
       baiDuMapRef.value.showPoints([]);
     }
-    const response = await fetch(
-      `/api/traffic_analysis/car_points/?commaddr=${encodeURIComponent(carPlate.value)}&start_time=${encodeURIComponent(carStartTime.value)}&end_time=${encodeURIComponent(carEndTime.value)}`
-    );
+
+    // 2. 切换地图样式为浅色版本（在请求数据前就切换）
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.setMapStyle === 'function') {
+      baiDuMapRef.value.setMapStyle('light');
+      console.log('✅ 已切换为浅色地图样式（车辆轨迹查询）');
+    }
+
+    // 3. 构建请求参数
+    const params = new URLSearchParams({
+      commaddr: carPlate.value,
+      start_time: carStartTime.value,
+      end_time: carEndTime.value
+    });
+
+    console.log('车辆轨迹查询参数:', params.toString());
+
+    // 4. 请求数据
+    const response = await fetch(`/api/traffic_analysis/car_points/?${params.toString()}`);
     const data = await response.json();
-    if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
-      baiDuMapRef.value.showPoints(data);
+
+    console.log('车辆轨迹返回数据:', data);
+
+    // 5. 显示车辆轨迹
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.showVehicleTrack === 'function') {
+      baiDuMapRef.value.showVehicleTrack(data);
+    } else {
+      alert('地图组件未实现 showVehicleTrack 方法');
     }
   } catch (error) {
-    alert('查询失败');
+    console.error('车辆轨迹查询失败:', error);
+    alert('车辆轨迹查询失败: ' + (error && error.message ? error.message : error));
   }
 }
 
@@ -304,9 +429,22 @@ async function onShowHeatmap() {
     if (baiDuMapRef.value && typeof baiDuMapRef.value.showPoints === 'function') {
       baiDuMapRef.value.showPoints([]);
     }
-    const response = await fetch(
-      `/api/traffic_analysis/pickup_points/?time=${encodeURIComponent(startTime.value)}`
-    );
+
+    // 2. 切换地图样式为浅色版本（在请求数据前就切换）
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.setMapStyle === 'function') {
+      baiDuMapRef.value.setMapStyle('light');
+      console.log('✅ 已切换为浅色地图样式（热力图查询）');
+    }
+
+    // 3. 构建请求参数
+    const params = new URLSearchParams({
+      time: heatmapQueryTime.value
+    });
+
+    console.log('热力图查询参数:', params.toString());
+
+    // 4. 请求数据
+    const response = await fetch(`/api/traffic_analysis/pickup_points/?${params.toString()}`);
     const data = await response.json();
     if (baiDuMapRef.value && typeof baiDuMapRef.value.showHeatmap === 'function') {
       baiDuMapRef.value.showHeatmap(data);
@@ -314,6 +452,7 @@ async function onShowHeatmap() {
       alert('地图组件未实现 showHeatmap 方法');
     }
   } catch (error) {
+    console.error('热力图查询失败:', error);
     alert('热力图查询失败: ' + (error && error.message ? error.message : error));
   }
 }
@@ -325,7 +464,13 @@ async function onShowDynamicHeatmap() {
       baiDuMapRef.value.showPoints([]);
     }
 
-    // 构建请求参数
+    // 2. 切换地图样式为浅色版本（在请求数据前就切换）
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.setMapStyle === 'function') {
+      baiDuMapRef.value.setMapStyle('light');
+      console.log('✅ 已切换为浅色地图样式（动态热力图）');
+    }
+
+    // 3. 构建请求参数
     const params = new URLSearchParams({
       start_time: dynamicHeatmapStartTime.value,
       end_time: dynamicHeatmapEndTime.value,
@@ -334,11 +479,13 @@ async function onShowDynamicHeatmap() {
 
     console.log('动态热力图请求参数:', params.toString());
 
+    // 4. 请求数据
     const response = await fetch(`/api/traffic_analysis/dynamic_heatmap/?${params.toString()}`);
     const data = await response.json();
 
     console.log('动态热力图返回数据:', data);
 
+    // 5. 显示动态热力图
     if (baiDuMapRef.value && typeof baiDuMapRef.value.showDynamicHeatmap === 'function') {
       baiDuMapRef.value.showDynamicHeatmap(data);
     } else {
@@ -355,7 +502,8 @@ async function onQueryFlow() {
     // 直接使用本地时间格式，避免UTC转换
     const params = new URLSearchParams({
       start_time: flowStartTime.value,
-      end_time: flowEndTime.value
+      end_time: flowEndTime.value,
+      interval: flowInterval.value
     })
     
     const response = await fetch(`/api/traffic_analysis/flow/?${params.toString()}`)
@@ -365,7 +513,7 @@ async function onQueryFlow() {
       const option = {
         title: { 
           text: '客流量分析',
-          subtext: `时间间隔: ${result.interval_minutes}分钟`
+          subtext: `时间间隔: ${flowInterval.value}分钟`
         },
         tooltip: { 
           trigger: 'axis',
@@ -386,7 +534,14 @@ async function onQueryFlow() {
           name: '订单数量',
           type: 'line',
           data: result.time_slots.map(slot => slot.order_count),
-          itemStyle: { color: '#5470c6' },
+          itemStyle: { 
+            color: '#5470c6',
+            borderColor: '#ffffff',
+            borderWidth: 2,
+            shadowBlur: 5,
+            shadowColor: 'rgba(0,0,0,0.3)'
+          },
+          symbolSize: 8,
           lineStyle: { width: 3 },
           smooth: true
         }]
@@ -556,7 +711,14 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 0,
             data: result.data.map(item => item.passenger_flow),
             lineStyle: { width: 3 },
-            itemStyle: { color: '#5470c6' },
+            itemStyle: { 
+              color: '#5470c6',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 5,
+              shadowColor: 'rgba(0,0,0,0.3)'
+            },
+            symbolSize: 8,
             smooth: true
           },
           {
@@ -565,7 +727,14 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 1,
             data: result.data.map(item => item.weather.temperature),
             lineStyle: { color: '#ff6b6b', width: 2 },
-            itemStyle: { color: '#ff6b6b' },
+            itemStyle: { 
+              color: '#ff6b6b',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 5,
+              shadowColor: 'rgba(0,0,0,0.3)'
+            },
+            symbolSize: 8,
             smooth: true
           },
           {
@@ -574,7 +743,14 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 2,
             data: result.data.map(item => item.weather.humidity),
             lineStyle: { color: '#91cc75', width: 2 },
-            itemStyle: { color: '#91cc75' },
+            itemStyle: { 
+              color: '#91cc75',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 5,
+              shadowColor: 'rgba(0,0,0,0.3)'
+            },
+            symbolSize: 8,
             smooth: true
           },
           {
@@ -583,7 +759,14 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 3,
             data: result.data.map(item => item.weather.wind_speed),
             lineStyle: { color: '#fac858', width: 2 },
-            itemStyle: { color: '#fac858' },
+            itemStyle: { 
+              color: '#fac858',
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              shadowBlur: 5,
+              shadowColor: 'rgba(0,0,0,0.3)'
+            },
+            symbolSize: 8,
             smooth: true
           },
           {
@@ -854,10 +1037,21 @@ function onClearMapOverlays() {
 // 人口显示
 function onTogglePopulation() {
   baiDuMapRef.value?.togglePopulation()
+  activeAnalysis.value = 'population'
+
+  // 滚动到地图区域
+  const mapMain = document.querySelector('.map-main')
+  if (mapMain) {
+    mapMain.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }
 }
 
 function onGoToShandong() {
   baiDuMapRef.value?.goToShandong()
+  activeAnalysis.value = 'shandong'
 }
 
 async function onQueryRoadSpeed() {
@@ -867,6 +1061,13 @@ async function onQueryRoadSpeed() {
       baiDuMapRef.value.showPoints([]);
     }
 
+    //2. 先切换地图样式为浅色版本（在请求数据前就切换）
+    if (baiDuMapRef.value && typeof baiDuMapRef.value.setMapStyle === 'function') {
+      baiDuMapRef.value.setMapStyle('light');
+      console.log('✅ 已切换为浅色地图样式');
+    }
+
+    // 3. 构建请求参数
     const params = new URLSearchParams({
       query_time: speedQueryTime.value
     });
@@ -878,6 +1079,7 @@ async function onQueryRoadSpeed() {
 
     console.log('道路速度返回数据:', data);
 
+    // 5. 绘制道路线条
     if (baiDuMapRef.value && typeof baiDuMapRef.value.showRoadSpeed === 'function') {
       baiDuMapRef.value.showRoadSpeed(data);
     } else {
@@ -891,6 +1093,12 @@ async function onQueryRoadSpeed() {
 </script>
 
 <style>
+:root {
+  font-size: 18px;
+}
+.analysis-content, .analysis-sidebar, .form-group, .info-text, .card, .analysis-footer {
+  font-size: 18px;
+}
 .main-layout {
   display: flex;
   flex-direction: column;
@@ -909,6 +1117,9 @@ async function onQueryRoadSpeed() {
   padding: 1.5rem 1rem;
   box-sizing: border-box;
   padding-top: 100px;
+}
+.sidebar .card-title {
+  font-size: 19px;
 }
 .map-main {
   flex: 1;
@@ -938,13 +1149,16 @@ async function onQueryRoadSpeed() {
 }
 .card {
   background: #efdb9384;
+  color: #2C3E50;      /* 藏青色字体 */
   border-radius: 8px;
-  padding: 1.2rem 1rem;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  padding: 1.21rem;
+  box-shadow: 0 2px8px rgba(0,0,0,0.08);
+}
+.utc-time-card {
+  padding: 0.8rem 1rem;
 }
 .card-title {
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   font-weight: bold;
   margin-bottom: 1rem;
   display: flex;
@@ -1002,20 +1216,28 @@ button:hover {
   gap: 0.5rem;
 }
 .analysis-sidebar button {
-  background: #000000;
-  color: white;
+  background: #bae686;
+  color: #2C3E50;
   border-radius: 4px;
   border: none;
   padding: 0.5rem 1rem;
   cursor: pointer;
-  text-align: left;
-  transition: background 0.2s;
+  text-align: center;
+  font-size: 16px;
+  margin-bottom: 8px;
+  transition: background 0.2s, color 0.2s;
+  font-weight: bold;
+  box-shadow: none;
 }
 .analysis-sidebar button:hover {
-  background: #003d73;
+  background: #bae686;
 }
-.analysis-sidebar button:active {
-  background: #002a4d;
+.analysis-sidebar button.active-analysis-btn {
+  background: #395168 !important;
+  color: #fff !important;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(44,62,80,0.10);
 }
 .analysis-content {
   flex: 1;
@@ -1047,5 +1269,76 @@ button:hover {
   font-size: 0.9rem;
   color: #fff;
   line-height: 1.4;
+}
+
+.time-convert-dialog {
+  position: fixed;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  padding: 18px 20px 12px 20px;
+  min-width: 260px;
+}
+.close-btn {
+  margin-top: 10px;
+  background: #f56c6c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  float: right;
+}
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  margin-left: 6px;
+  cursor: pointer;
+  color: #409eff;
+  transition: color 0.2s;
+}
+.icon-btn:hover {
+  color: #66b1ff;
+}
+.time-query-title {
+  display: flex;
+  align-items: center;         /* 垂直居中 */
+  justify-content: space-between;
+  font-weight: bold;
+  font-size: 18px;
+  color: #2C3E50;
+  min-height: 44px;            /* 保证按钮能完整显示，且不会太高 */
+}
+
+.time-convert-btn {
+  margin-left: 10px;
+  background: #2C3E50;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(44,62,80,0.08);
+}
+.time-convert-btn:hover {
+  background: #223A5E;
+}
+.icon-clock {
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+}
+.analysis-card .card-title {
+  font-size: 22px;
 }
 </style>
