@@ -69,7 +69,11 @@ CORS(
 db.init_app(app)
 
 # 初始化 SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app,
+                    cors_allowed_origins="*",
+                    max_http_buffer_size=100 * 1024 * 1024,       # 对应 maxHttpBufferSize: 1e8 (100MB)
+                    ping_timeout=60000,                            # 对应 pingTimeout: 60000
+                    ping_interval=25000   )
 
 # 初始化日志系统
 setup_logging(app)

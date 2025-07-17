@@ -10,7 +10,7 @@ class Config:
     JWT_HEADER_TYPE = 'Bearer'
 
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:12345678@localhost:3306/test_db'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:123@localhost:3306/test_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # 邮件验证码发送邮箱配置
