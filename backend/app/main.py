@@ -144,7 +144,7 @@ def handle_connect():
     # app_logger.info("SocketIO 客户端连接")
     sid = request.sid
     app_logger.info(f"SocketIO 客户端连接: {sid}")
-    client_recognition_status[sid] = True  # 新连接默认允许识别
+    #client_recogn ition_status[sid] = True  # 新连接默认允许识别
 
 
 @socketio.on('disconnect')
@@ -332,7 +332,7 @@ def create_admin_if_not_exists():
 if __name__ == '__main__':
     with app.app_context():
         try:
-            db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")

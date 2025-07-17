@@ -18,22 +18,22 @@ ns = Namespace('logs_alerts', description='日志与告警管理')
 
 # --- 定义模型 (与我之前给您的内容一致) ---
 log_entry_model = ns.model('LogEntry', {
-    'timestamp': fields.String(description='日志记录时间'),
-    'level': fields.String(description='日志级别'),
-    'message': fields.String(description='日志消息'),
-    'pathname': fields.String(description='代码文件路径'),
-    'lineno': fields.Integer(description='代码行号'),
-    'module': fields.String(description='模块名称')
+    'timestamp': fields.String(description='日志记录时间', example='2024-07-16T12:00:00'),
+    'level': fields.String(description='日志级别', example='INFO'),
+    'message': fields.String(description='日志消息', example='系统启动成功'),
+    'pathname': fields.String(description='代码文件路径', example='/app/main.py'),
+    'lineno': fields.Integer(description='代码行号', example=42),
+    'module': fields.String(description='模块名称', example='main')
 })
 
 alert_entry_model = ns.model('AlertEntry', {
-    'alert_id': fields.String(readOnly=True, description='告警ID'),
-    'timestamp': fields.String(description='告警时间'),
-    'type': fields.String(description='告警类型'),
-    'description': fields.String(description='告警描述'),
-    'details': fields.Raw(description='告警详情（JSON对象）'),
-    'status': fields.String(description='告警状态（活跃，已处理，已忽略）'),
-    'media_url': fields.String(description='关联媒体URL（图片或视频）')
+    'alert_id': fields.String(readOnly=True, description='告警ID', example='A123'),
+    'timestamp': fields.String(description='告警时间', example='2024-07-16T12:00:00'),
+    'type': fields.String(description='告警类型', example='pavement_anomaly'),
+    'description': fields.String(description='告警描述', example='检测到路面坑洞'),
+    'details': fields.Raw(description='告警详情（JSON对象）', example={'frame': 1, 'confidence': 0.92}),
+    'status': fields.String(description='告警状态（活跃，已处理，已忽略）', example='活跃'),
+    'media_url': fields.String(description='关联媒体URL（图片或视频）', example='/static/alert_videos/road/xxx.jpg')
 })
 
 # 用于分页的通用响应模型
@@ -47,19 +47,23 @@ from datetime import datetime
 
 @ns.route('/logs')
 class LogList(Resource):
-    @ns.doc('获取系统日志列表', parser=pagination_parser)
-    @ns.param('level', '按日志级别过滤 (INFO, WARNING, ERROR, DEBUG)')
-    @ns.param('start_time', '开始时间 (ISO格式，如 2023-01-01T00:00:00 或 2023-01-01)')
-    @ns.param('end_time', '结束时间 (ISO格式，如 2023-01-01T23:59:59 或 2023-01-01)')
+    @ns.doc('获取系统日志列表', parser=pagination_parser, description='获取所有系统日志，支持按级别和时间范围过滤，并进行分页')
+    @ns.param('level', '按日志级别过滤 (INFO, WARNING, ERROR, DEBUG)', example='INFO')
+    @ns.param('start_time', '开始时间 (ISO格式，如 2023-01-01T00:00:00 或 2023-01-01)', example='2024-07-01T00:00:00')
+    @ns.param('end_time', '结束时间 (ISO格式，如 2023-01-01T23:59:59 或 2023-01-01)', example='2024-07-16T23:59:59')
     @ns.marshal_with(ns.model('LogsResponse', {
         'logs': fields.List(fields.Nested(log_entry_model)),
-        'total': fields.Integer(description='总日志数'),
-        'page': fields.Integer(description='当前页码'),
-        'per_page': fields.Integer(description='每页数量')
+        'total': fields.Integer(description='总日志数', example=100),
+        'page': fields.Integer(description='当前页码', example=1),
+        'per_page': fields.Integer(description='每页数量', example=10)
     }))
+    @ns.response(200, '获取成功')
+    @ns.response(400, '参数错误')
     def get(self):
         """
         获取所有系统日志，支持按级别和时间范围过滤，并进行分页。
+        参数：level, start_time, end_time, page, per_page。
+        返回：日志列表及分页信息。
         """
         args = pagination_parser.parse_args()
         level = request.args.get('level')
@@ -82,6 +86,59 @@ class LogList(Resource):
         return logs_data
 
 
+# --- 告警 API  ---
+@ns.route('/alerts')
+class AlertList(Resource):
+    @ns.doc('获取告警事件列表', parser=pagination_parser, description='获取所有告警事件，支持按类型和状态过滤，并进行分页')
+    @ns.param('type', '按告警类型过滤 (例如: unauthorized_access, pavement_anomaly)', example='pavement_anomaly')
+    @ns.param('status', '按告警状态过滤 (活跃, 已处理, 已忽略)', example='活跃')
+    @ns.marshal_with(ns.model('AlertsResponse', {
+        'alerts': fields.List(fields.Nested(alert_entry_model)),
+        'total': fields.Integer(description='总告警数', example=20),
+        'page': fields.Integer(description='当前页码', example=1),
+        'per_page': fields.Integer(description='每页数量', example=10)
+    }))
+    @ns.response(200, '获取成功')
+    @ns.response(400, '参数错误')
+    def get(self):
+        """
+        获取所有告警事件，支持按类型和状态过滤，并进行分页。
+        参数：type, status, page, per_page。
+        返回：告警列表及分页信息。
+        """
+        args = pagination_parser.parse_args()
+        alert_type = request.args.get('type')
+        status = request.args.get('status')
+
+        alerts_data = LoggingService.get_alerts(
+            alert_type=alert_type,
+            status=status,
+            page=args['page'],
+            per_page=args['per_page']
+        )
+        return alerts_data
+
+@ns.route('/alerts/playback/<string:alert_id>')
+@ns.param('alert_id', '告警的唯一标识符', example='A123')
+class AlertPlayback(Resource):
+    @ns.doc('获取告警事件回放数据', description='根据告警ID获取告警详情及关联的媒体（图片/视频）回放数据')
+    @ns.marshal_with(ns.model('AlertPlaybackResponse', {
+        'alert_info': fields.Nested(alert_entry_model),
+        'media_url': fields.String(description='关联的媒体文件URL，用于回放', example='/static/alert_videos/road/xxx.jpg')
+    }))
+    @ns.response(200, '获取成功')
+    @ns.response(404, '告警未找到')
+    def get(self, alert_id):
+        """
+        根据告警ID获取告警详情及关联的媒体（图片/视频）回放数据。
+        参数：alert_id。
+        返回：告警详情和媒体URL。
+        """
+        playback_data = LoggingService.get_alert_playback_data(alert_id)
+        if not playback_data:
+            ns.abort(404, message=f"告警 {alert_id} 未找到")
+        return playback_data
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -91,7 +148,6 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# 删除告警信息用
 @ns.route('/alerts/<string:alert_type>/<int:alert_id>')
 class AlertDelete(Resource):
     @admin_required
@@ -117,15 +173,18 @@ class AlertDelete(Resource):
         db.session.commit()
         return {'success': True, 'message': '告警事件及本地缓存已删除'}
 
-# 清除日志
 @ns.route('/logs/clear_by_time')
 class ClearLogsByTime(Resource):
-    @admin_required
+    @ns.doc('批量删除日志', description='按时间区间和日志级别批量删除日志（仅管理员）', security='jwt')
+    @ns.response(200, '删除成功')
+    @ns.response(400, '时间格式错误')
+    @ns.response(403, '无权限')
     def post(self):
         """
-        按时间区间和日志级别批量删除日志
-        前端传递: {"startTime": "2024-07-01", "endTime": "2024-07-10", "level": "ERROR"}
-        level 可选
+        按时间区间和日志级别批量删除日志。
+        需管理员权限。
+        参数：startTime, endTime, level（JSON body）。
+        返回：删除结果。
         """
         from datetime import datetime
 
@@ -170,13 +229,20 @@ class ClearLogsByTime(Resource):
 
         return {"success": True, "deleted": count}
 
-# 导出日志
+
 @ns.route('/logs/export_by_time')
 class ExportLogsByTime(Resource):
+    @ns.doc('导出日志为CSV', description='按时间区间和日志级别导出日志为CSV')
+    @ns.param('startTime', '开始时间', example='2024-07-01')
+    @ns.param('endTime', '结束时间', example='2024-07-16')
+    @ns.param('level', '日志级别', example='INFO')
+    @ns.response(200, '导出成功')
+    @ns.response(400, '时间格式错误')
     def get(self):
         """
-        按时间区间和日志级别导出日志为CSV
-        GET参数: ?startTime=2024-07-01&endTime=2024-07-10&level=INFO
+        按时间区间和日志级别导出日志为CSV。
+        参数：startTime, endTime, level（query参数）。
+        返回：CSV文件。
         """
         import csv, io
         from flask import Response, request
@@ -242,7 +308,7 @@ class ExportLogsByTime(Resource):
                         headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
-# 获取所有人脸识别告警信息
+# 获取所有人脸识别告警信息（之前）
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
@@ -270,7 +336,7 @@ class FaceAlertFrames(Resource):
             return {'error': '获取失败'}, 500
 
 
-# 根据视频ID获取路面灾害告警详情
+# （可用）根据视频ID获取路面灾害告警详情
 @ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
 class AlertVideoDetail(Resource):               
     def get(self, video_id):
@@ -328,7 +394,7 @@ class FaceAlertFrameDelete(Resource):
         return {'success': True, 'message': '告警帧已删除'}
 
         
-# 获取路面检测视频
+# (可用）路面检测视频
 @ns.route('/alert_videos')
 class AlertVideos(Resource):               
     def get(self):

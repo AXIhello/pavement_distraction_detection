@@ -17,12 +17,30 @@ ns = Namespace('face', description='人脸识别相关接口')
 
 # 请求体模型
 face_register_model = ns.model('FaceRegister', {
-    'name': fields.String(required=True, description='姓名'),
-    'image': fields.String(required=True, description='Base64图片')
+    'name': fields.String(required=True, description='姓名', example='张三'),
+    'image': fields.String(required=True, description='Base64图片', example='data:image/jpeg;base64,...')
 })
 
 face_recognition_model = ns.model('FaceRecognition', {
-    'image': fields.String(required=True, description='Base64图片')
+    'image': fields.String(required=True, description='Base64图片', example='data:image/jpeg;base64,...')
+})
+
+face_register_response_model = ns.model('FaceRegisterResponse', {
+    'success': fields.Boolean(description='是否成功', example=True),
+    'message': fields.String(description='提示信息', example='成功注册 张三 的人脸特征'),
+    'face_id': fields.Integer(description='人脸特征ID', example=1)
+})
+
+face_recognition_result_model = ns.model('FaceRecognitionResult', {
+    'face_id': fields.Integer(description='人脸编号', example=0),
+    'name': fields.String(description='识别到的姓名', example='张三'),
+    'distance': fields.Float(description='欧氏距离', example=0.32),
+    'bbox': fields.Raw(description='人脸框坐标', example={'left': 10, 'top': 20, 'right': 100, 'bottom': 120})
+})
+
+face_recognition_response_model = ns.model('FaceRecognitionResponse', {
+    'success': fields.Boolean(description='是否成功', example=True),
+    'faces': fields.List(fields.Nested(face_recognition_result_model), description='识别结果列表')
 })
 
 # 权限校验装饰器
@@ -57,9 +75,19 @@ face_alert_frame_model = ns.model('FaceAlertFrame', {
 
 @ns.route('/register')
 class FaceRegister(Resource):
-    @ns.expect(face_register_model)
+    @ns.doc('人脸注册', description='注册新的人脸特征，需登录', security='jwt')
+    @ns.expect(face_register_model, validate=True)
+    @ns.marshal_with(face_register_response_model)
+    @ns.response(200, '注册成功')
+    @ns.response(400, '参数错误或未检测到人脸')
+    @ns.response(401, '未登录')
+    @ns.response(500, '服务器内部错误')
     def post(self):
-        """人脸图片录入接口"""
+        """
+        人脸图片录入接口。
+        参数：姓名、Base64图片。
+        返回：注册结果。
+        """
         try:
             data = ns.payload
             name = data.get('name')
@@ -118,9 +146,19 @@ class FaceRegister(Resource):
 
 @ns.route('/recognize')
 class FaceRecognition(Resource):
-    @ns.expect(face_recognition_model)
+    @ns.doc('人脸识别', description='对单张图片进行人脸识别', security='jwt')
+    @ns.expect(face_recognition_model, validate=True)
+    @ns.marshal_with(face_recognition_response_model)
+    @ns.response(200, '识别成功')
+    @ns.response(400, '缺少图片数据')
+    @ns.response(401, '未登录')
+    @ns.response(500, '服务器内部错误')
     def post(self):
-        """人脸识别接口（用于单张图片识别）"""
+        """
+        人脸识别接口（用于单张图片识别）。
+        参数：Base64图片。
+        返回：识别结果。
+        """
         try:
             data = ns.payload
             image_base64 = data.get('image')

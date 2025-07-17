@@ -17,45 +17,48 @@ ns = Namespace('pavement_detection', description='路面病害检测相关操作
 parser = ns.parser()
 parser.add_argument(
     'images', type=str, action='split', required=True, location='form',
-    help='一组Base64编码的图片字符串，用英文逗号分隔'
+    help='一组Base64编码的图片字符串，用英文逗号分隔',
+    default='data:image/jpeg;base64,...,data:image/jpeg;base64,...'
 )
 
 # 定义检测结果项的模型
 detection_result_item_model = ns.model('DetectionResultItem', {
-    'class': fields.String(description='检测到的病害类别'),
-    'confidence': fields.Float(description='检测置信度'),
-    'bbox': fields.List(fields.Float, description='边界框坐标 [xmin, ymin, xmax, ymax]'),
-    'error': fields.String(required=False, description='处理错误信息（如果存在）')
+    'class': fields.String(description='检测到的病害类别', example='坑洞'),
+    'confidence': fields.Float(description='检测置信度', example=0.95),
+    'bbox': fields.List(fields.Float, description='边界框坐标 [xmin, ymin, xmax, ymax]', example=[10.0, 20.0, 100.0, 120.0]),
+    'error': fields.String(required=False, description='处理错误信息（如果存在）', example='图片解码失败')
 })
 
 # 定义单帧检测结果的模型
 frame_result_model = ns.model('FrameResult', {
-    'frame_index': fields.Integer(description='帧索引'),
+    'frame_index': fields.Integer(description='帧索引', example=0),
     'detections': fields.List(fields.Nested(detection_result_item_model), description='该帧中检测到的所有对象'),
-    'image_base64': fields.String(required=False, description='标注后的图像Base64编码（仅在成功时返回）'),
-    'status': fields.String(description='处理状态，"success" 或 "error"'),
-    'message': fields.String(required=False, description='处理消息或错误信息')
+    'image_base64': fields.String(required=False, description='标注后的图像Base64编码（仅在成功时返回）', example='data:image/jpeg;base64,...'),
+    'status': fields.String(description='处理状态，"success" 或 "error"', example='success'),
+    'message': fields.String(required=False, description='处理消息或错误信息', example='检测成功')
 })
 
 # 定义批量检测响应的模型
 detection_response_model = ns.model('DetectionResponse', {
-    'status': fields.String(description='整体处理状态'),
-    'message': fields.String(description='整体处理消息'),
+    'status': fields.String(description='整体处理状态', example='success'),
+    'message': fields.String(description='整体处理消息', example='共处理 2 帧图像'),
     'frames': fields.List(fields.Nested(frame_result_model), description='每帧的检测结果列表')
 })
 
 
 @ns.route('/analyze_video')
 class DetectPavementBatch(Resource):
-    @ns.doc('多帧路面病害检测')
+    @ns.doc('多帧路面病害检测', description='对一组路面图像（Base64编码）执行病害检测，返回每帧的检测结果')
     @ns.expect(parser)
     @ns.marshal_with(detection_response_model)
+    @ns.response(200, '检测成功')
     @ns.response(400, '无效的请求数据')
     @ns.response(500, '服务器内部错误')
     def post(self):
         """
         对一组路面图像（Base64编码）执行病害检测。
-        此API用于批量处理图像，返回每帧的检测结果。
+        参数：images（form-data，Base64图片字符串数组，英文逗号分隔）。
+        返回：每帧的检测结果。
         """
         args = parser.parse_args()
         images = args['images']
