@@ -20,7 +20,6 @@
         <div class="upload-text">
           <h3>上传视频文件</h3>
           <p>点击选择或拖拽视频文件到此区域</p>
-          <p class="upload-hint">支持 MP4, AVI, MOV 等格式</p>
         </div>
       </div>
 

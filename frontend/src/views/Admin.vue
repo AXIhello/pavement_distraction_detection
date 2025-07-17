@@ -84,7 +84,11 @@
                         {{ user.role }}
                       </span>
                     </span>
-                    <input v-else v-model="user.editedPhone" type="text" class="edit-input" />
+                    <select v-else v-model="user.editedPhone" class="edit-input">
+  <option value="user">user</option>
+  <option value="admin">admin</option>
+</select>
+
                   </td>
                   <td>
                     <template v-if="!user.isEditing">
