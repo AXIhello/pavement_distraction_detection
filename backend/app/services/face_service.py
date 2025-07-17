@@ -274,7 +274,7 @@ class FaceRecognitionService:
                                         save_dir = Path(f'data/alert_videos/face')
                                         save_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
                                         face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
-                                        _, buffer = cv2.imencode('.jpg', face_img_resized)
+                                        _, buffer = cv2.imencode('.jpg', face_img_bgr)
                                         image_bytes = base64.b64encode(buffer).decode('utf-8')
                                         # 人脸告警帧
                                         distance = round(min_dist, 3) if min_dist != float('inf') else None
