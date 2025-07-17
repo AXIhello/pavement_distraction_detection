@@ -292,7 +292,22 @@ class FaceAlertFrames(Resource):
     def get(self):
         try:
             frames = FaceAlertFrame.query.order_by(FaceAlertFrame.created_at.desc()).all()
-            data = [frame.to_dict() for frame in frames]
+            data = []
+            for frame in frames:
+                folder_path = frame.image_path  # 例如 data/alert_videos/face/video_20240716_123456
+                if folder_path:
+                    rel_path = folder_path.replace("\\", "/").replace("data/", "")
+                    image_url = f"/static/{rel_path}/frame_00000.jpg"
+                else:
+                    image_url = ""
+                data.append({
+                    "id": frame.id,
+                    "created_at": frame.created_at.isoformat() if frame.created_at else None,
+                    "alert_type": frame.alert_type,
+                    "confidence": frame.confidence,
+                    "image_url": image_url,
+                    # 你可以按需补充其他字段
+                })
             return data
         except Exception as e:
             logger.error(f"获取人脸告警帧失败: {e}")

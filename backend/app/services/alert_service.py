@@ -26,7 +26,7 @@ def create_alert_video(db_type: str, video_name: str, save_dir: str, total_frame
     db.session.commit()
     return video.id
 
-def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None, bboxes: list = None,save_dir0: str = None) -> str:
+def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id: int = 0, frame_index: int = 0,  disease_type: str = None,save_dir0: str = None) -> str:
     if db_type == 'road':
         VideoModel = AlertVideo
         FrameModel = AlertFrame
@@ -40,6 +40,7 @@ def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id:
         filename = f"frame_{frame_index:05d}.jpg"
         save_path = save_dir / filename
 
+    # 只有单帧检测调用这个
     elif db_type == 'face':
         FrameModel = FaceAlertFrame
 
@@ -49,7 +50,7 @@ def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id:
         
         save_dir = Path(save_dir0)
         save_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
-        save_path = save_dir / f"frame_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jpg"  # 动态生成文件名
+        save_path = save_dir / f"frame_00000.jpg"  # 动态生成文件名
     else:
         raise ValueError(f"不支持的告警类型: {db_type}")
 
@@ -83,7 +84,7 @@ def save_alert_frame(db_type: str, image_base64: str,confidence: float,video_id:
         alert_frame = FrameModel(
         alert_type=disease_type or "未知",  
         confidence=confidence,
-        image_path=str(save_path),
+        image_path=str(save_dir),
         created_at=datetime.utcnow()
     )
 

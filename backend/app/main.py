@@ -176,16 +176,6 @@ def handle_face_recognition(data):
         app_logger.info(f"忽略客户端 {sid} 的识别请求，因为已收到结束信号")
         return
 
-    # # 首帧处理逻辑（如初始化告警模块、记录日志、写数据库等）
-    # if not first_frame_processed[sid]:
-    #     app_logger.info(f"首次接收到人脸图像，sid={sid}")
-    #     first_frame_processed[sid] = True
-    #     # 自动生成保存路径
-    #     now = datetime.now()
-    #     timestamp = now.strftime('%Y%m%d_%H%M%S')
-    #     save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
-    #     video_id_map[sid] = video_id  # 保存视频ID到映射中
-
     app_logger.info("收到人脸识别请求")
     try:
         base64_image = data.get('image', '')
@@ -270,11 +260,9 @@ def log_response_info(response):
 
 @app.before_request
 def load_user_from_token():
-    print("请求头 Authorization:", request.headers.get('Authorization'))
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         token = auth_header.split(' ')[1]
-        print("解析到的token:", token)
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_id = payload.get("user_id")
@@ -344,7 +332,7 @@ def create_admin_if_not_exists():
 if __name__ == '__main__':
     with app.app_context():
         try:
-            #db.drop_all()  # 清空数据库（仅在开发环境中使用）
+            db.drop_all()  # 清空数据库（仅在开发环境中使用）
             db.create_all()
             print("当前注册模型表：", db.metadata.tables.keys())
             app_logger.info("数据库连接成功，所有表已创建（或已存在）")
