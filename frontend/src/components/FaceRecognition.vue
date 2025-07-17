@@ -364,6 +364,7 @@ async function handleRecognitionResult(face) {
       }
       return
     }
+
   }
   //  if (face.name === '未知人员') {
   //   alert('人脸数据库中无数据，请前去录入')
@@ -534,6 +535,7 @@ function processRecognitionResult(result) {
     if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
       progress.value = 100;
       // 传递当前帧的完整face对象（含confidence）
+      // 只在最终三帧一致时调用handleRecognitionResult
       handleRecognitionResult(result.faces[0]);
       recognitionFinished.value = true;
       stopAll();
