@@ -386,10 +386,7 @@ class FaceAlertFrameDelete(Resource):
         try:
             # 判断 image_path 是文件还是文件夹
             if frame.image_path and os.path.exists(frame.image_path):
-                if os.path.isfile(frame.image_path):
-                    os.remove(frame.image_path)
-                elif os.path.isdir(frame.image_path):
-                    shutil.rmtree(frame.image_path)
+                shutil.rmtree(frame.image_path)
         except Exception as e:
             return {'success': False, 'message': f'删除文件失败: {str(e)}'}, 500
 
