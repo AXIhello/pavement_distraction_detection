@@ -175,39 +175,34 @@ class UserLogin(Resource):
     @ns.expect(login_model, validate=True)
     @ns.marshal_with(login_response_model)
     def post(self):
-        """
-        处理用户登录请求，验证凭据并返回JWT令牌。
-        """
         data = ns.payload
         username = data.get('username')
         password = data.get('password')
         captcha = data.get('captcha')
 
-        # 校验验证码
         code = session.get('captcha_code')
 
         if not code:
             return {'success': False, 'message': '验证码已过期，请刷新验证码'}, 400
         if not captcha or captcha.upper() != code:
             return {'success': False, 'message': '验证码错误'}, 400
-        # 验证通过后清除验证码，防止重用
+
         session.pop('captcha_code', None)
 
-        # 实际的认证逻辑（例如，查询数据库验证用户名和密码）
         user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            access_token = create_jwt_token(user)
-            return {
-                'success': True,
-                'message': '登录成功',
-                'access_token': access_token,
-                'token_type': 'bearer'
-            }
-        else:
-            return {
-                'success': False,
-                'message': '无效的用户名或密码'
-            }
+        if not user:
+            return {'success': False, 'message': '用户名不存在'}, 400
+        if not user.check_password(password):
+            return {'success': False, 'message': '密码错误'}, 400
+
+        access_token = create_jwt_token(user)
+        return {
+            'success': True,
+            'message': '登录成功',
+            'access_token': access_token,
+            'token_type': 'bearer'
+        }
+
 
 # 邮箱验证码发送请求模型
 send_email_code_model = ns.model('SendEmailCode', {
@@ -249,12 +244,15 @@ class LoginWithEmailCode(Resource):
         email = data.get('email')
         code = data.get('code')
 
-        if not verify_email_code(email, code):
-            return {'success': False, 'message': '验证码无效或已过期'}, 401
+        if not email or not code:
+            return {'success': False, 'message': '邮箱和验证码不能为空'}, 400
 
         user = User.query.filter_by(email=email).first()
         if not user:
-            return {'success': False, 'message': '用户不存在'}, 404
+            return {'success': False, 'message': '该邮箱尚未注册'}, 404
+
+        if not verify_email_code(email, code):
+            return {'success': False, 'message': '验证码错误或已过期'}, 400
 
         token = create_jwt_token(user)
         return {
@@ -263,6 +261,7 @@ class LoginWithEmailCode(Resource):
             'access_token': token,
             'token_type': 'bearer'
         }
+
     
 # 注册
 register_model = ns.model('Register', {
