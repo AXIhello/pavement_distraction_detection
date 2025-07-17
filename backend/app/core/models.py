@@ -153,7 +153,7 @@ class FaceAlertFrame(db.Model):
         return {
                 'id': self.id,
                 'image_url': self.image_path,
-                'alert_type': self.alert_type,                                                          
+                'alert_type': self.alert_type,                                                           
                 'confidence': self.confidence,
                 'created_at': self.created_at.isoformat() if self.created_at else None
             }                        

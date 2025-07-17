@@ -1,3 +1,4 @@
+from turtle import distance
 from flask_restx import Namespace, Resource, fields
 from flask import request, current_app, g
 import logging
@@ -6,6 +7,8 @@ from functools import wraps
 from ..services.alert_service import save_alert_frame
 from datetime import datetime
 from pathlib import Path
+import hashlib
+from flask import jsonify
 
 
 # 获取日志器
@@ -42,6 +45,13 @@ face_feature_model = face_feature_ns.model('FaceFeature', {
     'feature_count': fields.Integer,
     'created_at': fields.DateTime,
     'updated_at': fields.DateTime
+})
+
+# 新增：保存人脸告警帧接口
+face_alert_frame_model = ns.model('FaceAlertFrame', {
+    'image': fields.String(required=True, description='Base64图片'),
+    'type': fields.String(required=True, description='告警类型'),
+    'confidence': fields.Float(required=True, description='置信度')
 })
 
 
@@ -141,6 +151,23 @@ class FaceRecognition(Resource):
                     'message': '未检测到人脸'
                 }
 
+            # 告警模块
+            if recognition_results[0].get("name") == "陌生人" or recognition_results[0].get("name") == "deepfake":                # 1️. 自动生成保存路径
+                now = datetime.now()
+                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
+                save_dir.mkdir(parents=True, exist_ok=True)
+                if(recognition_results[0].get("distance") != None):
+                    confidence = 1 - recognition_results[0].get("distance")
+                else: confidence = 0.1
+                save_alert_frame(
+                    "face",
+                    image_base64,
+                    confidence,
+                    disease_type=recognition_results[0].get("name"),
+                    save_dir0=str(save_dir)
+                )
+
             return {
                 'success': True,
                 'faces': recognition_results
@@ -149,6 +176,86 @@ class FaceRecognition(Resource):
         except Exception as e:
             logger.error(f"人脸识别接口处理失败: {e}", exc_info=True)
             return {'success': False, 'message': f'识别失败: {str(e)}'}
+
+
+@ns.route('/save_frame')
+class SaveFaceFrame(Resource):
+    def post(self):
+        data = request.json
+        session_id = data.get('session_id')
+        image = data.get('image')
+        frame_index = data.get('frame_index', 0)
+        if not session_id or not image:
+            return {'success': False, 'message': '缺少参数'}, 400
+        from pathlib import Path
+        import base64, io
+        from PIL import Image
+        save_dir = Path(f'data/alert_videos/face/{session_id}')
+        save_dir.mkdir(parents=True, exist_ok=True)
+        save_path = save_dir / f'frame_{frame_index:05d}.jpg'
+        # 保存图片
+        if image and ',' in image:
+            image_base64 = image.split(',')[1]
+        else:
+            image_base64 = image
+        image_data = base64.b64decode(image_base64)
+        image_pil = Image.open(io.BytesIO(image_data))
+        if image_pil.mode == 'RGBA':
+            image_pil = image_pil.convert('RGB')
+        image_pil.save(save_path)
+        return {'success': True, 'path': str(save_path)}
+
+@ns.route('/alert_judgement')
+class FaceAlertJudgement(Resource):
+    def post(self):
+        """
+        视频/摄像头流式识别的最终判定接口。
+        只处理视频和摄像头模式的告警写入，单张图片识别不调用此接口。
+        """
+        try:
+            data = request.json
+            session_id = data.get('session_id')
+            result = data.get('result')  # 'normal', 'deepfake', 'stranger'
+            confidence = data.get('confidence', 1)
+            logger.info(f"[DEBUG] 收到告警判定请求: session_id={session_id}, result={result}, confidence={confidence}")
+            if not session_id or not result:
+                logger.error(f"[ERROR] 缺少参数: session_id={session_id}, result={result}")
+                return {'success': False, 'message': '缺少参数'}, 400
+            folder_path = f'data/alert_videos/face/{session_id}'
+            logger.info(f"[DEBUG] 检查文件夹路径: {folder_path}")
+            import shutil, os
+            from app.extensions import db
+            from app.core.models import FaceAlertFrame
+            if result == 'normal':
+                # 正常情况，删除临时文件夹
+                logger.info(f"[DEBUG] 正常情况，删除文件夹: {folder_path}")
+                shutil.rmtree(folder_path, ignore_errors=True)
+                logger.info(f"视频/摄像头识别正常，已删除临时文件夹: {folder_path}")
+                return {'success': True, 'message': '正常，已删除文件夹'}
+            else:
+                # 告警情况，写入数据库
+                logger.info(f"[DEBUG] 告警情况，检查文件夹是否存在: {folder_path}")
+                if not os.path.exists(folder_path):
+                    logger.error(f"[ERROR] 文件夹不存在: {folder_path}")
+                    return {'success': False, 'message': f'文件夹不存在: {folder_path}'}, 44
+                # 写入前查重，确保每个 session_id 只写一条
+                exist = FaceAlertFrame.query.filter_by(image_path=folder_path).first()
+                if exist:
+                    logger.info(f"视频/摄像头告警已存在，不重复写入: session_id={session_id}")
+                    return {'success': True, 'message': '该告警已存在，不重复写入'}
+                logger.info(f"[DEBUG] 创建告警记录: image_path={folder_path}, alert_type={result}, confidence={confidence}")
+                alert_frame = FaceAlertFrame(
+                    image_path=folder_path,
+                    alert_type=result,
+                    confidence=confidence
+                )
+                db.session.add(alert_frame)
+                db.session.commit()
+                logger.info(f"视频/摄像头告警已记录: session_id={session_id}, type={result}, confidence={confidence}")
+                return {'success': True, 'message': '告警已记录'}
+        except Exception as e:
+            logger.error(f"视频/摄像头告警判定失败: {e}", exc_info=True)
+            return {'success': False, 'message': f'告警判定失败: {str(e)}'}, 500
 
 # 人脸特征管理接口
 @ns.route('/features')

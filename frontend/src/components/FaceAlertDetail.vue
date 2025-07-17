@@ -7,8 +7,7 @@
    <div class="detail-header" v-if="detail">
   <div class="detail-info-wrapper">
     <div class="detail-info">
-      <p><strong>告警帧 ID：</strong>{{ detail.id }}</p>
-      <p><strong>帧索引：</strong>{{ detail.frame_index }}</p>
+      <p><strong>告警 ID：</strong>{{ detail.id }}</p>
       <p><strong>时间：</strong>{{ detail.created_at }}</p>
       <p><strong>告警类型：</strong>{{ detail.alert_type }}</p>
       <p><strong>置信度：</strong>{{ (detail.confidence * 100).toFixed(1) }}%</p>

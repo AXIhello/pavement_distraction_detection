@@ -75,6 +75,7 @@
                   </div>
                 </th>
                 <th>类型</th>
+                <th>首帧图片</th>
                 <th class="action-header">操作</th>
               </tr>
             </thead>
@@ -82,6 +83,9 @@
               <tr v-for="item in displayedData" :key="item.id" class="data-row">
                 <td class="date-cell">{{ item.date }}</td>
                 <td class="type-cell">{{ formatType(item.type) }}</td>
+                <td>
+                  <img :src="getFullImageUrl(item.image_url)" alt="首帧" style="width: 80px; height: auto;" />
+                </td>
                 <td class="action-cell">
                   <button @click="viewDetails(item)" class="detail-btn">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -140,7 +144,7 @@ async function fetchData() {
       created_at: item.created_at,
       alert_type: item.alert_type ? item.alert_type.toLowerCase() : 'unknown',
       confidence: item.confidence,
-      image_url: item.image_url,
+      image_url: item.image_url, // 这里假设 image_url 是文件夹路径
       date: item.created_at ? item.created_at.split('T')[0] : '未知',
       type: item.alert_type ? item.alert_type.toLowerCase() : 'unknown'
     }))
@@ -210,6 +214,12 @@ function backToList() {
 function clearFilters() {
   filterDate.value = ''
   filterType.value = ''
+}
+
+function getFullImageUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  return `http://localhost:8000${url}`;
 }
 
 onMounted(() => {
