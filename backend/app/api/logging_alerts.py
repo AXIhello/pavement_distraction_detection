@@ -400,6 +400,22 @@ class FaceAlertFrameDelete(Resource):
 class AlertVideos(Resource):               
     def get(self):
         try:
+            # 先查找 alert_frame_count=0 的记录
+            zero_alert_videos = AlertVideo.query.filter_by(alert_frame_count=0).all()
+            import shutil, os
+            from app.extensions import db
+            for video in zero_alert_videos:
+                # 删除本地文件夹
+                if video.save_dir and os.path.exists(video.save_dir):
+                    try:
+                        shutil.rmtree(video.save_dir)
+                    except Exception as e:
+                        logger.error(f"删除本地文件夹失败: {e}")
+                # 删除数据库记录
+                db.session.delete(video)
+            if zero_alert_videos:
+                db.session.commit()
+            # 再查找剩余视频
             videos = AlertVideo.query.order_by(AlertVideo.created_at.desc()).all()
             data = [videos.to_dict() for videos in videos]
             return data
