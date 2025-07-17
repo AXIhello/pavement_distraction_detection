@@ -82,52 +82,6 @@ class LogList(Resource):
         return logs_data
 
 
-# --- 告警 API  ---
-@ns.route('/alerts')
-class AlertList(Resource):
-    @ns.doc('获取告警事件列表', parser=pagination_parser)
-    @ns.param('type', '按告警类型过滤 (例如: unauthorized_access, pavement_anomaly)')
-    @ns.param('status', '按告警状态过滤 (活跃, 已处理, 已忽略)')
-    @ns.marshal_with(ns.model('AlertsResponse', {
-        'alerts': fields.List(fields.Nested(alert_entry_model)),
-        'total': fields.Integer(description='总告警数'),
-        'page': fields.Integer(description='当前页码'),
-        'per_page': fields.Integer(description='每页数量')
-    }))
-    def get(self):
-        """
-        获取所有告警事件，支持按类型和状态过滤，并进行分页。
-        """
-        args = pagination_parser.parse_args()
-        alert_type = request.args.get('type')
-        status = request.args.get('status')
-
-        alerts_data = LoggingService.get_alerts(
-            alert_type=alert_type,
-            status=status,
-            page=args['page'],
-            per_page=args['per_page']
-        )
-        return alerts_data
-
-@ns.route('/alerts/playback/<string:alert_id>')
-@ns.param('alert_id', '告警的唯一标识符')
-class AlertPlayback(Resource):
-    @ns.doc('获取告警事件回放数据')
-    @ns.marshal_with(ns.model('AlertPlaybackResponse', {
-        'alert_info': fields.Nested(alert_entry_model),
-        'media_url': fields.String(description='关联的媒体文件URL，用于回放')
-    }))
-    @ns.response(404, '告警未找到')
-    def get(self, alert_id):
-        """
-        根据告警ID获取告警详情及关联的媒体（图片/视频）回放数据。
-        """
-        playback_data = LoggingService.get_alert_playback_data(alert_id)
-        if not playback_data:
-            ns.abort(404, message=f"告警 {alert_id} 未找到")
-        return playback_data
-
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -137,6 +91,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# 删除告警信息用
 @ns.route('/alerts/<string:alert_type>/<int:alert_id>')
 class AlertDelete(Resource):
     @admin_required
@@ -162,6 +117,7 @@ class AlertDelete(Resource):
         db.session.commit()
         return {'success': True, 'message': '告警事件及本地缓存已删除'}
 
+# 清除日志
 @ns.route('/logs/clear_by_time')
 class ClearLogsByTime(Resource):
     @admin_required
@@ -214,7 +170,7 @@ class ClearLogsByTime(Resource):
 
         return {"success": True, "deleted": count}
 
-
+# 导出日志
 @ns.route('/logs/export_by_time')
 class ExportLogsByTime(Resource):
     def get(self):
@@ -286,7 +242,7 @@ class ExportLogsByTime(Resource):
                         headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
-# 获取所有人脸识别告警信息（之前）
+# 获取所有人脸识别告警信息
 @ns.route('/face_alert_frames')
 class FaceAlertFrames(Resource):    
     def get(self):
@@ -299,7 +255,7 @@ class FaceAlertFrames(Resource):
             return {'error': '获取失败'}, 500
 
 
-# （可用）根据视频ID获取路面灾害告警详情
+# 根据视频ID获取路面灾害告警详情
 @ns.route('/alert_video_detail/<int:video_id>',methods=['GET'])
 class AlertVideoDetail(Resource):               
     def get(self, video_id):
@@ -332,31 +288,8 @@ class AlertVideoDetail(Resource):
             return data
         except Exception as e:
             logger.error(f"获取人脸告警视频详情失败: {e}")
-            return {'error': '获取失败'}, 500    
-        
-# @ns.route('/face_alert_detail/<int:video_id>',methods=['GET'])
-# class AlertVideoDetail(Resource):
-#     def get(self, video_id):
-#         try:
-#             # 查询视频信息
-#             # video = FaceAlertFrame.query.get(video_id)
-#             # if not video:
-#             #     return {'error': '未找到对应视频'}, 404
-#
-#             # 查询该视频下的所有帧（如果有）
-#             frame = FaceAlertFrame.query.filter_by(id=video_id).order_by(FaceAlertFrame.created_at.asc()).first()
-#
-#             # 构造响应数据
-#             data = {
-#                 'id': frame.id,
-#                 'created_at': frame.created_at.isoformat() if frame.created_at else None,
-#                 'alert_type': frame.alert_type,
-#                 'image_url': frame.image_path,
-#             }
-#             return data
-#         except Exception as e:
-#             logger.error(f"获取人脸告警视频详情失败: {e}")
-#             return {'error': '获取失败'}, 500
+            return {'error': '获取失败'}, 500
+
 
 # 删除人脸识别告警帧
 import os
@@ -380,7 +313,7 @@ class FaceAlertFrameDelete(Resource):
         return {'success': True, 'message': '告警帧已删除'}
 
         
-# (可用）路面检测视频
+# 获取路面检测视频
 @ns.route('/alert_videos')
 class AlertVideos(Resource):               
     def get(self):

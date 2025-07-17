@@ -2,8 +2,6 @@
 import datetime
 
 
-
-mock_alerts_db = []
 from ..core.models import db, LogEntry
 class LoggingService:
     @staticmethod
@@ -49,55 +47,3 @@ class LoggingService:
             "page": page,
             "per_page": per_page
         }
-    @staticmethod
-    def add_alert(alert_type, description, details=None, media_url=None):
-        """
-        添加一条新的告警记录。
-        """
-        alert_entry = {
-            "alert_id": f"alert_{len(mock_alerts_db) + 1}",
-            "timestamp": datetime.datetime.now().isoformat(),
-            "type": alert_type,
-            "description": description,
-            "details": details if details else {},
-            "status": "活跃", # 可以有 '活跃', '已处理', '已忽略'
-            "media_url": media_url # 告警相关的图片或视频链接
-        }
-        mock_alerts_db.append(alert_entry)
-        # 实际项目中，这里会将 alert_entry 写入数据库
-        return alert_entry
-
-    @staticmethod
-    def get_alerts(alert_type=None, status=None, page=1, per_page=10):
-        """
-        获取告警记录，支持过滤和分页。
-        """
-        filtered_alerts = mock_alerts_db[:]
-        if alert_type:
-            filtered_alerts = [alert for alert in filtered_alerts if alert['type'] == alert_type]
-        if status:
-            filtered_alerts = [alert for alert in filtered_alerts if alert['status'] == status]
-
-        start_index = (page - 1) * per_page
-        end_index = start_index + per_page
-        paginated_alerts = filtered_alerts[start_index:end_index]
-
-        return {
-            "alerts": paginated_alerts,
-            "total": len(filtered_alerts),
-            "page": page,
-            "per_page": per_page
-        }
-
-    @staticmethod
-    def get_alert_playback_data(alert_id):
-        """
-        获取指定告警的播放数据（如图片或视频URL）。
-        """
-        for alert in mock_alerts_db:
-            if alert['alert_id'] == alert_id:
-                return {
-                    "alert_info": alert,
-                    "media_url": alert.get('media_url')
-                }
-        return None
