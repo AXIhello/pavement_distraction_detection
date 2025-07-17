@@ -373,7 +373,7 @@ class AlertVideoDetail(Resource):
 
 
 # 删除人脸识别告警帧
-import os
+import shutil, os
 @ns.route('/face_alert_frames/<int:frame_id>')
 class FaceAlertFrameDelete(Resource):
     @admin_required
@@ -385,7 +385,7 @@ class FaceAlertFrameDelete(Resource):
         try:
             # 如果有对应的本地缓存文件需要删除，也可在这里做
             if frame.image_path and os.path.exists(frame.image_path):
-                os.remove(frame.image_path)
+                shutil.rmtree(frame.image_path)
         except Exception as e:
             return {'success': False, 'message': f'删除文件失败: {str(e)}'}, 500
 
