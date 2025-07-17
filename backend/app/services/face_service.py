@@ -236,6 +236,7 @@ class FaceRecognitionService:
 
                     min_dist = float('inf')
                     recognized_name = "陌生人"
+                    confidence = 0.0
 
                     # 先进行DeepFake检测
                     fake_prob = float(pred[0][0]) if pred is not None else None
@@ -244,18 +245,8 @@ class FaceRecognitionService:
                     if is_deepfake:
                         # 如果是DeepFake，直接返回deepfake身份
                         recognized_name = "deepfake"
+                        confidence = fake_prob if fake_prob is not None else 1.0
                         logger.warning(f"!!! DeepFake警告: 概率: {fake_prob:.4f}，位置: {d.left()},{d.top()},{d.right()},{d.bottom()}")
-                        # 写入告警模块
-                        # 自动生成保存路径
-                        # now = datetime.now()
-                        # timestamp = now.strftime('%Y%m%d_%H%M%S')
-                        # save_dir = Path(f'data/alert_videos/face')
-
-                        # face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
-                        # _, buffer = cv2.imencode('.jpg', face_img_bgr)
-                        # image_bytes = base64.b64encode(buffer).decode('utf-8')
-                        # # 人脸告警帧
-                        # save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=fake_prob,disease_type="deepfake",save_dir0=str(save_dir))
 
                     else:
                         # 如果不是DeepFake，进行正常的人脸识别
@@ -269,37 +260,31 @@ class FaceRecognitionService:
                                         recognized_name = self.face_name_known_list[j]
                                     else:
                                         recognized_name = "陌生人"
-                                        # 写入告警模块
-                                        # 自动生成保存路径
-                                        # save_dir = Path(f'data/alert_videos/face')
-                                        # save_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
-                                        # face_img_bgr = cv2.cvtColor(face_img_resized, cv2.COLOR_RGB2BGR)
-                                        # _, buffer = cv2.imencode('.jpg', face_img_resized)
-                                        # image_bytes = base64.b64encode(buffer).decode('utf-8')
-                                        # # 人脸告警帧
-                                        # distance = round(min_dist, 3) if min_dist != float('inf') else None
-                                        # save_alert_frame('face', f'data:image/jpeg;base64,{image_bytes}', confidence=distance,disease_type="陌生人",save_dir0=str(save_dir))
-
+                            confidence = round(min_dist, 3) if min_dist != float('inf') else None
+                        else:
+                            # 没有已知人脸
+                            confidence = 1.0
 
                     recognition_results.append({
                         "face_id": i,
                         "name": recognized_name,
-                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,  
+                        "distance": round(min_dist, 3) if min_dist != float('inf') else None,
+                        "confidence": confidence,
                         "bbox": {"left": d.left(), "top": d.top(), "right": d.right(), "bottom": d.bottom()}
                     })
                     logger.info(
-                        f"检测到人脸: {recognized_name} (距离: {min_dist:.3f})"
+                        f"检测到人脸: {recognized_name} (距离: {min_dist:.3f}, 置信度: {confidence:.3f})"
                     )
 
             else:
                 logger.info("未检测到人脸。")
-                recognition_results.append({"name": "未检测到人脸", "status": "no_face"})
+                recognition_results.append({"name": "未检测到人脸", "status": "no_face", "confidence": None})
 
             return recognition_results
 
         except Exception as e:
             logger.error(f"人脸识别服务处理图像失败: {e}", exc_info=True)
-            return [{"status": "error", "message": f"Processing error: {e}"}]
+            return [{"status": "error", "message": f"Processing error: {e}", "confidence": None}]
 
     def extract_all_features_to_csv(self):
         """

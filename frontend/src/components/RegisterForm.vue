@@ -4,9 +4,12 @@
     <h2>注册</h2>
     <form @submit.prevent="handleRegister">
       <div class="form-group">
-        <label for="reg-account">账号</label>
-        <input type="text" id="reg-account" v-model="regAccount" required />
-      </div>
+  <label for="reg-account">账号</label>
+  <input type="text" id="reg-account" v-model="regAccount" required 
+  placeholder="至少3个字符长度"/>
+  <div v-if="regAccount && !isAccountValid" style="color: red;">账号不能少于3个字符</div>
+</div>
+
 <!-- 邮箱 -->
 <div class="form-group">
   <label for="reg-email">邮箱</label>
@@ -57,6 +60,7 @@
 import { ref, computed } from 'vue'
 
 const emit = defineEmits(['switch-tab'])
+const isAccountValid = computed(() => regAccount.value.length >= 3)
 
 const regAccount = ref('')
 const regEmail = ref('')
@@ -99,6 +103,12 @@ async function handleRegister() {
     regMessage.value = '请填写所有字段'
     return
   }
+
+  if (regAccount.value.length < 3) {
+  regMessage.value = '账号长度不能少于3个字符'
+  return
+}
+
 
   if (!isValidEmail(regEmail.value)) {
     regMessage.value = '邮箱格式不正确'

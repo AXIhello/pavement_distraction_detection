@@ -117,8 +117,8 @@ app_logger.info("测试日志写入：如果你看到这条日志，说明日志
 
 # 配置 Swagger UI
 api = Api(app,
-          version='1.0',
-          title='综合管理平台 API',
+          version='3.0',
+          title='智城慧视平台 API',
           description='人脸识别、路面病害、交通分析及日志告警',
           doc='/doc',
           prefix='/api')

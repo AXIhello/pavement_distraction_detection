@@ -91,7 +91,7 @@ class FaceDatabaseService:
             return None
     
     @staticmethod
-    def get_all_features() -> List[Tuple[str, np.ndarray]]:
+    def get_all_features(user_id=None) -> List[Tuple[str, np.ndarray]]:
         """
         获取所有加密的人脸特征
         Returns:
@@ -100,7 +100,7 @@ class FaceDatabaseService:
         try:
             records = FaceFeature.get_all_features()
             features = []
-            
+
             for record in records:
                 try:
                     feature_vector = aes_encryption.decrypt_feature_vector(record.feature_encrypted)
@@ -108,10 +108,10 @@ class FaceDatabaseService:
                 except Exception as e:
                     logger.error(f"解密 {record.name} 的特征失败: {e}")
                     continue
-            
+
             logger.info(f"成功获取 {len(features)} 个人脸特征")
             return features
-            
+
         except Exception as e:
             logger.error(f"获取所有人脸特征失败: {e}", exc_info=True)
             return []
