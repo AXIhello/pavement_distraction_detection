@@ -201,7 +201,20 @@ function onImageUpload(e) {
 
       if (result.success && result.faces && result.faces.length > 0) {
         const face = result.faces[0]
-        handleRecognitionResult(face)
+        // 单张图片识别直接弹窗/跳转
+        if (face.name === 'deepfake') {
+          alert('⚠️ 警告：检测到DeepFake人脸！')
+          router.push('/login')
+        } else if (face.name === '陌生人') {
+          alert('告警：检测到陌生人！')
+          router.push('/face_register')
+        } else if (face.name) {
+          alert('识别成功，欢迎：' + face.name)
+          recognizedName.value = face.name
+          recognitionFinished.value = true
+        } else {
+          alert('识别失败')
+        }
       } else {
         progressStatus.value = result.message || '识别失败'
       }
@@ -315,50 +328,40 @@ async function handleRecognitionResult(face) {
     } else {
       console.warn('无法获取摄像头画面，未能保存告警帧')
     }
-    // 新增：最终判定，等待后端返回再决定 UI
+    // 新增：最终判定，等待后端结束数据库操作后返回结果再决定 UI
     if (mode.value === 'camera' || mode.value === 'video') {
       console.log(`[DEBUG] 准备发送最终判定: ${face.name === 'deepfake' ? 'deepfake' : 'stranger'}`)
-      const finalResult = await sendFinalJudgement(face.name === 'deepfake' ? 'deepfake' : 'stranger', face.distance || 1.0)
-      console.log('后端最终判定返回：', finalResult);
-      const resultType = finalResult.result || (finalResult.data && finalResult.data.result);
-      if (resultType === 'deepfake') {
+      const finalResult = await sendFinalJudgement(
+        face.name === 'deepfake' ? 'deepfake' : 'stranger',
+        face.confidence !== undefined ? face.confidence : 1.0
+      )
+      if (finalResult.result === 'deepfake') {
         alert(`⚠️ 警告：检测到DeepFake人脸！`)
         stopAll()
         router.push('/login')
         return
       }
-      if (resultType === 'stranger') {
+      if (finalResult.result === 'stranger') {
         alert('告警：检测到陌生人！')
         stopAll()
         router.push('/face_register')
         return
       }
-      if (resultType === 'normal') {
-        recognizedName.value = face.name || ''
-        recognitionFinished.value = true
-        stopAll()
-        return
-      }
-      // 兜底：未知类型也不显示欢迎
-      alert('识别失败或未知类型，请重试！')
+      // 只有正常人才显示欢迎
+      recognizedName.value = face.name || ''
+      recognitionFinished.value = true
       stopAll()
       return
     }
   } else if (!alertFrameSent) {
     if (mode.value === 'camera' || mode.value === 'video') {
       console.log(`[DEBUG] 正常情况，发送最终判定: normal`)
-      const finalResult = await sendFinalJudgement('normal')
-      console.log('后端最终判定返回：', finalResult);
-      const resultType = finalResult.result || (finalResult.data && finalResult.data.result);
-      if (resultType === 'normal') {
+      const finalResult = await sendFinalJudgement('normal', face.confidence !== undefined ? face.confidence : 1.0)
+      if (finalResult.result === 'normal') {
         recognizedName.value = face.name || ''
         recognitionFinished.value = true
         stopAll()
-        return
       }
-      // 兜底：非 normal 不显示欢迎
-      alert('识别失败或未知类型，请重试！')
-      stopAll()
       return
     }
   }
@@ -530,6 +533,7 @@ function processRecognitionResult(result) {
   } else if (lastResults.length === 3) {
     if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
       progress.value = 100;
+      // 传递当前帧的完整face对象（含confidence）
       handleRecognitionResult(result.faces[0]);
       recognitionFinished.value = true;
       stopAll();

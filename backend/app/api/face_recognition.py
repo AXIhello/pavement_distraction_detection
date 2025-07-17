@@ -195,8 +195,8 @@ class FaceRecognition(Resource):
                 timestamp = now.strftime('%Y%m%d_%H%M%S')
                 save_dir = Path(f'data/alert_videos/face/video_{timestamp}')
                 save_dir.mkdir(parents=True, exist_ok=True)
-                if(recognition_results[0].get("distance") != None):
-                    confidence = 1 - recognition_results[0].get("distance")
+                if(recognition_results[0].get("confidence") != None):
+                    confidence = recognition_results[0].get("confidence")
                 else: confidence = 0.1
                 save_alert_frame(
                     "face",
