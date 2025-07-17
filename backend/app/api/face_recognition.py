@@ -269,18 +269,18 @@ class FaceAlertJudgement(Resource):
                 logger.info(f"[DEBUG] 正常情况，删除文件夹: {folder_path}")
                 shutil.rmtree(folder_path, ignore_errors=True)
                 logger.info(f"视频/摄像头识别正常，已删除临时文件夹: {folder_path}")
-                return {'success': True, 'message': '正常，已删除文件夹'}
+                return {'success': True, 'message': '正常，已删除文件夹', 'result': 'normal'}
             else:
                 # 告警情况，写入数据库
                 logger.info(f"[DEBUG] 告警情况，检查文件夹是否存在: {folder_path}")
                 if not os.path.exists(folder_path):
                     logger.error(f"[ERROR] 文件夹不存在: {folder_path}")
-                    return {'success': False, 'message': f'文件夹不存在: {folder_path}'}, 44
+                    return {'success': False, 'message': f'文件夹不存在: {folder_path}', 'result': result}, 44
                 # 写入前查重，确保每个 session_id 只写一条
                 exist = FaceAlertFrame.query.filter_by(image_path=folder_path).first()
                 if exist:
                     logger.info(f"视频/摄像头告警已存在，不重复写入: session_id={session_id}")
-                    return {'success': True, 'message': '该告警已存在，不重复写入'}
+                    return {'success': True, 'message': '该告警已存在，不重复写入', 'result': result}
                 logger.info(f"[DEBUG] 创建告警记录: image_path={folder_path}, alert_type={result}, confidence={confidence}")
                 alert_frame = FaceAlertFrame(
                     image_path=folder_path,
@@ -290,10 +290,10 @@ class FaceAlertJudgement(Resource):
                 db.session.add(alert_frame)
                 db.session.commit()
                 logger.info(f"视频/摄像头告警已记录: session_id={session_id}, type={result}, confidence={confidence}")
-                return {'success': True, 'message': '告警已记录'}
+                return {'success': True, 'message': '告警已记录', 'result': result}
         except Exception as e:
             logger.error(f"视频/摄像头告警判定失败: {e}", exc_info=True)
-            return {'success': False, 'message': f'告警判定失败: {str(e)}'}, 500
+            return {'success': False, 'message': f'告警判定失败: {str(e)}', 'result': 'error'}, 500
 
 # 人脸特征管理接口
 @ns.route('/features')

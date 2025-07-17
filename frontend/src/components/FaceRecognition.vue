@@ -312,33 +312,54 @@ async function handleRecognitionResult(face) {
       ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
       base64Image = canvas.toDataURL('image/jpeg')
       console.log(`[DEBUG] 成功截图，图片大小: ${base64Image.length}`)
-      // 发送到后端
-      // sendFaceAlertFrame(base64Image, face.name, face.distance || 0) // 已废弃
     } else {
       console.warn('无法获取摄像头画面，未能保存告警帧')
     }
-    // 新增：最终判定
+    // 新增：最终判定，等待后端返回再决定 UI
     if (mode.value === 'camera' || mode.value === 'video') {
       console.log(`[DEBUG] 准备发送最终判定: ${face.name === 'deepfake' ? 'deepfake' : 'stranger'}`)
-      await sendFinalJudgement(face.name === 'deepfake' ? 'deepfake' : 'stranger', face.distance || 1.0)
-    }
-    // 再 stopAll 和跳转
-    if(face.name === 'deepfake') {
-      alert(`⚠️ 警告：检测到DeepFake人脸！`)
+      const finalResult = await sendFinalJudgement(face.name === 'deepfake' ? 'deepfake' : 'stranger', face.distance || 1.0)
+      console.log('后端最终判定返回：', finalResult);
+      const resultType = finalResult.result || (finalResult.data && finalResult.data.result);
+      if (resultType === 'deepfake') {
+        alert(`⚠️ 警告：检测到DeepFake人脸！`)
+        stopAll()
+        router.push('/login')
+        return
+      }
+      if (resultType === 'stranger') {
+        alert('告警：检测到陌生人！')
+        stopAll()
+        router.push('/face_register')
+        return
+      }
+      if (resultType === 'normal') {
+        recognizedName.value = face.name || ''
+        recognitionFinished.value = true
+        stopAll()
+        return
+      }
+      // 兜底：未知类型也不显示欢迎
+      alert('识别失败或未知类型，请重试！')
       stopAll()
-      router.push('/login')
-      return
-    }
-    if (face.name === '陌生人') {
-      alert('告警：检测到陌生人！')
-      stopAll()
-      router.push('/face_register')
       return
     }
   } else if (!alertFrameSent) {
     if (mode.value === 'camera' || mode.value === 'video') {
       console.log(`[DEBUG] 正常情况，发送最终判定: normal`)
-      await sendFinalJudgement('normal')
+      const finalResult = await sendFinalJudgement('normal')
+      console.log('后端最终判定返回：', finalResult);
+      const resultType = finalResult.result || (finalResult.data && finalResult.data.result);
+      if (resultType === 'normal') {
+        recognizedName.value = face.name || ''
+        recognitionFinished.value = true
+        stopAll()
+        return
+      }
+      // 兜底：非 normal 不显示欢迎
+      alert('识别失败或未知类型，请重试！')
+      stopAll()
+      return
     }
   }
   //  if (face.name === '未知人员') {
@@ -347,9 +368,6 @@ async function handleRecognitionResult(face) {
   //   router.push('/face_register')
   //   return
   // }
-  recognizedName.value = face.name || ''
-  recognitionFinished.value = true
-  stopAll()
 }
 
 function sendRecognitionEndSignal() {
@@ -485,11 +503,10 @@ async function sendFinalJudgement(resultType, confidence = 1.0) {
     })
     const result = await response.json()
     console.log(`[DEBUG] 最终判定响应:`, result)
-    if (!result.success) {
-      console.error(`[ERROR] 最终判定失败:`, result.message)
-    }
+    return result;
   } catch (e) {
     console.error('[ERROR] 上传判定结果失败', e)
+    return { result: 'error', success: false };
   }
 }
 
