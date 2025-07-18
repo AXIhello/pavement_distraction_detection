@@ -102,6 +102,7 @@ const videoContainer = ref(null)
 
 let livenessInterval = null // 活体检测定时器
 let alertFrameSent = false;
+let currentVideoEl = null; // 保存当前视频元素，用于截图
 
 function drawFaceBoxes(bboxes) {
   const canvas = overlayCanvas.value
@@ -250,6 +251,8 @@ function onVideoUpload(e) {
   videoEl.crossOrigin = 'anonymous';
   videoEl.currentTime = 0;
   videoEl.play();
+  // 保存视频元素到全局变量，供截图使用
+  currentVideoEl = videoEl;
   videoEl.onloadedmetadata = () => {
     const duration = videoEl.duration;
     const canvas = document.createElement('canvas');
@@ -265,7 +268,7 @@ function onVideoUpload(e) {
     videoEl.onseeked = () => {
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
       const base64Image = canvas.toDataURL('image/jpeg');
-      uploadFrame(base64Image); // 每帧都保存
+      // 移除每帧都保存的逻辑，只在三帧一致时保存
       const currentReqId = requestId++;
       latestReqId = currentReqId;
       socket.emit('face_recognition', {
@@ -279,7 +282,9 @@ function onVideoUpload(e) {
         setTimeout(captureFrame, 100);
       } else {
         progressStatus.value = '视频识别完成，等待结果...';
-        URL.revokeObjectURL(url);
+        // 不要立即清理视频元素，等待识别结果处理完成后再清理
+        // URL.revokeObjectURL(url);
+        // currentVideoEl = null; // 清理视频元素引用
       }
     };
     captureFrame();
@@ -309,6 +314,30 @@ async function uploadFrame(base64Image) {
   }
 }
 
+async function uploadFrameWithFixedIndex(base64Image, fixedIndex) {
+  try {
+    console.log(`[DEBUG] 上传帧 (固定索引): session_id=${sessionId}, frame_index=${fixedIndex}`)
+    const response = await fetch('http://127.0.0.1:8000/api/face/save_frame', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        image: base64Image,
+        frame_index: fixedIndex
+      })
+    })
+    const result = await response.json()
+    console.log(`[DEBUG] 帧上传响应 (固定索引):`, result)
+    if (!result.success) {
+      console.error(`[ERROR] 帧上传失败 (固定索引):`, result.message)
+    }
+    return result; // 返回结果以便调用者处理
+  } catch (e) {
+    console.error('[ERROR] 上传帧失败 (固定索引)', e)
+    return { success: false, message: '上传失败' };
+  }
+}
+
 // 统一处理识别结果
 async function handleRecognitionResult(face) {
   console.log(`[DEBUG] 处理识别结果: mode=${mode.value}, face.name=${face.name}, alertFrameSent=${alertFrameSent}`)
@@ -317,24 +346,56 @@ async function handleRecognitionResult(face) {
     console.log(`[DEBUG] 检测到告警: ${face.name}`)
     // 先截图，确保 video.value 可用
     let base64Image = ''
-    if (video.value && video.value.videoWidth && video.value.videoHeight) {
+    // 根据模式选择正确的视频元素
+    let targetVideo = null;
+    if (mode.value === 'video' && currentVideoEl) {
+      targetVideo = currentVideoEl;
+      console.log(`[DEBUG] 视频模式截图: currentVideoEl存在=${!!currentVideoEl}, videoWidth=${currentVideoEl.videoWidth}, videoHeight=${currentVideoEl.videoHeight}`);
+    } else if (mode.value === 'camera' && video.value && video.value.videoWidth && video.value.videoHeight) {
+      targetVideo = video.value;
+      console.log(`[DEBUG] 摄像头模式截图: video存在=${!!video.value}, videoWidth=${video.value.videoWidth}, videoHeight=${video.value.videoHeight}`);
+    }
+    
+    if (targetVideo && targetVideo.videoWidth > 0 && targetVideo.videoHeight > 0) {
       const canvas = document.createElement('canvas')
-      canvas.width = video.value.videoWidth
-      canvas.height = video.value.videoHeight
+      canvas.width = targetVideo.videoWidth
+      canvas.height = targetVideo.videoHeight
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(video.value, 0, 0, canvas.width, canvas.height)
+      ctx.drawImage(targetVideo, 0, 0, canvas.width, canvas.height)
       base64Image = canvas.toDataURL('image/jpeg')
       console.log(`[DEBUG] 成功截图，图片大小: ${base64Image.length}`)
     } else {
-      console.warn('无法获取摄像头画面，未能保存告警帧')
+      console.warn(`[WARN] 无法获取${mode.value}模式下的视频画面，targetVideo=${!!targetVideo}, videoWidth=${targetVideo?.videoWidth}, videoHeight=${targetVideo?.videoHeight}`)
     }
+    
     // 新增：最终判定，等待后端结束数据库操作后返回结果再决定 UI
     if (mode.value === 'camera' || mode.value === 'video') {
       console.log(`[DEBUG] 准备发送最终判定: ${face.name === 'deepfake' ? 'deepfake' : 'stranger'}`)
+      
+      // 确保先上传图片创建文件夹，再发送最终判定
+      let uploadSuccess = false;
+      if (base64Image) {
+        try {
+          console.log(`[DEBUG] 开始上传告警帧，session_id=${sessionId}`);
+          const uploadResult = await uploadFrameWithFixedIndex(base64Image, 0);
+          console.log('[DEBUG] 告警帧上传结果:', uploadResult);
+          uploadSuccess = true;
+          console.log('[DEBUG] 告警帧上传成功，准备发送最终判定');
+        } catch (error) {
+          console.error('[ERROR] 告警帧上传失败:', error);
+        }
+      } else {
+        console.warn('[WARN] 没有可用的截图，跳过文件夹创建');
+      }
+      
+      // 即使上传失败，也继续发送最终判定，让后端处理
+      console.log(`[DEBUG] 发送最终判定，uploadSuccess=${uploadSuccess}`);
       const finalResult = await sendFinalJudgement(
         face.name === 'deepfake' ? 'deepfake' : 'stranger',
         face.confidence !== undefined ? face.confidence : 1.0
       )
+      console.log('[DEBUG] 最终判定结果:', finalResult);
+      
       if (finalResult.result === 'deepfake') {
         alert(`⚠️ 警告：检测到DeepFake人脸！`)
         stopAll()
@@ -407,8 +468,8 @@ function connectSocket() {
 })
 
 // 新增：处理识别结果（视频和摄像头模式通用）
-socket.on('face_result', (result) => {
-  processRecognitionResult(result);
+socket.on('face_result', async (result) => {
+  await processRecognitionResult(result);
   // 继续采集下一帧（摄像头模式自动采集，视频模式由 onVideoUpload 控制）
   if (!recognitionFinished.value && mode.value === 'camera') {
     setTimeout(() => startImageStream(), WAIT_INTERVAL);
@@ -451,7 +512,7 @@ function startImageStream() {
   isWaitingForResult = true
   progressStatus.value = '识别中...'
   // 新增：每帧都上传
-  uploadFrame(base64Image)
+  //uploadFrame(base64Image)
   socket.emit('face_recognition', { image: base64Image })
 }
 
@@ -466,6 +527,13 @@ function stopAll() {
     socket = null
   }
   if (livenessInterval) clearInterval(livenessInterval)
+  // 清理视频元素引用和URL
+  if (currentVideoEl) {
+    if (currentVideoEl.src && currentVideoEl.src.startsWith('blob:')) {
+      URL.revokeObjectURL(currentVideoEl.src)
+    }
+    currentVideoEl = null
+  }
   isWaitingForResult = false
   lastResults = []
   progress.value = 0
@@ -515,7 +583,7 @@ async function sendFinalJudgement(resultType, confidence = 1.0) {
 }
 
 // 新增：统一三帧一致判定逻辑
-function processRecognitionResult(result) {
+async function processRecognitionResult(result) {
   if (recognitionFinished.value || alertFrameSent) return;
   isWaitingForResult = false;
   const name = result.faces && result.faces[0] ? result.faces[0].name : '未检测到人脸';
@@ -534,6 +602,54 @@ function processRecognitionResult(result) {
   } else if (lastResults.length === 3) {
     if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
       progress.value = 100;
+      // 只在最终三帧一致时截图并上传一帧图片
+      let screenshotSuccess = false;
+      try {
+        // 根据模式选择正确的视频元素
+        let targetVideo = null;
+        if (mode.value === 'video' && currentVideoEl) {
+          targetVideo = currentVideoEl;
+          console.log(`[DEBUG] 视频模式截图: currentVideoEl存在=${!!currentVideoEl}, videoWidth=${currentVideoEl.videoWidth}, videoHeight=${currentVideoEl.videoHeight}`);
+        } else if (mode.value === 'camera' && video.value && video.value.videoWidth && video.value.videoHeight) {
+          targetVideo = video.value;
+          console.log(`[DEBUG] 摄像头模式截图: video存在=${!!video.value}, videoWidth=${video.value.videoWidth}, videoHeight=${video.value.videoHeight}`);
+        }
+        
+        if (targetVideo && targetVideo.videoWidth > 0 && targetVideo.videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetVideo.videoWidth;
+          canvas.height = targetVideo.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(targetVideo, 0, 0, canvas.width, canvas.height);
+          const base64Image = canvas.toDataURL('image/jpeg', 0.7); // 压缩图片质量
+          // 只在这里上传一帧图片，使用固定的frame_index为0
+          await uploadFrameWithFixedIndex(base64Image, 0);
+          screenshotSuccess = true;
+          console.log('[DEBUG] 成功截图并上传，图片大小:', base64Image.length);
+        } else {
+          console.warn(`[WARN] 无法获取${mode.value}模式下的视频画面，targetVideo=${!!targetVideo}, videoWidth=${targetVideo?.videoWidth}, videoHeight=${targetVideo?.videoHeight}`);
+        }
+      } catch (error) {
+        console.error('[ERROR] 截图失败:', error);
+        // 截图失败时的备用方案：使用最后发送的帧图片
+        try {
+          if (result.image) {
+            console.log('[DEBUG] 使用识别结果中的图片作为备用');
+            await uploadFrameWithFixedIndex(result.image, 0);
+            screenshotSuccess = true;
+          } else {
+            console.warn('[WARN] 识别结果中也没有图片数据');
+          }
+        } catch (backupError) {
+          console.error('[ERROR] 备用方案也失败:', backupError);
+        }
+      }
+      
+      if (!screenshotSuccess) {
+        console.warn('[WARN] 截图和备用方案都失败，继续处理识别结果');
+        // 即使截图失败，也要继续处理识别结果，不影响用户体验
+      }
+      
       // 只在最终三帧一致时调用handleRecognitionResult
       handleRecognitionResult(result.faces[0]);
       // 不要在这里提前设置 recognitionFinished/stopAll

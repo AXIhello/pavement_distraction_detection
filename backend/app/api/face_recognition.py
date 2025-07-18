@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import hashlib
 from flask import jsonify
+import os
 
 
 # 获取日志器
@@ -274,19 +275,26 @@ class FaceAlertJudgement(Resource):
                 # 告警情况，写入数据库
                 logger.info(f"[DEBUG] 告警情况，检查文件夹是否存在: {folder_path}")
                 if not os.path.exists(folder_path):
-                    logger.error(f"[ERROR] 文件夹不存在: {folder_path}")
-                    return {'success': False, 'message': f'文件夹不存在: {folder_path}', 'result': result}, 44
+                    logger.warning(f"[WARN] 文件夹不存在，尝试创建: {folder_path}")
+                    try:
+                        # 自动创建文件夹
+                        save_dir = Path(folder_path)
+                        save_dir.mkdir(parents=True, exist_ok=True)
+                        logger.info(f"[DEBUG] 成功创建文件夹: {folder_path}")
+                    except Exception as create_error:
+                        logger.error(f"[ERROR] 创建文件夹失败: {create_error}")
+                        return {'success': False, 'message': f'创建文件夹失败: {str(create_error)}', 'result': result}, 500
+                
                 # 写入前查重，确保每个 session_id 只写一条
                 exist = FaceAlertFrame.query.filter_by(image_path=folder_path).first()
                 if exist:
                     logger.info(f"视频/摄像头告警已存在，不重复写入: session_id={session_id}")
                     return {'success': True, 'message': '该告警已存在，不重复写入', 'result': result}
                 logger.info(f"[DEBUG] 创建告警记录: image_path={folder_path}, alert_type={result}, confidence={confidence}")
-                alert_frame = FaceAlertFrame(
-                    image_path=folder_path,
-                    alert_type=result,
-                    confidence=confidence
-                )
+                alert_frame = FaceAlertFrame()
+                alert_frame.image_path = folder_path
+                alert_frame.alert_type = result
+                alert_frame.confidence = confidence
                 db.session.add(alert_frame)
                 db.session.commit()
                 logger.info(f"视频/摄像头告警已记录: session_id={session_id}, type={result}, confidence={confidence}")
