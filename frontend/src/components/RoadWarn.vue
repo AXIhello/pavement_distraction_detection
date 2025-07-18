@@ -252,7 +252,7 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   color: #1f2937;
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   margin: 0;
 }

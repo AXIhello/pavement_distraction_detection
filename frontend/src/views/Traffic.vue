@@ -142,7 +142,7 @@
             </form>
             <EchartsTable ref="flowChartRef" />
           </div>
-          
+
           <div v-else-if="activeAnalysis === 'speed'">
             <form @submit.prevent="onQueryRoadSpeed">
               <div class="form-group">
@@ -152,7 +152,7 @@
               <button type="submit">查询道路速度</button>
             </form>
             <div class="info-text">
-              <p style="color: #2C3E50;">💡 提示：查询后地图上将显示道路线条，颜色表示速度：<span style="color: #00ff00;">绿色(快速)</span> | <span style="color: #ffff00;">黄色(中等)</span> | <span style="color: #ff0000;">红色(慢速)</span></p>
+              <p style="color: #2C3E50;">💡 提示：查询后地图上将显示道路线条，颜色表示速度：<span style="color: #00cc00;">深绿色(快速)</span> | <span style="color: #CCCC00;">黄色(中等)</span> | <span style="color: #cc0000;">深红色(慢速)</span></p>
             </div>
           </div>
           <div v-else-if="activeAnalysis === 'heatmap'">
@@ -222,9 +222,9 @@
               <div class="form-group">
                 <label>时间间隔：</label>
                 <select v-model="weatherInterval" required>
-                  <option value="15">15分钟</option>
-                  <option value="30">30分钟</option>
                   <option value="60">1小时</option>
+                  <option value="120">2小时</option>
+                  <option value="180">3小时</option>
                   <option value="240">4小时</option>
                   <option value="1440">1天</option>
                 </select>
@@ -505,17 +505,17 @@ async function onQueryFlow() {
       end_time: flowEndTime.value,
       interval: flowInterval.value
     })
-    
+
     const response = await fetch(`/api/traffic_analysis/flow/?${params.toString()}`)
     const result = await response.json()
-    
+
     if (result.time_slots && flowChartRef.value) {
       const option = {
-        title: { 
+        title: {
           text: '客流量分析',
           subtext: `时间间隔: ${flowInterval.value}分钟`
         },
-        tooltip: { 
+        tooltip: {
           trigger: 'axis',
           formatter: function(params) {
             return `${params[0].axisValue}<br/>订单数量: ${params[0].value}`
@@ -525,8 +525,8 @@ async function onQueryFlow() {
           type: 'category',
           data: result.time_slots.map(slot => slot.start_time.slice(11, 16)) // 只显示时:分
         },
-        yAxis: { 
-          type: 'value', 
+        yAxis: {
+          type: 'value',
           name: '订单数量',
           minInterval: 1
         },
@@ -534,7 +534,7 @@ async function onQueryFlow() {
           name: '订单数量',
           type: 'line',
           data: result.time_slots.map(slot => slot.order_count),
-          itemStyle: { 
+          itemStyle: {
             color: '#5470c6',
             borderColor: '#ffffff',
             borderWidth: 2,
@@ -546,7 +546,7 @@ async function onQueryFlow() {
           smooth: true
         }]
       }
-      
+
       flowChartRef.value.setChartData(option)
       console.log('客流量图表已更新:', option)
     } else {
@@ -580,10 +580,10 @@ async function onQueryBusCount() {
       const endTime = endDate.toTimeString().slice(0, 5) // 获取时:分
       return `${startTime}-${endTime}`
     })
-    
+
     const option = {
       title: { text: '载客车数量-时段折线图' },
-      tooltip: { 
+      tooltip: {
         trigger: 'axis',
         formatter: function(params) {
           return `${params[0].axisValue}<br/>载客车数量: ${params[0].value}`
@@ -623,14 +623,14 @@ async function onQueryWeatherFlow() {
       end_time: weatherEndTime.value,
       interval: weatherInterval.value
     })
-    
+
     const response = await fetch(`/api/traffic_analysis/weather_flow/?${params.toString()}`)
     const result = await response.json()
-    
+
     if (result.data && weatherChartRef.value) {
       // 构建多轴折线图配置，显示更多天气信息
       const option = {
-        title: { 
+        title: {
           text: '客流与天气关系图',
           subtext: `时间范围: ${result.start_time?.slice(11, 16)} - ${result.end_time?.slice(11, 16)}`
         },
@@ -665,7 +665,7 @@ async function onQueryWeatherFlow() {
         },
         xAxis: {
           type: 'category',
-          data: result.data.map(item => item.hour),
+          data: result.data.map(item => item.time),
           axisLabel: {
             rotate: 35,
             interval: 0
@@ -711,7 +711,7 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 0,
             data: result.data.map(item => item.passenger_flow),
             lineStyle: { width: 3 },
-            itemStyle: { 
+            itemStyle: {
               color: '#5470c6',
               borderColor: '#ffffff',
               borderWidth: 2,
@@ -727,7 +727,7 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 1,
             data: result.data.map(item => item.weather.temperature),
             lineStyle: { color: '#ff6b6b', width: 2 },
-            itemStyle: { 
+            itemStyle: {
               color: '#ff6b6b',
               borderColor: '#ffffff',
               borderWidth: 2,
@@ -743,7 +743,7 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 2,
             data: result.data.map(item => item.weather.humidity),
             lineStyle: { color: '#91cc75', width: 2 },
-            itemStyle: { 
+            itemStyle: {
               color: '#91cc75',
               borderColor: '#ffffff',
               borderWidth: 2,
@@ -759,7 +759,7 @@ async function onQueryWeatherFlow() {
             yAxisIndex: 3,
             data: result.data.map(item => item.weather.wind_speed),
             lineStyle: { color: '#fac858', width: 2 },
-            itemStyle: { 
+            itemStyle: {
               color: '#fac858',
               borderColor: '#ffffff',
               borderWidth: 2,
@@ -774,7 +774,7 @@ async function onQueryWeatherFlow() {
             type: 'bar',
             yAxisIndex: 0,
             data: result.data.map(item => item.weather.precip),
-            itemStyle: { 
+            itemStyle: {
               color: '#73c0de',
               opacity: 0.6
             },
@@ -782,7 +782,7 @@ async function onQueryWeatherFlow() {
           }
         ]
       }
-      
+
       weatherChartRef.value.setChartData(option)
       console.log('天气客流图表已更新:', option)
     } else {
@@ -859,7 +859,7 @@ async function onQueryOrderDistribution() {
           }
         ]
       }
-      
+
       orderChartRef.value.setChartData(option)
       console.log('订单占比图表已更新:', option)
     } else {
@@ -887,11 +887,11 @@ async function onQueryOrderStats() {
       // 构建3D散点图数据
       const scatterData = []
       const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4']
-      
+
       result.time_slots.forEach((slot, slotIndex) => {
         const timeLabel = slot.start_time.slice(11, 16) // 获取时:分作为Z轴标签
         const color = colors[slotIndex % colors.length]
-        
+
         // 处理每个时段内的订单数据
         if (slot.orders && slot.orders.length > 0) {
           // 如果有详细的订单数据，使用实际数据
@@ -915,7 +915,7 @@ async function onQueryOrderStats() {
       })
 
       const option = {
-        title: { 
+        title: {
           text: '订单耗时-距离3D散点图',
           subtext: `时间范围: ${result.start_time?.slice(11, 16)} - ${result.end_time?.slice(11, 16)}`
         },
@@ -953,7 +953,7 @@ async function onQueryOrderStats() {
           }
         },
         yAxis3D: {
-          type: 'value', 
+          type: 'value',
           name: '距离(公里)',
           nameTextStyle: {
             color: '#333'
@@ -991,7 +991,7 @@ async function onQueryOrderStats() {
           }
         ]
       }
-      
+
       console.log('3D散点图数据:', scatterData)
       console.log('3D散点图配置:', option)
       statChartRef.value.setChartData(option)
@@ -1007,9 +1007,9 @@ async function onQueryOrderStats() {
 
 function getCategoryColor(category) {
   const colors = {
-    'short': '#87CEEB',   // 浅蓝 - 短途
-    'medium': '#90EE90',  // 浅绿 - 中途
-    'long': '#FFB6C1'     // 粉红 - 长途
+    'short': '#588b71',   // 浅蓝 - 短途
+    'medium': '#eae2cf',  // 浅绿 - 中途
+    'long': '#d24f6b'     // 粉红 - 长途
   }
   return colors[category] || '#87CEEB'
 }
@@ -1018,14 +1018,14 @@ function calculateOptimalInterval(startTime, endTime) {
   const start = new Date(startTime);
   const end = new Date(endTime);
   const diffHours = (end - start) / (1000 * 60 * 60);
-  
-  if (diffHours <= 3) return '15';      
-  if (diffHours <= 6) return '30'; 
+
+  if (diffHours <= 3) return '15';
+  if (diffHours <= 6) return '30';
   if (diffHours <= 12) return '60';
   if (diffHours <= 18) return '90';
   if (diffHours <= 24) return '120';
-  if (diffHours <= 168) return '240';   
-  return '1440';                        
+  if (diffHours <= 168) return '240';
+  return '1440';
 }
 
 function onClearMapOverlays() {

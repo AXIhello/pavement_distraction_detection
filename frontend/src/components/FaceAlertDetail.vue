@@ -49,7 +49,7 @@ const emit = defineEmits(['back'])
 const isAdmin = ref(false)
 onMounted(() => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-  isAdmin.value = userInfo.role === 'admin'  // 根据你的用户结构调整
+  isAdmin.value = userInfo.role === 'admin'  
 })
 
 function getFrameImageUrl(imagePath) {

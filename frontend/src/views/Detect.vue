@@ -2,8 +2,14 @@
   <Header2 ref="headerRef" />
   <div class="detect-container" :style="{ paddingTop: headerHeight + 'px' }">
     <div class="page-header">
+      
       <h2 class="page-title">
-        上传并分析路障
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4l-2-7z"/>
+          <path d="M15 11h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4l2-7z"/>
+          <path d="M12 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+        </svg>
+        上传并分析路面灾害
       </h2>
     </div>
 
