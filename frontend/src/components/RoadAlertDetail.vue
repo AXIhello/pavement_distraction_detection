@@ -101,7 +101,7 @@ async function confirmDeleteVideo() {
     if (res.status === 200 || res.status === 204 || res.data?.success) {
       alert('删除成功')
       stopAutoPlay()
-      emit('back')  // ✅仍保留
+      emit('back')  // 仍保留
     } else {
       alert('删除失败：' + (res.data?.message || '状态异常'))
     }
@@ -129,7 +129,6 @@ function getFrameImageUrl(frame) {
 const props = defineProps({
   detail: Object
 })
-// defineEmits(['back'])
 
 const isAutoPlaying = ref(true)
 
@@ -179,7 +178,7 @@ const diseaseTypeCount = computed(() => {
 })
 
 watch(() => props.detail?.frames, () => {
-  if (isDeleting.value) return // ❗跳过删除中带来的 watch 变化
+  if (isDeleting.value) return // 跳过删除中带来的 watch 变化
   currentFrameIndex.value = 0
   resetAutoPlay()
 })
@@ -200,20 +199,6 @@ function nextFrame() {
   resetAutoPlay()
 }
 
-// function startAutoPlay() {
-//   if (autoPlayTimer) return
-//   autoPlayTimer = setInterval(() => {
-//     nextFrame()
-//   }, 3000) // 3秒切换一帧
-// }
-
-// function resetAutoPlay() {
-//   if (autoPlayTimer) {
-//     clearInterval(autoPlayTimer)
-//     autoPlayTimer = null
-//   }
-//   startAutoPlay()
-// }
 
 onMounted(() => {
   startAutoPlay()

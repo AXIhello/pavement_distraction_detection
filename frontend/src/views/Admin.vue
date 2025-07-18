@@ -526,7 +526,7 @@ async function deleteFace(faceId) {
 
 <style>
 #admin {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:  -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   min-height: 100vh;
 }
 
@@ -561,6 +561,7 @@ async function deleteFace(faceId) {
   font-size: 28px;
   font-weight: 700;
   margin: 0;
+   margin-top: 20px;
 }
 
 .user-count {

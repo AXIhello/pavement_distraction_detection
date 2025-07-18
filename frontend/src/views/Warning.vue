@@ -39,7 +39,7 @@ Navigation {
   margin: auto;
   padding-left: 1rem;
   padding-right: 1rem;
-  padding-top: 120px; /* 避免导航栏遮挡 */
+  padding-top: 100px; /* 避免导航栏遮挡 */
 
   display: flex;
   flex-direction: column;   /* 改成纵向排列 */
