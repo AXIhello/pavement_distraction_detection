@@ -8,7 +8,7 @@
   <div class="detail-info-wrapper">
     <div class="detail-info">
       <p><strong>视频ID：</strong>{{ detail.id }}</p>
-      <p><strong>告警帧数：</strong>{{ alertFrameCount }}</p>
+      <p><strong>告警次数：</strong>{{ alertFrameCount }}</p>
       <p>
         <strong>类别统计：</strong> 
         <span v-for="(count, type) in diseaseTypeCount" :key="type" class="disease-type-tag">
@@ -42,11 +42,12 @@
     <h3>帧详细信息</h3>
     <p><strong>类型：</strong>{{ detail.frames[currentFrameIndex].disease_type || '未知' }}</p>
     <p><strong>置信度：</strong>{{ (detail.frames[currentFrameIndex].confidence * 100).toFixed(1) }}%</p>
+    <p><strong>告警出现帧：</strong>{{ detail.frames[currentFrameIndex].frame_index }}</p>
 
     <!-- 新增：帧索引与自动播放控制 -->
     <div class="frame-control">
       <p class="frame-index">
-        当前帧：{{ currentFrameIndex + 1 }} / {{ detail.frames.length }}
+        当前告警：{{ currentFrameIndex + 1 }} / {{ detail.frames.length }}
       </p>
       <button class="autoplay-toggle-btn" @click="toggleAutoPlay">
         {{ isAutoPlaying ? '暂停轮播' : '开始轮播' }}
