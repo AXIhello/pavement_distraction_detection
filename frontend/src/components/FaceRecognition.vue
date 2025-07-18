@@ -534,11 +534,9 @@ function processRecognitionResult(result) {
   } else if (lastResults.length === 3) {
     if (lastResults[0] === lastResults[1] && lastResults[1] === lastResults[2] && lastResults[0] !== '未检测到人脸') {
       progress.value = 100;
-      // 传递当前帧的完整face对象（含confidence）
       // 只在最终三帧一致时调用handleRecognitionResult
       handleRecognitionResult(result.faces[0]);
-      recognitionFinished.value = true;
-      stopAll();
+      // 不要在这里提前设置 recognitionFinished/stopAll
       return;
     } else {
       progress.value = 0;
