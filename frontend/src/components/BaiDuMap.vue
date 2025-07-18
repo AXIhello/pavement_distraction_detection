@@ -1,6 +1,6 @@
 <template>
   <div id="mapContainer"></div>
-  
+
   <!-- 动态热力图控制面板 -->
   <div v-if="showDynamicControls" class="dynamic-heatmap-controls">
     <div class="control-panel">
@@ -24,7 +24,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, defineExpose } from 'vue'
 
-const BMAP_AK = '20FcUoEvheMHZMHXkCOdDIh5kEFm8gOo'
+const BMAP_AK = '08cA2cvSV7s3cXQvcKEoyp23ssubn8np'
 let map = null
 let view = null
 let pointLayer = null
@@ -58,14 +58,21 @@ const currentTimeSlot = ref('')
 const isAutoPlaying = ref(false)
 const autoPlayInterval = ref(null)
 
+// 地图样式状态记录
+let currentMapStyle = 'normal' // 记录当前地图样式：'normal' | 'light'
+
 // 清空地图覆盖物的方法
 function clearMapOverlays() {
   console.log('🗑️ 正在清除地图覆盖物')
 
   if (map) {
     map.clearOverlays()
-    // 恢复默认地图样式
-    setMapStyle('normal');
+    // 只有在当前不是默认样式时才恢复默认地图样式
+    if (currentMapStyle !== 'normal') {
+      setMapStyle('normal');
+    } else {
+      console.log('🔄 地图已经是默认样式，跳过样式设置');
+    }
   }
 
   if (view) {
@@ -77,7 +84,7 @@ function clearMapOverlays() {
   pointLayer = null
   heatmapLayer = null
   roadSpeedLayer = null
-  
+
   // 清除道路速度覆盖物
   roadSpeedOverlays.forEach(overlay => {
     if (map && map.removeOverlay) {
@@ -85,20 +92,20 @@ function clearMapOverlays() {
     }
   })
   roadSpeedOverlays = []
-  
+
   removeDistrictBoundaries() // 清空地图时也同步清空区县边界
 }
 
 // 专门用于清空热力图的方法，保持地图样式不变
 function clearHeatmapOnly() {
   console.log('🔥 正在清除热力图数据，保持地图样式')
-  
+
   if (view && heatmapLayer) {
     console.log('🔥 移除热力图图层')
     view.removeLayer(heatmapLayer)
     console.log('🔥 热力图图层移除完毕')
   }
-  
+
   heatmapLayer = null
 }
 
@@ -155,7 +162,7 @@ function showHeatmap(data) {
     alert('mapvgl 脚本或视图尚未加载完成，请稍后再试！');
     return;
   }
-  
+
   // 如果是动态热力图模式，只清空热力图数据，保持地图样式
   if (showDynamicControls.value) {
     clearHeatmapOnly();
@@ -163,15 +170,15 @@ function showHeatmap(data) {
     // 非动态热力图模式，清空所有覆盖物
     clearMapOverlays();
   }
-  
+
   if (!data || !data.length) return;
-  
+
   // 构造热力图数据
   const points = data.map(item => ({
     geometry: { type: 'Point', coordinates: [item.lng, item.lat] },
     count: item.count || 30 // 使用数据中的count值，默认为30
   }));
-  
+
   heatmapLayer = new window.mapvgl.HeatmapLayer({
     size: 60,
     max: 100,
@@ -193,14 +200,14 @@ function showDynamicHeatmap(data) {
     alert('动态热力图数据格式错误或为空！');
     return;
   }
-  
+
   // 确保地图样式为浅色
   setMapStyle('light');
-  
+
   // 处理数据，每个时段只显示起始时间作为标识
   const processedTimeSlots = data.timeSlots.map((slot, index) => {
     const startTime = new Date(slot.startTime);
-    
+
     return {
       timeSlot: `时段 ${index + 1} (${startTime.toLocaleString('zh-CN', {
         month: '2-digit',
@@ -212,21 +219,21 @@ function showDynamicHeatmap(data) {
       points: slot.points || []
     };
   });
-  
+
   timeSlotsData.value = processedTimeSlots;
   currentIndex.value = 0;
   showDynamicControls.value = true;
-  
+
   // 显示第一个时段的数据
   updateCurrentTimeSlot();
 }
 
 function updateCurrentTimeSlot() {
   if (timeSlotsData.value.length === 0) return;
-  
+
   const currentSlot = timeSlotsData.value[currentIndex.value];
   currentTimeSlot.value = currentSlot.timeSlot;
-  
+
   // 直接调用 showHeatmap 方法，传入当前时段的数据
   showHeatmap(currentSlot.points || []);
 }
@@ -271,7 +278,7 @@ function closeDynamicControls() {
 
 function startAutoPlay() {
   if (isAutoPlaying.value) return;
-  
+
   isAutoPlaying.value = true;
   autoPlayInterval.value = setInterval(() => {
     if (currentIndex.value < timeSlotsData.value.length - 1) {
@@ -293,20 +300,28 @@ function stopAutoPlay() {
 
 // 根据速度获取颜色
 function getSpeedColor(speed) {
-  if (speed >= 60) return '#00ff00' // 绿色 - 快速
-  if (speed >= 30) return '#ffff00' // 黄色 - 中等
-  return '#ff0000' // 红色 - 慢速
+  if (speed >= 60) return '#00cc00' // 深绿色 - 快速
+  if (speed >= 30) return '#CCCC00' // 橙色 - 中等
+  return '#cc0000' // 深红色 - 慢速
 }
 
 // 设置地图样式的方法
 function setMapStyle(style) {
+  // 如果样式相同，则不重复设置
+  if (currentMapStyle === style) {
+    console.log(`🔄 地图样式已经是 ${style}，跳过重复设置`);
+    return;
+  }
+
   try {
     if (typeof map.setMapStyleV2 === 'function') {
       if (style === 'light') {
         map.setMapStyleV2({ styleId: 'f6283d269df3e47a16dd34611de7ece2' });
+        currentMapStyle = 'light';
         console.log('✅ 使用 setMapStyleV2切换为浅色样式');
       } else if (style === 'normal') {
         map.setMapStyleV2({ styleId: 'default' });
+        currentMapStyle = 'normal';
         console.log('✅ 使用 setMapStyleV2 恢复默认样式');
       }
     } else {
@@ -320,41 +335,41 @@ function setMapStyle(style) {
 // 显示道路速度
 function showRoadSpeed(data) {
   console.log('🚗 showRoadSpeed 被调用', data);
-  
+
   if (!map) {
     alert('地图尚未加载完成，请稍后再试！');
     return;
   }
-  
+
   // 清空之前的道路速度覆盖物
   roadSpeedOverlays.forEach(overlay => {
     map.removeOverlay(overlay);
   });
   roadSpeedOverlays = [];
-  
+
   if (!data || !data.roads || !data.roads.length) {
     console.log('没有道路速度数据');
     return;
   }
-  
+
   // 计算所有道路的边界，用于调整地图视野
   let minLat = Infinity, maxLat = -Infinity;
   let minLng = Infinity, maxLng = -Infinity;
-  
+
   data.roads.forEach(road => {
     minLat = Math.min(minLat, road.start_lat, road.end_lat);
     maxLat = Math.max(maxLat, road.start_lat, road.end_lat);
     minLng = Math.min(minLng, road.start_lng, road.end_lng);
     maxLng = Math.max(maxLng, road.start_lng, road.end_lng);
   });
-  
+
   // 调整地图视野以显示所有道路
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
   const latDiff = maxLat - minLat;
   const lngDiff = maxLng - minLng;
   const maxDiff = Math.max(latDiff, lngDiff);
-  
+
   // 根据道路分布计算合适的缩放级别
   let zoom = 13;
   if (maxDiff > 0.1) zoom = 10;
@@ -362,16 +377,16 @@ function showRoadSpeed(data) {
   else if (maxDiff > 0.02) zoom = 12;
   else if (maxDiff > 0.01) zoom = 13;
   else zoom = 14;
-  
+
   map.centerAndZoom(new window.BMapGL.Point(centerLng, centerLat), zoom);
-  
+
   // 为每条道路创建线条和信息窗口
   data.roads.forEach((road, index) => {
     const startPoint = new window.BMapGL.Point(road.start_lng, road.start_lat);
     const endPoint = new window.BMapGL.Point(road.end_lng, road.end_lat);
-    
+
     console.log(`绘制道路 ${index + 1}: 从 (${road.start_lat}, ${road.start_lng}) 到 (${road.end_lat}, ${road.end_lng}), 速度: ${road.speed} km/h`);
-    
+
     // 创建道路线条
     const polyline = new window.BMapGL.Polyline([startPoint, endPoint], {
       strokeColor: getSpeedColor(road.speed),
@@ -379,11 +394,11 @@ function showRoadSpeed(data) {
       strokeOpacity: 0.8,
       strokeStyle: 'solid'
     });
-    
+
     // 添加流动动画效果
     const dashArray = [20, 10]; // 虚线样式
     polyline.setStrokeStyle(dashArray);
-    
+
     // 创建信息窗口
     const infoWindow = new window.BMapGL.InfoWindow(
       `<div style="padding: 10px;">
@@ -400,74 +415,74 @@ function showRoadSpeed(data) {
         title: '道路速度详情'
       }
     );
-    
+
     // 鼠标悬停事件
     polyline.addEventListener('mouseover', function(e) {
       const point = e.latLng || e.latlng || e.point;
       map.openInfoWindow(infoWindow, point);
-      
+
       // 悬停时线条变粗
       polyline.setStrokeWeight(10);
     });
-    
+
     // 鼠标移出事件
     polyline.addEventListener('mouseout', function() {
       map.closeInfoWindow();
       polyline.setStrokeWeight(6);
     });
-    
+
     // 点击事件
     polyline.addEventListener('click', function(e) {
       const point = e.latLng || e.latlng || e.point;
       map.openInfoWindow(infoWindow, point);
     });
-    
+
     // 添加到地图
     map.addOverlay(polyline);
     roadSpeedOverlays.push(polyline);
   });
-  
+
   console.log(`已显示 ${data.roads.length} 条道路的速度信息，地图中心: (${centerLat}, ${centerLng}), 缩放级别: ${zoom}`);
 }
 
 // 显示车辆轨迹
 function showVehicleTrack(data) {
   console.log('🚗 showVehicleTrack 被调用', data);
-  
+
   if (!map) {
     alert('地图尚未加载完成，请稍后再试！');
     return;
   }
-  
+
   // 清空之前的车辆轨迹覆盖物
   roadSpeedOverlays.forEach(overlay => {
     map.removeOverlay(overlay);
   });
   roadSpeedOverlays = [];
-  
+
   if (!data || !data.length) {
     console.log('没有车辆轨迹数据');
     return;
   }
-  
+
   // 按时间排序数据点
   const sortedData = data.sort((a, b) => {
     const timeA = new Date(a.timestamp || a.time || a.datetime);
     const timeB = new Date(b.timestamp || b.time || b.datetime);
     return timeA - timeB;
   });
-  
+
   console.log('排序后的车辆轨迹数据:', sortedData);
   console.log('排序后轨迹点数量:', sortedData.length);
-  
+
   // 去除重复的经纬度点
   const uniqueData = [];
   const seenCoordinates = new Set();
-  
+
   sortedData.forEach((point, index) => {
     const timeField = point.timestamp || point.time || point.datetime;
     const coordinateKey = `${point.lat.toFixed(6)},${point.lng.toFixed(6)}`;
-    
+
     if (!seenCoordinates.has(coordinateKey)) {
       seenCoordinates.add(coordinateKey);
       uniqueData.push(point);
@@ -476,15 +491,15 @@ function showVehicleTrack(data) {
       console.log(`跳过重复轨迹点 ${index + 1}: 位置=(${point.lat}, ${point.lng})`);
     }
   });
-  
+
   console.log('去重后轨迹点数量:', uniqueData.length);
   console.log('去重后车辆轨迹数据:', uniqueData);
-  
+
   // 创建轨迹线条的点数组
-  const trackPoints = uniqueData.map(point => 
+  const trackPoints = uniqueData.map(point =>
     new window.BMapGL.Point(point.lng, point.lat)
   );
-  
+
   // 创建轨迹线条
   const polyline = new window.BMapGL.Polyline(trackPoints, {
     strokeColor: '#ff0000',  // 红色轨迹线
@@ -492,26 +507,26 @@ function showVehicleTrack(data) {
     strokeOpacity: 0.8,
     strokeStyle: 'solid'
   });
-  
+
   // 添加流动动画效果
   const dashArray = [15, 8]; // 虚线样式
   polyline.setStrokeStyle(dashArray);
-  
+
   // 添加到地图
   map.addOverlay(polyline);
   roadSpeedOverlays.push(polyline);
-  
+
   // 为每个轨迹点创建标记和信息窗口
   uniqueData.forEach((point, index) => {
     console.log(`创建轨迹点 ${index + 1}: 位置=(${point.lat}, ${point.lng})`);
-    
+
     const pointObj = new window.BMapGL.Point(point.lng, point.lat);
-    
+
     // 创建标记点 - 简化版本，避免标签设置问题
     const marker = new window.BMapGL.Marker(pointObj, {
       icon: new window.BMapGL.Icon('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iNiIgZmlsbD0iIzAwZmYwMCIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+', new window.BMapGL.Size(24, 24))
     });
-    
+
     // 创建信息窗口
     const infoWindow = new window.BMapGL.InfoWindow(
       `<div style="padding: 10px;">
@@ -527,29 +542,29 @@ function showVehicleTrack(data) {
         title: `车辆轨迹 - 第${index + 1}个轨迹点`
       }
     );
-    
+
     // 鼠标悬停事件
     marker.addEventListener('mouseover', function(e) {
       const point = e.latLng || e.latlng || e.point;
       map.openInfoWindow(infoWindow, point);
     });
-    
+
     // 鼠标移出事件
     marker.addEventListener('mouseout', function() {
       map.closeInfoWindow();
     });
-    
+
     // 点击事件
     marker.addEventListener('click', function(e) {
       const point = e.latLng || e.latlng || e.point;
       map.openInfoWindow(infoWindow, point);
     });
-    
+
     // 添加到地图
     map.addOverlay(marker);
     roadSpeedOverlays.push(marker);
   });
-  
+
   console.log(`已显示车辆轨迹，共 ${uniqueData.length} 个轨迹点`);
 }
 
@@ -567,44 +582,44 @@ function togglePopulation() {
 
 function drawDistrictBoundaries() {
   console.log('drawDistrictBoundaries 被调用')
-  
+
   // 先清空之前的区县边界
   removeDistrictBoundaries();
-  
+
   // 不调整地图中心和缩放等级，保持用户当前的地图视野
   console.log('保持当前地图视野，不调整中心点和缩放等级');
-  
+
   const boundary = new window.BMapGL.Boundary();
   let processedCount = 0;
   const totalDistricts = Object.keys(districtPopulation).length;
-  
+
   // 使用固定的区县顺序，确保每次显示一致
   const districtNames = [
-    '历下区', '市中区', '槐荫区', '天桥区', '历城区', 
+    '历下区', '市中区', '槐荫区', '天桥区', '历城区',
     '长清区', '平阴县', '济阳县', '商河县', '章丘市'
   ];
-  
+
   districtNames.forEach(districtName => {
     boundary.get('济南市' + districtName, function(rs){
       console.log(`获取 ${districtName} 边界数据:`, rs);
       processedCount++;
-      
+
       if (rs.boundaries && rs.boundaries.length) {
         rs.boundaries.forEach(boundaryStr => {
           const points = boundaryStr.split(';').map(item => {
             const [lng, lat] = item.split(',').map(Number);
             return new window.BMapGL.Point(lng, lat);
           });
-          
+
           // 创建区县边界多边形
           const polygon = new window.BMapGL.Polygon(points, {
-            strokeColor: "#0066cc", 
-            strokeWeight: 3, 
-            strokeOpacity: 0.8, 
+            strokeColor: "#0066cc",
+            strokeWeight: 3,
+            strokeOpacity: 0.8,
             fillColor: "#0066cc",
             fillOpacity: 0.1
           });
-          
+
           map.addOverlay(polygon);
           districtPolygons.push(polygon);
 
@@ -618,7 +633,7 @@ function drawDistrictBoundaries() {
                   <p style="margin: 0; color: #0066cc; font-weight: bold; font-size: 16px;">
                     人口：${districtPopulation[districtName]}万
                   </p>
-                </div>`, 
+                </div>`,
                 {
                   width: 150,
                   height: 80,
@@ -628,12 +643,12 @@ function drawDistrictBoundaries() {
               map.openInfoWindow(info, pt);
             }
           });
-          
+
           // 鼠标移出时关闭
           polygon.addEventListener('mouseout', function(){
             map.closeInfoWindow();
           });
-          
+
           // 点击时也显示信息
           polygon.addEventListener('click', function(e){
             if (showPopulation.value) {
@@ -644,7 +659,7 @@ function drawDistrictBoundaries() {
                   <p style="margin: 0; color: #0066cc; font-weight: bold; font-size: 16px;">
                     人口：${districtPopulation[districtName]}万
                   </p>
-                </div>`, 
+                </div>`,
                 {
                   width: 150,
                   height: 80,
@@ -655,12 +670,12 @@ function drawDistrictBoundaries() {
             }
           });
         });
-        
+
         console.log(`✅ ${districtName} 边界已绘制`);
       } else {
         console.warn(`⚠️ ${districtName} 未获取到边界数据`);
       }
-      
+
       // 当所有区县都处理完成后的日志
       if (processedCount === totalDistricts) {
         console.log(`所有区县边界绘制完成，共绘制了 ${districtPolygons.length} 个区县边界`);
@@ -701,6 +716,7 @@ defineExpose({
   closeDynamicControls,
   startAutoPlay,
   stopAutoPlay,
+  getCurrentMapStyle: () => currentMapStyle,
 })
 
 onMounted(async () => {
@@ -709,7 +725,7 @@ onMounted(async () => {
     map = new window.BMapGL.Map('mapContainer')
     map.centerAndZoom(new window.BMapGL.Point(116.994917, 36.66123), 13)
     map.enableScrollWheelZoom(true)
-    
+
     await loadMapVGL()
     view = new window.mapvgl.View({ map })
 
